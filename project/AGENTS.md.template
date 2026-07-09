@@ -1,0 +1,50 @@
+# <PROJECT NAME> — Agent Guide
+
+<One paragraph: what the app is, main stack, how it's orchestrated.>
+This file is the source of truth for AI coding agents (Claude Code, Codex, etc.). Keep it updated when commands or conventions change.
+
+## Architecture
+
+<Table or bullet list: each project/package/folder and its role. State the dependency
+direction explicitly if layered ("dependencies point inward: X → Y → Z; never reference outward").
+Name anything agents must NOT touch (legacy folders, generated code, key material).>
+
+## Commands
+
+```bash
+# Run everything locally
+<command>
+
+# Build & test (use the exact same filter/flags CI uses)
+<commands>
+
+# Format — CI fails on violations, so run before finishing any change
+<commands>
+```
+
+<Note any package-management rules: lock files, central versions, how to add a dependency correctly.>
+
+## Database & migrations  <!-- delete section if no DB -->
+
+<Migration tool, exact create/apply commands, where migrations live.
+Rules: always inspect generated migrations before applying; never edit an applied migration.>
+
+## Secrets & security (non-negotiable)
+
+- Secrets come from <.env / user-secrets / vault>. **Never** read, print, or commit them; never hardcode a secret in code, tests, or docs.
+- <List secret-holding paths agents must never touch.>
+- Every new endpoint needs: an explicit authorization decision, validation on all input, and error responses that leak no internals.
+- All data access parameterized — no string-interpolated SQL, ever.
+
+## Definition of done — every change, before you call it finished
+
+1. Build clean — zero *new* warnings introduced.
+2. Tests all green (same command as CI). New behavior has new tests.
+3. Format check clean (same commands as CI).
+4. New/changed endpoints pass the security checklist (see `.claude/skills/security-checklist/`).
+5. Work on a feature branch, never directly on `main`. Small, reviewable commits.
+
+## Conventions
+
+<Naming, patterns to copy ("look at a neighboring feature first and match its shape"),
+linting philosophy, anything the team decided that code alone doesn't show.>

@@ -1,0 +1,21 @@
+#!/bin/bash
+# Pre-commit: scan staged changes for secrets with gitleaks.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Install the scanner:    brew install gitleaks
+# NOTE: requires gitleaks >= 8.19 (`gitleaks git` subcommand). The older
+# `gitleaks protect --staged` silently scans nothing on modern versions.
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "[pre-commit] gitleaks not installed — skipping local secret scan (CI should still run it)."
+  echo "[pre-commit] Install with: brew install gitleaks"
+  exit 0
+fi
+
+if ! gitleaks git --pre-commit --staged --redact -v; then
+  echo ""
+  echo "[pre-commit] BLOCKED: gitleaks found a potential secret in your staged changes."
+  echo "[pre-commit] Remove the secret (use .env / user-secrets instead) and commit again."
+  exit 1
+fi
+
+exit 0
