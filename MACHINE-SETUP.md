@@ -38,6 +38,8 @@ This folder (`~/dev/ai-harness-template/`) is the single source of truth and liv
 
 Keep it updated: when a harness idea proves itself in a real project, fold it back into the template and `reference-implementation.md`.
 
+This repo is also the **versioned backup of every project's local-only harness state** (their `AGENTS.md`, `.claude/`, `docs/`, … are git-excluded in the projects themselves, so without this they have no recovery). Run `./backup-projects.sh` before committing here — it mirrors each project into `projects/<name>/` and secret-scans the snapshots (`.gitleaks.toml` allowlists only the fake self-test key).
+
 ## 4. Per-project
 
 Follow `BOOTSTRAP.md`. For the original reference implementation (WestcoastCars/car-dealer) see `reference-implementation.md` — the full inventory, toggle table for every component, and the Claude↔Codex mapping.

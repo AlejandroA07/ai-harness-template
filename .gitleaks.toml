@@ -1,0 +1,9 @@
+# Repo-local gitleaks config: default rules plus one allowlisted string —
+# the deliberately fake AWS key used by the gitleaks self-test standing goal
+# (.claude/goals/gitleaks-detects-secrets.md). It is not a real credential.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "fake test credential used by the gitleaks self-test goal"
+regexes = ['''AKIA4X7QZ2J9K3M8N5P1''']

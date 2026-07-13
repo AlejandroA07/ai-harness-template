@@ -1,0 +1,18 @@
+#!/bin/bash
+# Scan staged changes for secrets. Enable once per clone with:
+# git config core.hooksPath .githooks
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "[pre-commit] BLOCKED: gitleaks is required but not installed."
+  echo "[pre-commit] Install it with: brew install gitleaks"
+  exit 1
+fi
+
+if ! gitleaks git --pre-commit --staged --redact -v; then
+  echo
+  echo "[pre-commit] BLOCKED: gitleaks found a potential secret in staged changes."
+  echo "[pre-commit] Remove it and use .NET user secrets or environment variables."
+  exit 1
+fi
+
+exit 0

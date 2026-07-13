@@ -1,0 +1,18 @@
+{
+  "_harness_mode": "auto",
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet format:*)",
+      "Bash(dotnet run --project src/SoloMaster.Web:*)",
+      "Bash(scripts/verify.sh)",
+      "Bash(./scripts/verify.sh)"
+    ]
+  }
+}

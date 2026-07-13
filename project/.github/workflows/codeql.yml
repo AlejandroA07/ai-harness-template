@@ -13,15 +13,21 @@ on:
   schedule:
     - cron: "17 6 * * 1" # weekly, Monday morning
 
+# One run per branch/PR; superseded runs are cancelled to save minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  contents: read
+  contents: read # default for all jobs — analyze widens only what CodeQL needs
 
 jobs:
   analyze:
+    name: CodeQL analyze
     runs-on: ubuntu-latest
     permissions:
-      security-events: write
-      contents: read
+      security-events: write # upload SARIF results to code scanning
+      contents: read # checkout
       actions: read # required for the SARIF upload in private repositories
 
     steps:

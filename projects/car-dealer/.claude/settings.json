@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(dpkeys/**)",
+      "Read(prod_db_password.txt)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
+    ],
+    "allow": []
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-changed.sh",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
+  },
+  "_git_autonomy": "off"
+}

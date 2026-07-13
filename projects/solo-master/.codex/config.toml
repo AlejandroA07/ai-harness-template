@@ -1,0 +1,21 @@
+#:schema https://developers.openai.com/codex/config-schema.json
+
+[features]
+hooks = true
+
+# Block git commit / git push for the agent — Manuel publishes himself.
+[[hooks.PreToolUse]]
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = '/bin/bash "$(git rev-parse --show-toplevel)/.harness/hooks/guard-git-publish.sh"'
+timeout = 10
+statusMessage = "Checking command against publish guard"
+
+[[hooks.Stop]]
+
+[[hooks.Stop.hooks]]
+type = "command"
+command = '/bin/bash "$(git rev-parse --show-toplevel)/.harness/hooks/format-changed.sh"'
+timeout = 180
+statusMessage = "Formatting changed C# files"
