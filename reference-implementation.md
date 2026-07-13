@@ -18,19 +18,25 @@ You don't review every line an AI writes — so the harness has to. It does that
 |---|---|---|
 | `AGENTS.md` | Context | **Source of truth.** Architecture, commands, security rules, definition of done. Read natively by Codex, Cursor, and others. |
 | `CLAUDE.md` | Context | Claude Code's entry point — just imports `AGENTS.md` (`@AGENTS.md`) plus Claude-only notes. Never duplicate content here. |
-| `.claude/settings.json` | Guardrails | Claude permissions: denies reading `.env`/`dpkeys/`, force-pushes, and `--no-verify` commits; pre-approves safe commands (build/test/format). Registers hooks. |
+| `.claude/settings.json` | Guardrails | Claude permissions: denies reading `.env`/`.env.*`/`dpkeys/`, and **all** `git commit`/`git push` (upgraded 2026-07-12 from force-push/no-verify only — the owner publishes himself, now mechanically enforced). Registers hooks. (The convenience allowlist lives in `settings.local.json`, managed by the mode switch below.) |
+| `.claude/harness-mode.sh` | Guardrails | **Autonomy switch**: `auto` = hooks on, edits auto-accepted, safe commands pre-approved, MCP on. `manual` = hooks off, every edit/command asks first (full visibility), MCP unloaded (spares tokens). Deny rules are untouched in both modes. |
+| `.claude/git-autonomy.sh` + `.claude/skills/git/` | Guardrails | **Dormant git system, default OFF** (added 2026-07-13): graduated levels `commit` (local commits, feature branches only) → `push` (feature branches; main/force/delete/bare pushes stay denied) → `pr` (may open PRs, never merge). Rewrites only the git entries in `settings.json`; the global deny is a second lock the script warns about but never edits. Only the owner flips it; the skill refuses at OFF. See HARNESS-TIERS.md §2.8. |
+| `.claude/sandbox-mode.sh` | Guardrails | **Dormant OS-sandbox switch, default OFF** (added 2026-07-13): `on` writes the Seatbelt config from HARNESS-TIERS.md (docker excluded, ssh/aws denied) into `settings.json`; prerequisite for any Tier 2 loop/schedule. Owner-only. |
 | `.claude/hooks/format-changed.sh` | Guardrails | Runs automatically when Claude finishes a turn: formats every changed `.cs` file so CI's format check can't fail. |
-| `.claude/skills/` | Context | Reusable playbooks: `migrate` (EF Core), `new-feature` (vertical-slice scaffolding), `security-checklist` (endpoint review). Plain markdown — readable by any tool. |
+| `.claude/skills/` | Context | Reusable playbooks: `migrate` (EF Core), `new-feature` (vertical-slice scaffolding), `security-checklist` (endpoint review), `db` (read-only inspection), `deploy`, `retro` (weekly compost). Plain markdown — readable by any tool. Cross-project *role* skills (web-designer, backend/fullstack-engineer, devops, architecture-designer) live in `~/.claude/skills/`. |
 | `.githooks/pre-commit` | Guardrails | Blocks any commit containing a secret (gitleaks). Works for humans, Claude, and Codex alike since it's plain git. |
 | `.mcp.json` | Verification | Playwright MCP server — lets the agent drive the real web UI (http://localhost:5002) in a browser to prove a change works. |
 | `.github/workflows/ci.yml` | Verification | Format check, vulnerable-package check, build, tests + coverage, docker build, **gitleaks history scan**. |
 | `.github/workflows/codeql.yml` | Verification | GitHub's static security analysis for C# (security-extended queries), on PRs and weekly. |
 | `.github/dependabot.yml` | Verification | Weekly dependency update PRs for NuGet, GitHub Actions, and Docker base images. |
-| `~/.claude/settings.json` (global) | Guardrails | Machine-wide denies for every project: `.env` files, SSH/AWS keys, certificates, force-push, `--no-verify`. |
+| `~/.claude/settings.json` (global) | Guardrails | Machine-wide denies for every project: `.env`/`.env.*` files, SSH/AWS keys, certificates, and all `git commit`/`git push` (a user-level deny beats any project allow); `disableBypassPermissionsMode` self-locks bypass mode out (both added 2026-07-12). |
 | `WestcoastCars.ArchitectureTests/` | Verification | NetArchTest tests that fail if any code violates the clean-architecture dependency rule (e.g. Application referencing Infrastructure). Runs with the normal test suite. |
 | `Directory.Build.props` + `Directory.Packages.props` (analyzers) | Verification | .NET analyzers (`AnalysisLevel latest-recommended`) + SonarAnalyzer.CSharp on every build — compile-time review incl. security rules. Noisy low-value rules demoted in `.editorconfig`. |
 | `dotnet-tools.json` | Verification | Local tool manifest with Stryker.NET (mutation testing, run on demand). |
 | Workflow hardening | Guardrails | All GitHub Actions pinned to commit SHAs, `persist-credentials: false` on checkouts, least-privilege `permissions:` — zizmor reports zero findings. |
+| `scripts/verify.sh` + `scripts/warnings-baseline.txt` | Verification | **The final vote** (git-visible, AI-neutral): Release build + warning **ratchet** (count may go down, never up; baseline tightens itself) + both format gates + full test suite, one deterministic command. AGENTS.md defines "done" as this exiting 0. |
+| `.claude/goals/` + `.claude/verify-goals.sh` | Verification | **Standing goals**: invariants re-verified on demand, each a cheap shell predicate (hooks path active, no `.env` tracked, gitleaks self-test, zizmor clean, architecture rules). History in `goals/ledger.tsv`. Run manually; cron-ready if ever wanted. |
+| `.claude/skills/retro/` | Context | Weekly-ish "compost": mines goal-ledger/CI/git failures for ≤3 proposed harness improvements. Propose-only — the owner signs off. |
 
 ## One-time setup (new machine or new clone)
 
@@ -65,6 +71,8 @@ The loop that keeps quality high without reading every diff:
 | `/security-review`, `/code-review` | No built-in equivalents — paste the `security-checklist` skill as the review prompt, and rely on CodeQL + PR review. |
 
 ## Reusing this in other projects (including TypeScript/React ones)
+
+> **There is now a ready-made starter kit: `~/dev/ai-harness-template/`** — generic skeleton files, `BOOTSTRAP.md` (apply to any project, AI-executable), `MACHINE-SETUP.md` (rebuild a fresh machine), and a copy of this manual. Prefer it over doing the list below by hand.
 
 Copy the pattern, not the files:
 
@@ -101,10 +109,38 @@ Pending (Manuel):
 - [ ] Commit the git-visible changes (CI workflows, dependabot, ArchitectureTests, build props, .editorconfig, dotnet-tools.json, lock files)
 - [ ] Gradually burn down the ~209 analyzer warnings; when near zero, consider `TreatWarningsAsErrors`
 
+## Status addendum (2026-07-12) — harness review across all three projects
+
+A full cross-project audit leveled the guardrails and gates everywhere; this manual stays the *concepts* reference, and the current per-project state lives in the newer template docs:
+
+- **`HARNESS-PARITY.md`** — component matrix (alfred / car-dealer / solo-master): what's leveled, what's a justified difference, which proposals were approved and applied (alfred coverage CI + Stryker; solo xunit.v3).
+- **`HARNESS-TIERS.md`** — Tier 1 (active, Pro plan) vs Tier 2 (dormant machinery: loops, schedules, maker/checker, fleets, OS sandbox) with activation conditions and setup guides.
+- **`RESEARCH-REVIEWS.md`** — external ideas + official-docs findings: what was adopted (global commit/push denies, `disableBypassPermissionsMode`, vuln gates), recorded (sandbox recipe), or rejected (Mira, "model-brain extraction").
+- **`GUIDE-what-goes-where.md`** — the knowledge-encoding ladder (model / analyzers / AGENTS.md / skills / live docs) and the admission test that keeps the harness lean.
+- **`BOOTSTRAP.md` §Lessons** — eight real mistakes from an AI-performed bootstrap, now guarded against.
+- Each project carries a one-page operating card at `.claude/HARNESS.md` (local-only): its inventory, mode switch, goals, and skills.
+
+## Autonomy modes — the master dial (added 2026-07-09)
+
+One command flips the whole harness between full-flow and full-control (takes effect next Claude session):
+
+```bash
+.claude/harness-mode.sh auto     # vibe mode: hooks, auto-accepted edits, pre-approved commands, MCP on
+.claude/harness-mode.sh manual   # control mode: no hooks, every edit & command asks first, MCP off (fewer tokens)
+.claude/harness-mode.sh status
+```
+
+What MANUAL gives you: you see and approve **every** file edit and command before it happens (so you can read all produced code and tests as they land), nothing runs automatically in the background, and unloading the MCP servers trims their tool definitions from the context — the token saving you asked for. What it never changes: the deny rules (secrets, force-push) — less autonomy, never less safety.
+
+Mid-session, `Shift+Tab` also cycles permission behavior (plan mode ⇄ normal ⇄ accept-edits) without touching any files — use that for a quick one-session change, and the script when you want the mode to stick.
+
 ## Toggles — turning each piece on and off
 
 | Component | Turn OFF | Turn back ON |
 |---|---|---|
+| **Everything autonomous at once** | `.claude/harness-mode.sh manual` | `.claude/harness-mode.sh auto` |
+| Warning ratchet | delete the ratchet block in `scripts/verify.sh` (baseline file stays harmless) | restore the block; next run re-baselines |
+| Standing goals | nothing runs unless invoked; retire one goal by setting `status: retired` in its file | run `.claude/verify-goals.sh`; un-retire by editing status |
 | Analyzers (one build) | `dotnet build -p:DisableExtraAnalyzers=true` | just build normally |
 | Analyzers (permanently) | remove the `AnalysisLevel` line in `Directory.Build.props` and the `GlobalPackageReference` block in `Directory.Packages.props` | restore those lines |
 | One analyzer rule | in `.editorconfig`: `dotnet_diagnostic.<RuleId>.severity = none` (or `suggestion`) | set it back to `warning`/`error` |
@@ -120,6 +156,35 @@ Pending (Manuel):
 | Dependabot | delete `.github/dependabot.yml` (or set `open-pull-requests-limit: 0` per ecosystem) | restore the file |
 | Stryker.NET | never runs unless invoked; uninstall with `dotnet tool uninstall dotnet-stryker` | `dotnet tool install dotnet-stryker`; run: `dotnet stryker --project WestcoastCars.Application` |
 | zizmor | never runs unless invoked; `brew uninstall zizmor` | `brew install zizmor`; run: `zizmor .github/workflows/` |
+
+## Review: the "Agentic OS" post (evaluated 2026-07-09)
+
+Manuel brought an X post ("How to Build An Agentic OS using Fable 5", @Av1dlive) describing a full autonomous fleet: cron conductor, cheap OpenRouter workers, trust ledgers, budget enforcement. Verdict: **adopt the principles and the cheap pieces; record install-conditions for the machinery.** The post's own rule applies: "installing them speculatively is how systems bloat."
+
+**Adopted (built and verified):**
+
+| Idea from the post | Where it landed |
+|---|---|
+| "Laws, not tips" constitution | AGENTS.md `NEVER` block — numbers, nevers, checkable rules (incl. "never weaken a test to make it pass") |
+| Anti-gold-plating + grounded-progress prompt language | AGENTS.md "How to work" section |
+| Deterministic gate holds the final vote (BUILD 2) | `scripts/verify.sh` — "done" is now machine-checkable, not self-assessed |
+| Ratchet loop (BUILD 7) | Warning ratchet inside `verify.sh`: 209 analyzer warnings may only go down; baseline tightens itself |
+| Standing goals + goal ledger (BUILD 5) | `.claude/goals/` + `verify-goals.sh`, seeded with 5 real invariants incl. a scanner self-test (born from our own gitleaks silent-failure incident) |
+| Compost / failures-become-laws (BUILD 7) | `retro` skill — ≤3 proposals, propose-only, owner signs |
+| Fresh-context verification beats self-critique | Already had it: `/verify`, `/code-review`, `/security-review` |
+
+**Skipped — with the condition that would change the answer:**
+
+| Idea | Why skipped | Install when |
+|---|---|---|
+| Conductor/worker/verifier multi-model loop (BUILD 3) | Built for API/OpenRouter billing and a steady chore queue; Manuel works interactively on a subscription, and it pulls against the manual-control dial | A real backlog of well-specified recurring chores exists AND API billing is in use AND weeks of `verify.sh`/goals history look boring |
+| Trust ledger per skill (BUILD 4) | Needs ≥20 logged runs per skill to mean anything — only the loop generates that volume | The loop above gets installed |
+| Budget scripts (BUILD 6) | Subscription, not per-token API metering; the token lever here is `harness-mode.sh manual` | Switching to API billing |
+| Quorum, sparring (BUILD 7) | Post's own conditions not met (no cron wake-ups to dedupe; not shipping to users daily) | Their stated conditions appear |
+| Cron heartbeat (BUILD 8) | The harness philosophy here is pull-not-push — Manuel decides when things run | Wanting goals re-verified while away: `30 7 * * * cd <repo> && .claude/verify-goals.sh` is ready as-is |
+| BUILD 0 API configuration (max_tokens, effort flags, refusal stop-reasons) | Applies to scripted `claude -p` pipelines, which we don't run | Building any scripted pipeline — then re-read that section of the post first |
+
+One broadly useful BUILD 0 rule adopted implicitly: don't write prompts/skills asking the model to echo its private reasoning — ask for evidence and structured output instead (our skills already do).
 
 ## Roadmap — remaining candidates
 

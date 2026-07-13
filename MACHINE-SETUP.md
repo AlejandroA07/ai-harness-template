@@ -25,6 +25,7 @@ Verify: `git --version && gh --version && gitleaks version && zizmor --version &
 
 1. **Security deny rules** — merge the `permissions` block from `global/claude-settings.json` into `~/.claude/settings.json`, preserving any existing keys. These block every project's agent from reading `.env` files, SSH/AWS keys, and certificates, and from force-pushing or bypassing hooks.
 2. **Personal preferences** — copy `global/CLAUDE.md` to `~/.claude/CLAUDE.md` and edit to taste. This is how "I commit myself" and "repos must not look AI-assisted" follow you to every project without relying on per-project memory.
+3. **Role skills** — copy the folders in `global/skills/` to `~/.claude/skills/`. These are cross-project quality bars and procedures (web-designer, backend-engineer, fullstack-engineer, devops, architecture-designer) that any repo's sessions can invoke; project-specific procedures still live in each repo's `.claude/skills/`. `architecture-designer` + `devops` are the pair to invoke when starting a brand-new project, alongside `BOOTSTRAP.md`.
 
 Verify: start `claude` anywhere and ask it to read a `.env` path — it must be denied.
 

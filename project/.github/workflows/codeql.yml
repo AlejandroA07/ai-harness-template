@@ -22,6 +22,7 @@ jobs:
     permissions:
       security-events: write
       contents: read
+      actions: read # required for the SARIF upload in private repositories
 
     steps:
       - name: Checkout

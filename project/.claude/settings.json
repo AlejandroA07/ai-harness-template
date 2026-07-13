@@ -2,11 +2,11 @@
   "permissions": {
     "deny": [
       "Read(.env)",
+      "Read(.env.*)",
       "Read(**/.env)",
-      "Bash(git push --force*)",
-      "Bash(git push -f*)",
-      "Bash(git commit --no-verify*)",
-      "Bash(git commit -n *)"
+      "Read(**/.env.*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "allow": [
       "Bash(git status)",

@@ -9,12 +9,19 @@ changed() {
   { git diff --name-only HEAD -- "$@"; git ls-files --others --exclude-standard -- "$@"; } 2>/dev/null | sort -u
 }
 
-# .NET — only if the repo has a solution or csproj at the root
-if ls ./*.sln ./*.csproj >/dev/null 2>&1; then
+# .NET — only if the repo has a solution or csproj at the root (.slnx = new solution format).
+# compgen instead of `ls glob...`: ls exits non-zero if ANY glob is unmatched, which
+# silently disabled this whole branch (e.g. .sln present but no root .csproj).
+if compgen -G "*.sln" >/dev/null || compgen -G "*.slnx" >/dev/null || compgen -G "*.csproj" >/dev/null; then
   cs_files=$(changed '*.cs')
   if [ -n "$cs_files" ]; then
-    # shellcheck disable=SC2086  # word-splitting the file list is intentional
-    dotnet format --no-restore --severity info --include $cs_files >/dev/null 2>&1
+    # Whole-solution format: `dotnet format --include <list>` silently no-ops on
+    # larger lists (observed with dotnet 10.0.201 + slnx), so format everything.
+    # Only whitespace + style — exactly what verify.sh/CI gate on. Plain
+    # `dotnet format` would also apply analyzer code-fixes (e.g. CA1707
+    # renaming test methods), silently changing code beyond formatting.
+    dotnet format whitespace --no-restore >/dev/null 2>&1
+    dotnet format style --no-restore --severity info >/dev/null 2>&1
   fi
 fi
 
