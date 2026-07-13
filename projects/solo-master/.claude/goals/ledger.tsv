@@ -14,3 +14,7 @@
 2026-07-13T23:28:26Z	hooks-path-active	pass
 2026-07-13T23:28:26Z	no-env-tracked	pass
 2026-07-13T23:28:26Z	workflows-zizmor-clean	pass
+2026-07-13T23:37:53Z	gitleaks-detects-secrets	pass
+2026-07-13T23:37:53Z	hooks-path-active	pass
+2026-07-13T23:37:53Z	no-env-tracked	pass
+2026-07-13T23:37:53Z	workflows-zizmor-clean	pass
