@@ -106,3 +106,66 @@ Manuel asked whether to add skills encoding obvious programmer/designer/language
 ## Review 2026-07-12 — audit of an AI-performed bootstrap (solo-master)
 
 A second AI applied this template to the new solo-master project; its work and its self-audit were reviewed in detail. Its audit findings were **verified accurate** (all five package-version claims checked against live NuGet; the global.json/CI mismatch, missing vuln gate, missing Sonar layer, missing standing goals, and missing Codex guard were all real and are now fixed). What it got **wrong in the doing** became the "Lessons" section of `BOOTSTRAP.md` — eight concrete don'ts, the biggest being: it argued against the owner's standing local-only policy instead of implementing it, left every AI file committable, and wrote AI-signature text into the committable README.
+
+## Review 2026-07-15 — three posts + three video transcripts brought by Manuel
+
+Six items this round: three X posts (context engineering / "8x", designing with AI, Obsidian second brain) and three YouTube transcripts (harness & loop engineering, Chip Huyen's *AI Engineering* summarized, an "AI engineer roadmap"). The transcripts are learning material more than harness material — their distilled value went into the new `GUIDE-ai-engineering-learning.md` (concepts, terminology, roadmap). What follows is the harness verdict per item.
+
+### 1. "Anthropic engineers merge 8x more code — context engineering" (X post)
+
+**Fact-check first.** The 8x stat is real — Anthropic's own report ("How AI Is Transforming Work at Anthropic", Q2 2026) says the typical engineer merges ~8× as much code per day as in 2024, and >80% of merged code is authored by Claude. Two distortions in the post: Anthropic explicitly caveats that lines-of-code "almost certainly overstates the true productivity gain", and the claim that "nothing about the model changed" is false — the model generations changed enormously over that period. The referenced article is also real: [Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) (Sept 2025). Trust the sources, not the framing.
+
+**Verdict: validation, not news.** Every mechanism the post prescribes already exists here, mostly in stronger form:
+
+| Post's prescription | Harness reality |
+|---|---|
+| 3-layer stack (global / project / task) | `~/.claude/CLAUDE.md` + role skills / `AGENTS.md` + project skills / plan mode + the prompt |
+| AGENTS.md as the error-collecting file | Already the source of truth; retro skill is the error→law pipeline |
+| Memory file read at start, updated at end | Claude Code auto-memory, per project, already on |
+| MCP for outside context | context7 + Playwright installed; more on real need only |
+| "Context stack loading sequence" | This is just what Claude Code does; no ritual needed |
+
+**Adopted (one cheap habit):** the post's "context-engineered task" brief is a good default shape for nontrivial prompts — four lines: *goal (and why) · relevant files · constraints (which AGENTS.md rules bite) · success criteria*. Costs nothing, front-loads what plan mode would otherwise have to dig for. Use it; don't template it into a file.
+
+**Rejected:** the weekend "build all layers" plan (built long ago), and the implied metric — merged-LOC is exactly the metric the tiers doc already replaced with **cost per accepted change**.
+
+### 2. "Designing with AI — taste is the gap" (X post)
+
+**What it is:** content marketing (affiliate Mobbin link, TasteSkill promo) wrapped around a sound core process: define meaning → collect references → map structure → build component-by-component → custom assets.
+
+**Verdict: the core process agrees with the harness; the product placements are noise.** The `web-designer` role skill is precisely the post's "Method 1" done right — a default-shifter against AI slop — and its quality bar already demands intent before pixels.
+
+**Adopted (habits, no file changes — the admission test in `GUIDE-what-goes-where.md` keeps them out of skills until a real failure justifies a line):**
+- **Reference-driven prompting.** For any UI work that matters, collect 3–5 real screenshots/links first and hand them over with "combine the direction, don't copy". An inspiration folder per project is a *human* habit, not agent machinery.
+- **Component-by-component beats "build the site".** Already how the harness works everywhere else (smallest verifiable unit); now explicitly the rule for UI too.
+- **"Let AI interview you" for design direction** — same technique already adopted for skill authoring (review 2026-07-12 #3, kernel 2); works for brand/meaning questions too.
+
+**Rejected:** buying third-party "design skills" (unreviewed prompt packs are supply-chain risk for the context layer — same class of concern as unreviewed plugins), and tool-shopping (Quiver, Flow, Lummi) with no current need.
+
+### 3. "Claude reads it, links it, files it — second brain for $0" (X post)
+
+**What it is:** the same AI-maintained-Obsidian-vault concept as review 2026-07-12 #2, now with concrete artifacts — all verified real: [AgriciDaniel/claude-obsidian](https://github.com/AgriciDaniel/claude-obsidian) (MIT), built on Karpathy's LLM-wiki pattern (his gist exists), plus kepano's official obsidian-skills.
+
+**Verdict: install-condition unchanged — a hand-kept Obsidian habit must survive a month first** (`HARNESS-TIERS.md` §2.7). What this post changes: *if* the condition is ever met, start from the claude-obsidian repo instead of hand-building — it already implements the rules worth keeping (inbox, immutable raw/, lint/synthesis, hot cache). §2.7 updated with the pointer.
+
+**Rejected outright: pointing the three code repos' CLAUDE.md at a shared vault** (the post's "real unlock"). That forks project truth away from AGENTS.md — the exact failure mode review 2026-07-12 #1 closed. Code knowledge lives in the repo; the vault, if it ever exists, is for the human's non-code thinking.
+**Security notes for later:** the marketplace-plugin install path and the Obsidian Local REST API plugin both widen attack surface — if activated, read the skills/plugin code first, prefer the filesystem MCP over the REST plugin, and treat ingested web content as data, never instructions (standing rule).
+
+### 4–6. The three transcripts (harness & loops · Chip Huyen's *AI Engineering* · AI-engineer roadmap)
+
+**Verdict: education, not installation.** Sean's harness/loop video is an accurate intro whose every mechanism the harness already implements with harder edges (its "end-loop guardrails" = the five-line loop spec; its memory taxonomy maps 1:1 to existing pieces — see the glossary in the new guide). The Chip Huyen summary is a faithful sketch of a genuinely good book (O'Reilly, 2025) — the eval/tracing/guardrail material is exactly what Alfred's Assistant module will need, so it anchors the roadmap. The Codesmith roadmap is a Python-first bootcamp plan; its *project-based, deploy-something-real* philosophy is right, its stack is wrong for a .NET/TS developer — rebuilt on Manuel's stack and real projects in the guide.
+
+**One cheap piece adopted from Sean's video — the permission-wait notification.** Claude Code blocked on a permission prompt while you're elsewhere is pure dead time. Claude Code has a native `Notification` hook event for exactly this. Recipe (macOS, zero tokens, `~/.claude/settings.json`):
+```jsonc
+"hooks": {
+  "Notification": [{ "hooks": [{ "type": "command",
+    "command": "osascript -e 'display notification \"Claude needs input\" with title \"Claude Code\" sound name \"Glass\"'" }] }]
+}
+```
+Documented here rather than installed — Manuel flips it (or asks for it) if the dead-time problem is real for him.
+
+**New file this review produced:** `GUIDE-ai-engineering-learning.md` — the terminology the transcripts teach, mapped to where each concept already lives in this harness, plus a staged learning roadmap that rides on Alfred instead of toy projects.
+
+### Addendum 2026-07-15 — "Claude Projects full course" (X post, @cyrilXBT)
+
+**Duplicate of review 2026-07-12 #1.** Same content point-for-point (standing-brief template, precision-beats-volume, retrieval test, layers, Cowork — down to the identical "read every file in this folder" command); everything substantive already lives in `GUIDE-claude-projects.md`. Only novelties are plan trivia (free caps, 20 files/30 MB) that change no decision. Its "Code Project" template remains the rejected fork-the-truth anti-pattern for the code repos. These setup posts recirculate in near-identical variants — future copies need no new review unless they contain a feature the guide lacks.

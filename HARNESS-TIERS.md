@@ -119,6 +119,7 @@ ON STOP:   summarize what changed, what remains, and the pass/fail evidence
 **What:** cloud-side Claude Code runs on cron — a morning "read goals ledger + CI + Dependabot, fix the trivial, report the rest" routine; a weekly automated retro.
 **Activate when:** 2.2's loop has run supervised and boring for ≥2 weeks, and the outputs are worth reading daily. This is the most push-shaped, most-billed item — activate last.
 **How:** `/schedule` in Claude Code → describe the routine + cadence; point it at the proven skill from 2.2; give it the loop spec's STOP/ON STOP lines verbatim. Results come to you; the deny rules still hold (it can never commit/push — you merge).
+**Known gap to solve at activation (verified 2026-07-15):** `AGENTS.md`/`CLAUDE.md` are git-excluded in all three repos (the no-AI-signature rule), so anything that *clones from GitHub* — cloud routines, remote agents, CI-side agents — sees **no instructions at all**. Any cloud activation must first decide how the context reaches the clone (inline it in the routine prompt, or point the routine at the local checkout).
 
 ### 2.5 Deep review on demand (`/code-review ultra`)
 
@@ -135,7 +136,7 @@ ON STOP:   summarize what changed, what remains, and the pass/fail evidence
 ### 2.7 Obsidian vault automation (from research review #2)
 
 **What:** AI-filed personal notes: inbox → auto-filed + backlinked, weekly synthesis.
-**Activate when:** a hand-maintained Obsidian habit has actually survived a month. **How:** see `RESEARCH-REVIEWS.md` §2 for the rules worth keeping (single inbox, immutable raw/, weekly synthesis, link-density as the health metric); wire the morning filing as a 2.4-style scheduled routine only after the manual habit is real.
+**Activate when:** a hand-maintained Obsidian habit has actually survived a month. **How:** see `RESEARCH-REVIEWS.md` §2 for the rules worth keeping (single inbox, immutable raw/, weekly synthesis, link-density as the health metric); wire the morning filing as a 2.4-style scheduled routine only after the manual habit is real. If activated, start from the MIT-licensed [AgriciDaniel/claude-obsidian](https://github.com/AgriciDaniel/claude-obsidian) (Karpathy's LLM-wiki pattern; implements those rules already — review its skill code before install, and never point the code repos' CLAUDE.md at the vault; see review 2026-07-15 §3).
 
 ### 2.8 Git autonomy ladder (built and dormant — default OFF)
 

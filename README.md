@@ -12,6 +12,7 @@ Portable starter kit for the AI coding harness: context files (AGENTS.md), guard
 | `HARNESS-PARITY.md` | Component matrix across the three live projects — what's leveled everywhere, what's a justified difference, what's proposed |
 | `GUIDE-claude-projects.md` | Setting up claude.ai Projects properly — for non-coding work only (never for the code repos) |
 | `GUIDE-what-goes-where.md` | The knowledge-encoding ladder: what belongs in the model / analyzers / AGENTS.md / skills / live docs — and the admission test that keeps the harness lean |
+| `GUIDE-ai-engineering-learning.md` | AI-engineering concepts & terminology mapped to where each already lives in this harness, plus a staged learning roadmap (model calls → RAG → tools → evals) that rides on Alfred |
 
 Contents:
 

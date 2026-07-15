@@ -63,7 +63,7 @@ The loop that keeps quality high without reading every diff:
 
 | Claude Code | Codex equivalent |
 |---|---|
-| `CLAUDE.md` → imports `AGENTS.md` | Reads `AGENTS.md` natively (repo root, plus `~/.codex/AGENTS.md` for global notes) — nothing to do. |
+| `CLAUDE.md` → imports `AGENTS.md` | Reads `AGENTS.md` natively (repo root, plus `~/.codex/AGENTS.md` for global preferences — created 2026-07-15, template copy in `global/codex-AGENTS.md`, MACHINE-SETUP step 2.4). |
 | `.claude/settings.json` permissions | `~/.codex/config.toml`: `approval_policy` + `sandbox_mode` (e.g. `workspace-write` sandbox ≈ the deny rules). Codex sandboxes by default rather than using per-path rules. |
 | `.claude/hooks/format-changed.sh` | No hook system — the pre-commit hook and CI format check are the backstop; also add "run `dotnet format` before finishing" to `AGENTS.md` (already there via definition of done). |
 | `.claude/skills/*/SKILL.md` | Custom prompts: copy each SKILL.md body to `~/.codex/prompts/<name>.md`, invoke with `/<name>`. Or just tell Codex to "follow .claude/skills/migrate/SKILL.md" — it's plain markdown. |

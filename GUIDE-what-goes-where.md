@@ -60,6 +60,32 @@ Post-cutoff knowledge — new framework versions, changed APIs, current package 
 
 **Net verdict: no bloat today, and nothing important missing at L1/L2.** The gap Manuel worried about ("missing obvious things") is covered by L0+L1: the model supplies the knowledge, the analyzers and tests catch the lapses. What the harness deliberately does *not* have — language-tutorial skills — stays out by the admission test above.
 
+## Cost audit 2026-07-15 — what a session actually pays
+
+Manuel asked whether the harness bloats context / wastes tokens. Measured, not guessed:
+
+| Always loaded per session (alfred, heaviest project) | ~Tokens |
+|---|---|
+| Global `~/.claude/CLAUDE.md` | 293 |
+| Project `CLAUDE.md` + imported `AGENTS.md` | ~1,750 |
+| 10 skill description lines (bodies load only on invoke) | ~600 |
+| Auto-memory index | ~65 |
+| MCP (context7 instructions; Playwright's ~30 tools are deferred — names only until used) | ~200 |
+| **Total harness contribution** | **~2,900 (~1.5% of the window)** |
+
+For scale: Claude Code's own system prompt + built-in tools are ~15–20k tokens — 5–6× the whole harness, and untouchable. Everything designed to be free is free: deny rules, hooks, verify.sh, goals, HARNESS.md, and all template docs cost zero (enforced by tooling or read on demand). AGENTS.md's ~1,700 tokens repay themselves roughly once per session — one prevented wrong exploration (wrong EF command, hunting for the test convention) costs more than the whole file.
+
+**Where quota actually burns is session behavior, not config:** long transcripts accreting tool output, re-reading big files, compaction. The levers are the existing habits — plan mode, `/clear` between tasks, task briefs, fresh-session reviews — not trimming config tokens.
+
+**Findings and what was done (2026-07-15):**
+1. **alfred AGENTS.md was 955 words** (budget ~900) → trimmed to 919 by removing only in-file duplication (facts stated twice in different sections). No rule lost.
+2. **Growth plan decided: nested, directory-scoped AGENTS.md per module — not subagents.** Both Claude Code and Codex load a subdirectory's instruction file on demand when working in that subtree. Root AGENTS.md stays the constitution (laws, commands, one line per module); `src/Alfred.Modules.<X>/AGENTS.md` holds module facts, costing zero outside that module. Trigger: a module accumulates ~10+ lines of module-specific content in the root file (likely at the Finance/Assistant milestone). Cautions: add each nested file to `.git/info/exclude` (only root ones are excluded today), and retrieval-test the first one (fresh session, edit a module file, ask it to state a module rule). *Subagents per module rejected:* subagents are execution isolation, not context scoping — they start cold, cost more, and would need the module-facts file anyway.
+3. **Codex parity gap closed:** `~/.codex/AGENTS.md` did not exist, so Codex sessions got project rules but zero personal ones. Created (mirror of global CLAUDE.md + "repo AGENTS.md/skills/verify.sh are authoritative" bridge); template copy at `global/codex-AGENTS.md`; MACHINE-SETUP step 2.4 added. **Deliberately NOT done:** removing the NEVER block from project AGENTS.md files — it's the only layer every agent (current and future) reads, the ~100-token duplication is cheap insurance, and prose was never the enforcement anyway (deny rules / guard-git-publish.sh / gitleaks are).
+4. **car-dealer auto-memory cleaned:** deleted four files that restated global CLAUDE.md or template docs (`user-profile`, `user-commits-himself`, `keep-ai-tooling-out-of-git`, `harness-template-location` — its one non-derivable nugget, the AUTO/MANUAL dial intent, preserved as a slim `autonomy-dial-intent` memory). Standing rule reaffirmed: memory never stores what CLAUDE.md, the repo, or this template already record.
+5. **The one real bloat vector going forward is always-on MCP servers** — a chatty server can add more tokens than the entire AGENTS.md. Guard stays: add per-project, on real need only; tool deferral keeps rarely-used servers nearly free.
+
+Re-run this audit only when something structural changes (new module files, a new MCP server, skill count growth) — the two-command measurement is: `wc -w` on the always-loaded files, and the skill `description:` lines.
+
 ## If you still want a "patterns" file someday
 
 Make it an **incident ledger, not an encyclopedia**: a dated list of things an agent in *this* codebase actually got wrong twice, each entry three lines (what it did / what's right here / why). It starts empty. The retro skill mines the week's failures into it. The moment an entry can become an analyzer rule, editorconfig line, or test — promote it to L1 and delete the prose. An empty ledger is the harness working, not a gap.
