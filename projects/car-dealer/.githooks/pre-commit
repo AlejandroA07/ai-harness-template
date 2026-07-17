@@ -5,6 +5,16 @@
 # NOTE: requires gitleaks >= 8.19 (`gitleaks git` subcommand). The older
 # `gitleaks protect --staged` silently scans nothing on modern versions.
 
+# Branch names become public history (PRs, merge commits) — block AI-tool prefixes.
+branch="$(git symbolic-ref --short HEAD 2>/dev/null || true)"
+case "$branch" in
+  codex/*|claude/*|copilot/*|cursor/*|agent/*|ai/*)
+    echo "[pre-commit] BLOCKED: branch '$branch' carries an AI-tool prefix."
+    echo "[pre-commit] Rename it first: git branch -m feature/${branch#*/}"
+    exit 1
+    ;;
+esac
+
 if ! command -v gitleaks >/dev/null 2>&1; then
   echo "[pre-commit] BLOCKED: gitleaks is required but not installed (fail closed)."
   echo "[pre-commit] Install it with: brew install gitleaks"

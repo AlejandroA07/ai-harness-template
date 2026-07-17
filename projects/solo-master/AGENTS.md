@@ -87,6 +87,7 @@ Additionally:
 
 ## Conventions
 
+- Branches are `feature/<topic>`, always — including agent-created ones. If your tool defaults to another prefix (`codex/…`), rename with `git branch -m` before pushing (the pre-commit hook blocks AI-tool prefixes).
 - Target .NET 10 and keep nullable reference types enabled.
 - Prefer framework features before adding dependencies.
 - Keep Razor Page handlers thin; move reusable behavior into focused services or domain types when it appears.
