@@ -8,7 +8,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 
-REPOS=("$HOME/alfred" "$HOME/car-dealer" "$HOME/solo-master")
+REPOS=("$HOME/alfred" "$HOME/car-dealer" "$HOME/solo-master" "$HOME/vibehopper")
 FAILS=0; WARNS=0
 pass() { echo "[PASS] $*"; }
 fail() { echo "[FAIL] $*"; FAILS=$((FAILS+1)); }

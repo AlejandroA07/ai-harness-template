@@ -10,7 +10,7 @@ Read the week's exhaust, extract at most **3** proposals, apply **none** of them
 ## 1. Gather evidence (read-only)
 
 ```bash
-tail -50 .claude/goals/ledger.tsv | grep FAIL          # goal violations
+tail -50 .Codex/goals/ledger.tsv | grep FAIL          # goal violations
 gh run list --limit 15                                  # CI failures
 git log --oneline --since="7 days ago"                  # what shipped
 ```
@@ -22,9 +22,7 @@ Plus anything the user reports going wrong with agents this week (repeated corre
 Each proposal must be one of:
 - **A new law** for AGENTS.md's NEVER block — quote the incident(s) that motivate it. A law needs a number, a "never", or a command that checks it; anything softer gets optimized away.
 - **A skill fix** — the same failure repeating means the skill's steps are wrong, not the executor.
-- **A new standing goal** — something broke that a cheap predicate in `.claude/goals/` would have caught. Include the exact predicate and verify it detects (run it against the broken state if reproducible).
-
-**Prefer the executable form.** When a failure is mechanically checkable, propose the standing goal (or a repo test) over prose — a running predicate catches the regression forever; reserve laws and skill fixes for what no cheap predicate can check.
+- **A new standing goal** — something broke that a cheap predicate in `.Codex/goals/` would have caught. Include the exact predicate and verify it detects (run it against the broken state if reproducible).
 
 ## 3. Report format
 

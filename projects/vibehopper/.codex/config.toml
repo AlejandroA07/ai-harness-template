@@ -1,0 +1,24 @@
+[features]
+hooks = true
+
+[[hooks.PreToolUse]]
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = '/bin/bash "$(git rev-parse --show-toplevel)/.harness/hooks/guard-git-publish.sh"'
+timeout = 10
+statusMessage = "Checking command against publish guard"
+
+[mcp_servers.context7]
+command = "npx"
+args = [
+    "-y",
+    "@upstash/context7-mcp@3.2.3",
+]
+
+[mcp_servers.playwright]
+command = "npx"
+args = [
+    "-y",
+    "@playwright/mcp@0.0.78",
+]
