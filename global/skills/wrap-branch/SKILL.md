@@ -22,6 +22,8 @@ git status --porcelain                               # plus uncommitted work
 
 From this, name the key parts: new/changed behavior, decisions taken, anything a future reader would need to resume without re-deriving.
 
+**Check spec adherence.** If the branch had a spec or plan (`docs/planning/` — a grill spec, a milestone plan), compare what was actually built against it: every acceptance check met, nothing out-of-scope built early. Deviations are either justified in the dated report or flagged to the owner before wrap-up continues — code that is correct but doesn't do what the spec said is not done.
+
 ## 2. Document the key parts (before staging, so docs can ride in the commit)
 
 Follow `docs-model.md` in this skill's directory. In short:
