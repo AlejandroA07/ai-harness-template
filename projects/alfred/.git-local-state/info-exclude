@@ -13,3 +13,4 @@ CLAUDE.md
 # Local-only project docs (plans, research — never committed)
 docs/
 .agents/
+.playwright-mcp/

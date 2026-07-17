@@ -43,7 +43,7 @@ Both are **agent harnesses**: pi is a minimal terminal *coding* agent (a slim Cl
 
 - Neither is a component you embed in a multi-user product. They are single-user tools that assume the operator trusts them with a machine.
 - **Hermes is philosophically interesting** — it's the "personal butler" idea for hackers — worth skimming its skill/memory design for inspiration, but you cannot ship it to your wife and friends as an app.
-- **Do we need "an agent"?** Yes, in the plain sense: Alfred is an LLM in a tool-calling loop (intent → propose structured command → confirm → execute → respond). No, in the framework sense: for the MVP a direct tool-use loop via the Anthropic C# SDK (`BetaToolRunner`) is enough. Microsoft Agent Framework (.NET, GA 1.0 since April 2026, successor of Semantic Kernel + AutoGen) is the upgrade path if orchestration ever gets complex (multi-agent, workflows). Start without a framework.
+- **Do we need "an agent"?** Yes, in the plain sense: Alfred is an LLM in a tool-calling loop (intent → propose structured command → confirm → execute → respond). No, in the framework sense: for the MVP a direct tool-use loop through the `Microsoft.Extensions.AI` `IChatClient` abstraction is enough (per D8 — provider-agnostic; the earlier idea of using the Anthropic C# SDK's `BetaToolRunner` directly is superseded, as it would tie the loop to one provider). Microsoft Agent Framework (.NET, GA 1.0 since April 2026, successor of Semantic Kernel + AutoGen) is the upgrade path if orchestration ever gets complex (multi-agent, workflows). Start without a framework.
 
 ## D3. Stack: .NET, not Java/Spring
 

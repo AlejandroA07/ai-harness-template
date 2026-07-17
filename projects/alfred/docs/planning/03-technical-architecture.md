@@ -6,11 +6,11 @@
 |---|---|---|
 | Backend | **ASP.NET Core, .NET 10 (LTS), C#** | Owner's primary skill. Modular monolith — same architecture the research recommended, .NET flavor. |
 | ORM / DB | **PostgreSQL + EF Core (Npgsql)** | Relational for all core domain data; JSONB only for UI preferences and AI draft payloads (per research §24). Free tiers exist; runs in Docker locally. |
-| Frontend | **React 19 + TypeScript + Vite**, installable **PWA** | Owner knows TS; best ecosystem for chat/streaming UI; PWA covers phones in phase 1. Tailwind + shadcn/ui for speed. |
+| Frontend | **React 19 + TypeScript + Vite**, installable **PWA** | Owner knows TS; best ecosystem for chat/streaming UI; PWA covers phones in phase 1. Styling: **Tailwind + shadcn/ui** (reconfirmed 2026-07-15) — not yet installed; introduce when the first real UI work starts (M1 money map), through the repo's dependency-proposal and pnpm supply-chain rules. Plain CSS per component until then. |
 | AI | **Microsoft.Extensions.AI `IChatClient` abstraction** over a swappable provider | No provider lock-in; every major provider (OpenAI, Anthropic, Google, Ollama, OpenRouter) has an `IChatClient` adapter. Provider choice below in §AI design. |
 | Background jobs | **Hangfire** (or .NET `BackgroundService` to start) | Reminder scheduling, escalations, daily digest, weekly review generation. Runs inside the monolith — no extra infra. |
 | Notifications | **Web Push (VAPID)** | Free, works on installed PWAs incl. iOS 16.4+. |
-| Auth | ASP.NET Identity, cookie or JWT | Boring and fine. Invite-code registration for the beta. |
+| Auth | **ASP.NET Identity + `MapIdentityApi`, cookie sessions** (settled 2026-07-15, implemented in M0) | Boring and fine. Invite-code registration **implemented** (2026-07-15): register requires `X-Invite-Code` header, checked constant-time against `Identity:InviteCode` config (`Identity__InviteCode` env in deployment); unset = registration closed. Custom `POST /api/auth/logout` added (`MapIdentityApi` has none). Still open from the day-one baseline: **rate limiting on auth endpoints** — required before any non-local deployment. |
 
 Deliberately absent: microservices, message brokers, Redis, agent frameworks, metadata engines. One deployable unit: the API serves the built SPA as static files → one container.
 
