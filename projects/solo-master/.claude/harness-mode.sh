@@ -50,7 +50,8 @@ EOF
   "disableAllHooks": true,
   "permissions": {
     "defaultMode": "default",
-    "allow": []
+    "allow": [],
+    "ask": ["Bash"]
   }
 }
 EOF

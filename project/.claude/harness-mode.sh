@@ -48,7 +48,8 @@ EOF
   "disabledMcpjsonServers": ["playwright", "context7"],
   "permissions": {
     "defaultMode": "default",
-    "allow": []
+    "allow": [],
+    "ask": ["Bash"]
   }
 }
 EOF

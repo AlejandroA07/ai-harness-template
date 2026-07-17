@@ -1,7 +1,7 @@
 # Alfred — Agent Guide
 
 Alfred is a personal-first AI butler for life admin (finance, reminders, purchases, calendar, studies), built as an ASP.NET Core (.NET 10) modular monolith with a React 19 + TypeScript PWA frontend and PostgreSQL. Product plans and all design decisions live in `docs/planning/` (local-only, never committed) — read `docs/planning/00-README.md` before making product-level decisions.
-This file is the source of truth for AI coding agents (Claude Code, Codex, etc.). Keep it updated when commands or conventions change.
+Source of truth for AI coding agents (Claude Code, Codex); keep it updated when commands or conventions change.
 
 ## Architecture
 
@@ -16,7 +16,7 @@ This file is the source of truth for AI coding agents (Claude Code, Codex, etc.)
 
 **Dependency law (enforced by `ArchitectureTests`): modules reference only `Alfred.SharedKernel`, never each other.** Cross-module needs go through domain events or interfaces composed in the API host. New module = new classlib + project reference from Api + entry in `ArchitectureTests.ModuleAssemblies`.
 
-Do not touch: `docs/` content is the owner's planning space (read it, don't reorganize it); `web/dist` and `**/Migrations/*` already applied (create new migrations instead of editing old ones).
+Do not touch: `docs/` content is the owner's planning space (read it, don't reorganize it); `web/dist`; applied migrations (see Database section).
 
 ## Commands
 
@@ -24,10 +24,10 @@ Do not touch: `docs/` content is the owner's planning space (read it, don't reor
 # Infrastructure (Postgres 17 on localhost:5432, db/user "alfred")
 docker compose up -d
 
-# Run the API (http://localhost:5037, applies EF migrations on startup in Development)
+# Run the API (http://localhost:5037)
 dotnet run --project src/Alfred.Api --launch-profile http
 
-# Run the frontend dev server (proxies /api to the API)
+# Frontend dev server
 cd web && pnpm run dev
 
 # Build & test (same as CI)
@@ -46,7 +46,7 @@ cd web && pnpm run build
 dotnet stryker
 ```
 
-Package rules: NuGet lock files are enforced (`RestorePackagesWithLockFile`, CI restores `--locked-mode`) — after adding/updating a package, commit the regenerated `packages.lock.json`. Frontend uses **pnpm 11** with `pnpm-lock.yaml` (`pnpm install --frozen-lockfile` in CI). Supply-chain rules: dependency lifecycle scripts are blocked by default (add trusted exceptions via `allowBuilds` in `web/pnpm-workspace.yaml`, never globally); `minimumReleaseAge: 4320` delays new releases 3 days — do not lower or bypass it to get a newer package. `TreatWarningsAsErrors` is on solution-wide.
+Package rules: NuGet lock files are enforced (`RestorePackagesWithLockFile`, CI restores `--locked-mode`) — after adding/updating a package, commit the regenerated `packages.lock.json`. Frontend uses **pnpm 11** with `pnpm-lock.yaml` (`pnpm install --frozen-lockfile` in CI). Supply-chain rules: dependency lifecycle scripts are blocked by default (add trusted exceptions via `allowBuilds` in `web/pnpm-workspace.yaml`, never globally); `minimumReleaseAge: 4320` delays new releases 3 days — do not lower or bypass it. `TreatWarningsAsErrors` is on solution-wide.
 
 ## Database & migrations
 
@@ -80,7 +80,7 @@ Migrations apply automatically at startup in Development only. Always inspect a 
 
 Don't add features, refactor, or introduce abstractions beyond what the task requires. A bug fix doesn't need surrounding cleanup. Don't design for hypothetical future requirements: do the simplest thing that works well. Only validate at system boundaries.
 
-Before reporting progress, audit each claim against a tool result from this session. Only report work you can point to evidence for; if something is not yet verified, say so explicitly. If tests fail, say so with the output.
+Before reporting progress, audit each claim against a tool result from this session: report only what you have evidence for, say explicitly what is unverified, and if tests fail, say so with the output.
 
 ## Definition of done — every change, before you call it finished
 

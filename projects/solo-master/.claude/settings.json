@@ -8,16 +8,7 @@
       "Bash(git commit:*)",
       "Bash(git push:*)"
     ],
-    "allow": [
-      "Bash(git status)",
-      "Bash(git diff:*)",
-      "Bash(git log:*)",
-      "Bash(dotnet restore:*)",
-      "Bash(dotnet build:*)",
-      "Bash(dotnet test:*)",
-      "Bash(dotnet format:*)",
-      "Bash(./scripts/verify.sh)"
-    ]
+    "allow": []
   },
   "hooks": {
     "Stop": [
