@@ -20,6 +20,8 @@ cp -R ~/dev/ai-harness-template/project/. .
 
 This brings in: `.claude/` (settings, format hook, security-checklist skill), `.githooks/pre-commit`, `.mcp.json`, `CLAUDE.md`, `AGENTS.md.template`, and `.github/` templates.
 
+Then scaffold the docs model (spec: `global/skills/wrap-branch/docs-model.md`): create `docs/00-README.md` and `docs/dev/00-README.md` index files. Every finished branch writes a dated note into `docs/dev/` via the global `wrap-branch` skill; `docs/planning/` is added only when planning material exists. On an existing project this is strictly additive — index what's there, never move or delete it.
+
 ## Step 2 — Local-only mode: hide AI files from git
 
 Append to `.git/info/exclude` (this file itself is never committed):

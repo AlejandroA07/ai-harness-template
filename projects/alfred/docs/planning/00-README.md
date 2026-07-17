@@ -1,6 +1,6 @@
 # Alfred Butler App — Planning Index
 
-> Status: planning phase. Updated 2026-07-10.
+> Status: M0 skeleton complete (solution structure, CI, harness, auth with invite-code gated registration, login/logout UI — verified E2E 2026-07-15). Next: M1 finance core. Still open before any non-local deployment: rate limiting on auth endpoints. Updated 2026-07-15.
 
 ## Files in this folder
 
