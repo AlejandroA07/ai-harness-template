@@ -59,6 +59,7 @@ Additionally:
 1. New behavior has new tests.
 2. New/changed endpoints pass the security checklist (see `.claude/skills/security-checklist/`).
 3. Work on a feature branch, never directly on `main`. Small, reviewable commits.
+4. Branches are `feature/<topic>`, always — including agent-created ones. If your tool defaults to another prefix (`codex/…`), rename with `git branch -m` before pushing (the pre-commit hook blocks AI-tool prefixes).
 
 ## Conventions
 

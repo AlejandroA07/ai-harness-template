@@ -6,5 +6,5 @@
 - Repos must not look AI-assisted: never commit AI tooling files (AGENTS.md, CLAUDE.md, .claude/, .mcp.json, .githooks/, AI docs). Keep them local via .gitignore or .git/info/exclude. Standard security/quality tooling (CodeQL, Dependabot, analyzers, tests) is fine to commit — it carries no AI signature.
 - Security first: treat every endpoint/input as attacker-reachable; prefer the secure default; flag anything that weakens security instead of silently accepting it.
 - Never read, print, or commit secrets (.env files, keys, tokens) — use the project's secret mechanism.
-- Work on feature branches, never directly on main.
+- Work on feature branches named `feature/<topic>`, never directly on main. Never use AI-tool branch prefixes (`codex/…`, `claude/…`) — branch names end up in public history via PRs and merge commits; rename with `git branch -m` before any push.
 - I'm a .NET/C#/TypeScript developer who vibe-codes: verify your own work (build, tests, format, exercise the change) before calling it done, and explain AI-tooling concepts plainly when they come up.

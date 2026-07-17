@@ -9,7 +9,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-REPOS=("$HOME/alfred" "$HOME/car-dealer" "$HOME/solo-master")
+REPOS=("$HOME/alfred" "$HOME/car-dealer" "$HOME/solo-master" "$HOME/vibehopper")
 
 # Prerequisite BEFORE touching any snapshot: no scanner, no backup.
 command -v gitleaks >/dev/null 2>&1 || {

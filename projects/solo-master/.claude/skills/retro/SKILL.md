@@ -24,6 +24,8 @@ Each proposal must be one of:
 - **A skill fix** — the same failure repeating means the skill's steps are wrong, not the executor.
 - **A new standing goal** — something broke that a cheap predicate in `.claude/goals/` would have caught. Include the exact predicate and verify it detects (run it against the broken state if reproducible).
 
+**Prefer the executable form.** When a failure is mechanically checkable, propose the standing goal (or a repo test) over prose — a running predicate catches the regression forever; reserve laws and skill fixes for what no cheap predicate can check.
+
 ## 3. Report format
 
 For each proposal: the evidence (quoted), the exact change (diff-ready text), and what it would have prevented. If the week was clean, say exactly that and propose nothing — inventing proposals to fill quota is how harnesses bloat.

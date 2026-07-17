@@ -86,6 +86,7 @@ Additionally:
 
 ## Conventions
 
+- Branches are `feature/<topic>`, always — including agent-created ones. If your tool defaults to another prefix (`codex/…`), rename with `git branch -m` before pushing (the pre-commit hook blocks AI-tool prefixes).
 - C#: nullable reference types are on; keep them meaningful (no `!` to silence warnings). Follow `.editorconfig`.
 - New features are vertical slices: Domain entity/logic → Application handler + validator → Infrastructure persistence → Api endpoint → tests at each layer you touched.
 - Match the existing MediatR handler + FluentValidation patterns in `WestcoastCars.Application` rather than inventing new ones.
