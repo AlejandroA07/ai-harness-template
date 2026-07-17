@@ -48,6 +48,9 @@ with open(path) as f:
 if mode == "on":
     data["sandbox"] = {
         "enabled": True,
+        # False so MANUAL mode's ask-every-Bash contract survives sandboxing:
+        # the default (true) auto-runs sandboxed Bash without prompting.
+        "autoAllowBashIfSandboxed": False,
         "excludedCommands": ["docker *"],
         "credentials": {
             "files": [

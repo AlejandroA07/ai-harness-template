@@ -1,5 +1,6 @@
 ---
 name: deploy
+disable-model-invocation: true
 description: Deploy WestcoastCars to the VPS using the Docker Compose production overlay. Use when the user asks to deploy, release, or update the production/VPS environment.
 ---
 

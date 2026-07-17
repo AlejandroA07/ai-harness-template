@@ -1,5 +1,7 @@
 # AI Harness — how this repo works with AI coding agents
 
+> **SUPERSEDED IN PARTS (2026-07-15):** the Codex section below is stale — Codex now HAS a hook system (see `~/solo-master/.codex/config.toml` and the machine-wide guard in `~/.codex/config.toml`) and discovers skills via `.agents/skills/`; `~/.codex/prompts` is deprecated. Current truth: `~/dev/ai-harness-template/reference-implementation.md` (Codex section, updated 2026-07-15).
+
 This document explains the "harness": everything around the AI model that makes vibe coding safe and high quality. It is written tool-agnostically so the same setup works with Claude Code today and Codex (or any other agent) tomorrow.
 
 > **Local-only policy (decided 2026-07-08):** every AI-related file (this doc, `AGENTS.md`, `CLAUDE.md`, `.claude/`, `.mcp.json`, `.githooks/`) stays out of git — ignored via `.gitignore` and `.git/info/exclude` — so the repo carries no AI signature. Only the neutral security CI files (CodeQL, Dependabot, gitleaks job) are candidates for committing. Manuel does all commits and pushes himself.

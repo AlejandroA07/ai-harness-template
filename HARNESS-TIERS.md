@@ -42,6 +42,7 @@ Ready but not enabled (decision 2026-07-12, see `RESEARCH-REVIEWS.md`). Permissi
 {
   "sandbox": {
     "enabled": true,
+    "autoAllowBashIfSandboxed": false,  // default true would bypass MANUAL's ask-every-Bash contract
     "excludedCommands": ["docker *"],   // docker is incompatible — required for alfred/car-dealer
     "credentials": {
       "files": [
@@ -144,6 +145,7 @@ ON STOP:   summarize what changed, what remains, and the pass/fail evidence
 **Activate when:** an unattended workflow (2.2 loop / 2.4 routine) produces verified work that piles up faster than hand-committing it stays sane — or reviewing diffs in the working tree becomes the bottleneck. Start at `commit`, live with it for weeks before considering `push`; `pr` only alongside 2.3 maker/checker.
 **How:** `.claude/git-autonomy.sh commit|push|pr` (Manuel only — the skill forbids the agent to touch the switch). Two locks by design: the script also prints the one manual edit needed in `~/.claude/settings.json`, whose global deny always wins until removed by hand. `off` restores full dormancy.
 **Non-negotiables that survive activation:** verify.sh green before any commit, ≤200 lines per commit, gitleaks hook never bypassed, no AI attribution in commits/PRs, never merge, and the agent never raises its own level.
+**Pre-activation checklist (added 2026-07-15, from the external harness review):** the current design requires hand-removing the *global* commit/push denies, which exposes every unharnessed/new repo on the machine while active — before ever flipping it: (1) re-check whether Claude Code has grown a per-project way to override a user-scope deny, and prefer it; (2) "never merge" is prose only — add mechanical denies for `Bash(gh pr merge:*)` and PR-administration commands at the same scope you loosen; (3) add the activated state as a check in `audit-harness.sh` so a forgotten-on switch shows up in every audit run.
 
 ---
 

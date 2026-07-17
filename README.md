@@ -11,8 +11,11 @@ Portable starter kit for the AI coding harness: context files (AGENTS.md), guard
 | `RESEARCH-REVIEWS.md` | Running log of outside ideas evaluated: what was adopted, what was recorded with install-conditions, what was rejected and why |
 | `HARNESS-PARITY.md` | Component matrix across the three live projects — what's leveled everywhere, what's a justified difference, what's proposed |
 | `GUIDE-claude-projects.md` | Setting up claude.ai Projects properly — for non-coding work only (never for the code repos) |
+| `audit-harness.sh` | **Executable meta-audit** — read-only checks of the whole harness (exclusions, hooks, permissions, pins, skill links, MANUAL contract, snapshot drift) across machine + 3 projects + template. Run after changes and whenever something feels off |
+| `backup-projects.sh` / `restore-project.sh` | Snapshot each project's local-only harness state into `projects/<name>/` (incl. `.git/info/exclude` + hooksPath) / restore it onto a fresh clone — exclusions first, dry-run by default |
 | `GUIDE-what-goes-where.md` | The knowledge-encoding ladder: what belongs in the model / analyzers / AGENTS.md / skills / live docs — and the admission test that keeps the harness lean |
 | `GUIDE-ai-engineering-learning.md` | AI-engineering concepts & terminology mapped to where each already lives in this harness, plus a staged learning roadmap (model calls → RAG → tools → evals) that rides on Alfred |
+| `GUIDE-app-development-planning.md` | Evidence-led, adaptable method for moving from product framing and risk discovery to an outcome roadmap, verified delivery, release, and operation |
 
 Contents:
 

@@ -61,12 +61,14 @@ The loop that keeps quality high without reading every diff:
 
 `AGENTS.md` and everything in git (`.githooks`, CI, dependabot) work with Codex as-is. Only the Claude-specific pieces need a translation:
 
+> **Updated 2026-07-15** — two rows below were stale and have been corrected: Codex **does** have a hook system now (`[features] hooks = true` + `[[hooks.PreToolUse]]`/`[[hooks.Stop]]` in `config.toml` — solo-master and the machine-wide guard in `~/.codex/config.toml` both use it), and skills are discovered natively via `.agents/skills/` — the old `~/.codex/prompts` copy-advice is deprecated. car-dealer's `docs/ai-harness.md` still carries the old text; this table wins.
+
 | Claude Code | Codex equivalent |
 |---|---|
 | `CLAUDE.md` → imports `AGENTS.md` | Reads `AGENTS.md` natively (repo root, plus `~/.codex/AGENTS.md` for global preferences — created 2026-07-15, template copy in `global/codex-AGENTS.md`, MACHINE-SETUP step 2.4). |
 | `.claude/settings.json` permissions | `~/.codex/config.toml`: `approval_policy` + `sandbox_mode` (e.g. `workspace-write` sandbox ≈ the deny rules). Codex sandboxes by default rather than using per-path rules. |
-| `.claude/hooks/format-changed.sh` | No hook system — the pre-commit hook and CI format check are the backstop; also add "run `dotnet format` before finishing" to `AGENTS.md` (already there via definition of done). |
-| `.claude/skills/*/SKILL.md` | Custom prompts: copy each SKILL.md body to `~/.codex/prompts/<name>.md`, invoke with `/<name>`. Or just tell Codex to "follow .claude/skills/migrate/SKILL.md" — it's plain markdown. |
+| `.claude/hooks/format-changed.sh` | Codex hooks (since 2026): `[features] hooks = true` + `[[hooks.Stop]]` in `<repo>/.codex/config.toml` (see solo-master) — one representation per layer, TOML only, no `hooks.json` duplicate. The pre-commit hook and CI format gate remain the backstop. |
+| `.claude/skills/*/SKILL.md` | Native discovery via `.agents/skills/` (repo) and `~/.agents/skills/` (user). We use real directories containing **per-skill symlinks** into `.claude/skills/` — a symlinked `.agents/skills` dir itself hits a known discovery bug (openai/codex#11314). `~/.codex/prompts` is deprecated. |
 | `.mcp.json` | Codex supports MCP too: add the Playwright server under `[mcp_servers.playwright]` in `~/.codex/config.toml`. |
 | `/security-review`, `/code-review` | No built-in equivalents — paste the `security-checklist` skill as the review prompt, and rely on CodeQL + PR review. |
 
