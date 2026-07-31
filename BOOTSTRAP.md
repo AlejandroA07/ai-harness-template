@@ -22,6 +22,7 @@ The script installs or generates:
 
 - root `AGENTS.md` and thin `CLAUDE.md` when missing;
 - Claude and Codex project hooks;
+- the lean Claude built-in tool policy while retaining Bash and PowerShell;
 - fail-closed Gitleaks and narrow Git-metadata hooks;
 - cross-platform `node scripts/verify.mjs` from detected real commands;
 - committed security/verification CI, CodeQL, and detected Dependabot ecosystems for GitHub projects;

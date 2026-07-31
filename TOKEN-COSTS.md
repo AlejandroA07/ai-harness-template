@@ -18,6 +18,28 @@ This is the template's central cost ledger. Static sizes are measured from files
 | Images and attachments | When included | Include only the fidelity needed for the decision |
 | Compaction and handoffs | When crossing context boundaries | Reference existing artifacts instead of duplicating them |
 
+## Claude built-in tool policy
+
+Claude Code loads built-in tool schemas into every request. The harness removes the following optional tools with bare permission denials, while retaining both Bash and PowerShell:
+
+- `Artifact`
+- `CronCreate`
+- `CronDelete`
+- `CronList`
+- `EnterWorktree`
+- `ExitWorktree`
+- `Monitor`
+- `NotebookEdit`
+- `PushNotification`
+- `RemoteTrigger`
+- `ScheduleWakeup`
+- `SendUserFile`
+- `ShareOnboardingGuide`
+- `TaskOutput`
+- `Workflow`
+
+This is a capability trade-off, not just a permission-prompt change. Re-run the runtime protocol after changing the list.
+
 ## Static global guidance
 
 | File | Measured bytes | Estimated tokens |
@@ -62,8 +84,8 @@ Record runtime samples in the table below. Never parse private transcripts or ag
 
 | Date | Agent/version | Model | Project | Scenario | MCPs | Measured result | Method |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| — | — | — | — | Fresh session baseline | — | Unknown | Awaiting manual sample |
-| — | — | — | — | Representative skill invocation | — | Unknown | Awaiting manual sample |
+| 2026-07-31 | Claude Code 2.1.220 | Opus 5 | Harness session | Before optional-tool trim | 2 deferred tools | System tools 11.2k; total 30.1k / 1m | User-provided `/context` sample |
+| — | Claude Code 2.1.220 | Opus 5 | Harness session | After optional-tool trim | 2 deferred tools | Pending | Start a fresh session and run `/context` |
 
 ## Audit triggers
 

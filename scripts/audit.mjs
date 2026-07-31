@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
 import { discoverSkills, readInvocationPolicy } from './skill-lib.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,7 +24,7 @@ async function checkTemplate() {
   const required = [
     'README.md', 'MACHINE-SETUP.md', 'BOOTSTRAP.md', 'TOKEN-COSTS.md',
     'scripts/machine-setup.mjs', 'scripts/bootstrap.mjs', 'scripts/verify.mjs',
-    'components/guard-git.mjs', 'skills/invocation-policy.json',
+    'components/guard-git.mjs', 'components/claude-tool-policy.mjs', 'skills/invocation-policy.json',
   ];
   for (const relative of required) {
     if (await exists(path.join(root, relative))) pass(`template has ${relative}`);
@@ -59,6 +60,15 @@ async function checkMachine() {
     settings.includeCoAuthoredBy === false ? pass('Claude attribution disabled') : fail('Claude attribution setting is not disabled');
     const hookText = JSON.stringify(settings.hooks ?? {});
     hookText.includes('guard-git.mjs') ? pass('Claude machine guard configured') : fail('Claude machine guard missing');
+    hookText.includes('PowerShell') ? pass('Claude machine guard covers PowerShell') : fail('Claude machine guard does not cover PowerShell');
+    const denied = new Set(settings.permissions?.deny ?? []);
+    const missingToolDenials = deniedClaudeBuiltInTools.filter((tool) => !denied.has(tool));
+    missingToolDenials.length === 0
+      ? pass(`Claude optional built-in tools disabled: ${deniedClaudeBuiltInTools.length}`)
+      : fail(`Claude optional built-in tools remain enabled: ${missingToolDenials.join(', ')}`);
+    for (const shell of ['Bash', 'PowerShell']) {
+      denied.has(shell) ? fail(`Claude required shell is disabled: ${shell}`) : pass(`Claude required shell remains available: ${shell}`);
+    }
   } catch (error) { fail(`cannot audit Claude settings: ${error.message}`); }
 
   if (process.platform === 'win32') {
@@ -97,6 +107,18 @@ async function checkProject(project) {
   }
   const hooksPath = spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: project, encoding: 'utf8' });
   hooksPath.status === 0 && hooksPath.stdout.trim() === '.githooks' ? pass('project core.hooksPath is active') : fail('project core.hooksPath is not .githooks');
+
+  try {
+    const settings = JSON.parse(await fs.readFile(path.join(project, '.claude', 'settings.json'), 'utf8'));
+    const denied = new Set(settings.permissions?.deny ?? []);
+    const missingToolDenials = deniedClaudeBuiltInTools.filter((tool) => !denied.has(tool));
+    missingToolDenials.length === 0
+      ? pass(`project disables ${deniedClaudeBuiltInTools.length} optional Claude tools`)
+      : fail(`project leaves optional Claude tools enabled: ${missingToolDenials.join(', ')}`);
+    JSON.stringify(settings.hooks ?? {}).includes('PowerShell')
+      ? pass('project Claude guard covers PowerShell')
+      : fail('project Claude guard does not cover PowerShell');
+  } catch (error) { fail(`cannot audit project Claude settings: ${error.message}`); }
 
   if (await exists(path.join(project, '.harness', 'skills'))) {
     const check = spawnSync(process.execPath, [path.join(root, 'scripts', 'generate-project-skills.mjs'), '--project', project, '--check'], { encoding: 'utf8' });

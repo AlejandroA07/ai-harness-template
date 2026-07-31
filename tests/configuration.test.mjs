@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
 import { replaceHarnessHook } from '../scripts/config-merge.mjs';
 import { buildVerificationSteps } from '../scripts/project-verification.mjs';
 import { readLinkTarget } from '../scripts/skill-lib.mjs';
@@ -48,4 +49,30 @@ test('project verification includes local security gates', () => {
   });
   assert.ok(steps.some((step) => step.command === 'gitleaks'));
   assert.ok(steps.some((step) => step.command === 'zizmor'));
+});
+
+test('Claude tool policy removes only approved optional tools and guards both shells', async () => {
+  assert.deepEqual(deniedClaudeBuiltInTools, [
+    'Artifact',
+    'CronCreate',
+    'CronDelete',
+    'CronList',
+    'EnterWorktree',
+    'ExitWorktree',
+    'Monitor',
+    'NotebookEdit',
+    'PushNotification',
+    'RemoteTrigger',
+    'ScheduleWakeup',
+    'SendUserFile',
+    'ShareOnboardingGuide',
+    'TaskOutput',
+    'Workflow',
+  ]);
+  for (const relative of ['global/claude-settings.json', 'project/.claude/settings.json']) {
+    const settings = JSON.parse(await fs.readFile(path.resolve(import.meta.dirname, '..', relative), 'utf8'));
+    assert.equal(settings.hooks.PreToolUse[0].matcher, 'Bash|PowerShell|Read');
+  }
+  assert.equal(deniedClaudeBuiltInTools.includes('Bash'), false);
+  assert.equal(deniedClaudeBuiltInTools.includes('PowerShell'), false);
 });

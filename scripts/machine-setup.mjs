@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
 import { mergeUnique, replaceHarnessHook } from './config-merge.mjs';
 
 const apply = process.argv.includes('--apply');
@@ -79,7 +80,10 @@ const claudeTemplate = JSON.parse((await fs.readFile(path.join(root, 'global', '
 claudeSettings.includeCoAuthoredBy = false;
 claudeSettings.autoMemoryEnabled = false;
 claudeSettings.permissions ??= {};
-claudeSettings.permissions.deny = mergeUnique(claudeSettings.permissions.deny, claudeTemplate.permissions.deny);
+claudeSettings.permissions.deny = mergeUnique(
+  claudeSettings.permissions.deny,
+  [...claudeTemplate.permissions.deny, ...deniedClaudeBuiltInTools],
+);
 claudeSettings.permissions.disableBypassPermissionsMode = 'disable';
 claudeSettings.hooks ??= {};
 claudeSettings.hooks.PreToolUse = replaceHarnessHook(claudeSettings.hooks.PreToolUse, claudeTemplate.hooks.PreToolUse[0]);

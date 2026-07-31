@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
 import { mergeUnique, replaceHarnessHook } from './config-merge.mjs';
 import { buildVerificationSteps } from './project-verification.mjs';
 
@@ -106,7 +107,10 @@ projectClaude.$schema ??= claudeTemplate.$schema;
 projectClaude.includeCoAuthoredBy = false;
 projectClaude.autoMemoryEnabled = false;
 projectClaude.permissions ??= {};
-projectClaude.permissions.deny = mergeUnique(projectClaude.permissions.deny, claudeTemplate.permissions.deny);
+projectClaude.permissions.deny = mergeUnique(
+  projectClaude.permissions.deny,
+  [...claudeTemplate.permissions.deny, ...deniedClaudeBuiltInTools],
+);
 projectClaude.hooks ??= {};
 projectClaude.hooks.PreToolUse = replaceHarnessHook(projectClaude.hooks.PreToolUse, claudeTemplate.hooks.PreToolUse[0]);
 await fs.mkdir(path.dirname(projectClaudePath), { recursive: true });
