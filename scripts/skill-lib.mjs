@@ -82,6 +82,18 @@ export async function readInvocationPolicy(sourceRoot) {
   }
 }
 
+export async function readLinkTarget(target) {
+  try {
+    const stat = await fs.lstat(target);
+    if (!stat.isSymbolicLink()) return null;
+    const value = await fs.readlink(target);
+    return path.resolve(path.dirname(target), value);
+  } catch (error) {
+    if (error.code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
 function titleCase(name) {
   return name.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }

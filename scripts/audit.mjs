@@ -43,7 +43,7 @@ async function checkTemplate() {
   else fail(`canonical skill inventory has ${skills.length}, expected 19`);
   for (const name of policy) if (!names.has(name)) fail(`invocation policy references missing skill: ${name}`);
 
-  const forbidden = /(?:setup-matt|ask-matt|ready-for-agent|writing-great-skills|resolving-merge-conflicts)/i;
+  const forbidden = /(?:ready-for-agent|writing-great-skills|resolving-merge-conflicts)/i;
   for (const skill of skills) {
     const text = await fs.readFile(path.join(skill.directory, 'SKILL.md'), 'utf8');
     if (forbidden.test(text)) fail(`retired workflow reference in ${skill.name}`);

@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { mergeUnique, replaceHarnessHook } from './config-merge.mjs';
+import { buildVerificationSteps } from './project-verification.mjs';
 
 const args = process.argv.slice(2);
 const apply = args.includes('--apply');
@@ -44,9 +46,8 @@ const dependencies = { ...(packageJson.dependencies ?? {}), ...(packageJson.devD
 const hasUi = ['react', 'next', 'vue', 'svelte', '@angular/core'].some((name) => dependencies[name]);
 const hasGlobalJson = await exists(path.join(project, 'global.json'));
 const hasDocker = relativeFiles.some((file) => /(^|\/)Dockerfile(?:\.|$)/i.test(file));
-const hasGithubDirectory = await exists(path.join(project, '.github'));
 const ghCheck = spawnSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { cwd: project, encoding: 'utf8' });
-const isGithub = githubOverride || hasGithubDirectory || ghCheck.status === 0;
+const isGithub = githubOverride || ghCheck.status === 0;
 
 function recommendation(label, state, reason, trigger) {
   console.log(`${state} ${label}: ${reason}`);
@@ -96,14 +97,6 @@ async function readJson(filePath) {
   catch (error) { if (error.code === 'ENOENT') return {}; throw new Error(`Cannot safely merge invalid JSON at ${filePath}: ${error.message}`); }
 }
 
-function mergeUnique(existing = [], additions = []) {
-  return [...new Set([...existing, ...additions])];
-}
-
-function replaceHarnessHook(groups = [], replacement) {
-  return [...groups.filter((group) => !(group.hooks ?? []).some((hook) => String(hook.command ?? '').includes('guard-git.mjs'))), replacement];
-}
-
 await copyIfMissing(path.join(root, 'project', 'AGENTS.md.template'), path.join(project, 'AGENTS.md'));
 await copyIfMissing(path.join(root, 'project', 'CLAUDE.md'), path.join(project, 'CLAUDE.md'));
 const projectClaudePath = path.join(project, '.claude', 'settings.json');
@@ -132,32 +125,9 @@ await copyAlways(path.join(root, 'project', '.githooks', 'commit-msg'), path.joi
 await copyAlways(path.join(root, 'project', '.gitleaks.toml'), path.join(project, '.gitleaks.toml'));
 for (const file of componentFiles) await copyAlways(path.join(root, 'components', file), path.join(project, '.harness', 'hooks', file));
 
-function selectPackageManager() {
-  if (relativeFiles.includes('pnpm-lock.yaml')) return { command: 'pnpm', install: ['install', '--frozen-lockfile'], audit: ['audit', '--audit-level', 'high'] };
-  if (relativeFiles.includes('yarn.lock')) return { command: 'yarn', install: ['install', '--immutable'], audit: null };
-  if (relativeFiles.includes('bun.lock') || relativeFiles.includes('bun.lockb')) return { command: 'bun', install: ['install', '--frozen-lockfile'], audit: null };
-  return { command: 'npm', install: relativeFiles.includes('package-lock.json') ? ['ci'] : ['install'], audit: ['audit', '--audit-level', 'high'] };
-}
-
-const verifySteps = [];
-if (hasDotnet) {
-  const locked = relativeFiles.some((file) => file.endsWith('packages.lock.json'));
-  verifySteps.push({ name: 'Restore .NET', command: 'dotnet', args: locked ? ['restore', '--locked-mode'] : ['restore'] });
-  verifySteps.push({ name: 'Build .NET', command: 'dotnet', args: ['build', '--configuration', 'Release', '--no-restore'] });
-  verifySteps.push({ name: 'Format .NET', command: 'dotnet', args: ['format', '--verify-no-changes', '--no-restore'] });
-  verifySteps.push({ name: 'Test .NET', command: 'dotnet', args: ['test', '--configuration', 'Release', '--no-build'] });
-}
-if (hasNode) {
-  const manager = selectPackageManager();
-  verifySteps.push({ name: 'Install Node dependencies', command: manager.command, args: manager.install });
-  for (const script of ['build', 'typecheck', 'lint', 'format:check', 'test']) {
-    if (packageJson.scripts?.[script]) verifySteps.push({ name: `Node ${script}`, command: manager.command, args: manager.command === 'npm' ? ['run', script] : [script] });
-  }
-  if (manager.audit) verifySteps.push({ name: 'Audit Node dependencies', command: manager.command, args: manager.audit });
-}
-if (verifySteps.length === 0) verifySteps.push({ name: 'Tailor verification', command: 'node', args: ['-e', "throw new Error('Tailor scripts/verify.mjs for this stack')"] });
-
-const verifyText = `import { spawnSync } from 'node:child_process';\nimport { fileURLToPath } from 'node:url';\nimport path from 'node:path';\nimport process from 'node:process';\n\nconst root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');\nconst steps = ${JSON.stringify(verifySteps, null, 2)};\n\nfor (const step of steps) {\n  console.log(\`\\n==> \${step.name}\`);\n  const result = spawnSync(step.command, step.args, { cwd: root, stdio: 'inherit', shell: false });\n  if (result.error) { console.error(result.error.message); process.exit(1); }\n  if (result.status !== 0) process.exit(result.status ?? 1);\n}\nconsole.log('\\nVerification passed.');\n`;
+const verifySteps = buildVerificationSteps({ hasDotnet, hasNode, isGithub, packageJson, relativeFiles });
+const verifyTemplate = await fs.readFile(path.join(root, 'project', 'scripts', 'verify.mjs.template'), 'utf8');
+const verifyText = verifyTemplate.replace('__VERIFY_STEPS__', JSON.stringify(verifySteps, null, 2));
 if (!(await exists(path.join(project, 'scripts', 'verify.mjs')))) {
   await fs.mkdir(path.join(project, 'scripts'), { recursive: true });
   await fs.writeFile(path.join(project, 'scripts', 'verify.mjs'), verifyText);
@@ -197,10 +167,10 @@ if (isGithub) {
   if (hasDotnet && hasGlobalJson) languages.push('csharp');
   if (languages.length) {
     const setupDotnet = languages.includes('csharp')
-      ? `- name: Setup .NET\n        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4\n        with:\n          global-json-file: global.json`
+      ? `- name: Setup .NET\n        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5\n        with:\n          global-json-file: global.json`
       : `- name: No compiled runtime setup\n        run: echo "Interpreted language analysis"`;
     const autobuild = languages.includes('csharp')
-      ? `- uses: github/codeql-action/autobuild@47be0dbd5113ab1b79fe2dd3f68bdf7e426cdc87 # v3`
+      ? `- uses: github/codeql-action/autobuild@bce182f857edf1feab116e9795a3393d21977282 # v4`
       : `- name: No compiled build required\n        run: echo "Interpreted language analysis"`;
     const codeqlTemplate = await fs.readFile(path.join(root, 'project', '.github', 'workflows', 'codeql.yml.template'), 'utf8');
     const codeql = codeqlTemplate

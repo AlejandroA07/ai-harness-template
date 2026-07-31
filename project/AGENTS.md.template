@@ -21,7 +21,7 @@ This file is the project's source of truth. Keep commands, boundaries, and the d
 - Treat every external boundary as attacker-reachable: authorize explicitly, validate untrusted input, protect secrets, and test denied paths.
 - Never read, print, hardcode, or commit secrets. Use <project secret mechanism>.
 - Never weaken, delete, or skip a check to make verification pass.
-- Work on `feature/<topic>`, never directly on the default branch. Do not use tool-branded branch prefixes.
+- Work on `feature/<topic>`, never directly on the default branch. Do not use tool-branded branch prefixes. A temporary `research/<topic>` branch is the explicit exception for an approved Wayfinder research task.
 - Local commits are allowed after verification. Stage only intended paths, use a human-style message with zero AI attribution, and report the SHA.
 - Never push feature branches. A `research/*` push to `origin` requires separate explicit approval and may not force, delete, mirror, push tags, or include another refspec.
 - Agents must not run `git reset --hard`, `git clean -f`, `git branch -D`, `git checkout .`, or `git restore .`.

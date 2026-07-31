@@ -26,7 +26,7 @@ Before going further, confirm the fixed point resolves when one is used and that
 
 Look for the originating spec, in this order:
 
-1. Issue references in the commit messages (`#123`, `Closes #45`, GitLab `!67`, etc.) — fetch via the workflow in `docs/agents/issue-tracker.md`.
+1. Issue references in the commit messages (`#123`, `Closes #45`, etc.). For a GitHub repository, fetch the issue body and comments with `gh issue view`. Without a GitHub remote, resolve the matching local artifact under `.scratch/`; if neither source exists, ask the user.
 2. A path the user passed as an argument.
 3. A PRD/spec file under `docs/`, `specs/`, or `.scratch/` matching the branch name or feature.
 4. If nothing is found, ask the user where the spec is. If they say there isn't one, the **Spec** sub-agent will skip and report "no spec available".

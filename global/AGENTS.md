@@ -1,6 +1,6 @@
 # Global preferences
 
-- Work on human-named `feature/<topic>` branches, never directly on the default branch and never with a tool-branded prefix.
+- Work on human-named `feature/<topic>` branches, never directly on the default branch and never with a tool-branded prefix. A temporary `research/<topic>` branch is the explicit exception for an approved Wayfinder research task.
 - After the project verification gate passes, you may stage only the intended paths and create a clean local commit. Report its SHA.
 - Never push a feature branch. A `research/*` branch may be pushed only to `origin`, only after explicit approval for that individual push, and never with force, deletion, tags, mirrors, or another refspec.
 - Never include AI attribution in commit messages, branch names, pull-request titles or descriptions, or other Git/GitHub metadata.

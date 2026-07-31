@@ -36,4 +36,4 @@ Claude adapters are generated with Claude's `disable-model-invocation` metadata.
 
 GitHub Issues is canonical when the project is on GitHub. Ignored Markdown under `.scratch/` is the local fallback.
 
-Historical snapshots and retired components are kept outside discovery paths under `C:\Users\aleja\ai-workspaces\archive\` on this machine.
+Historical snapshots and retired components belong in an external, machine-local archive outside discovery paths. The reusable template does not record that archive's absolute location.

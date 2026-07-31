@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generateSkillTree } from './skill-lib.mjs';
+import { generateSkillTree, readLinkTarget } from './skill-lib.mjs';
 
 const apply = process.argv.includes('--apply');
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -22,17 +22,6 @@ function isWithin(candidate, parent) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-async function existingLinkTarget(target) {
-  try {
-    const stat = await fs.lstat(target);
-    if (!stat.isSymbolicLink()) return null;
-    return await fs.realpath(target);
-  } catch (error) {
-    if (error.code === 'ENOENT') return undefined;
-    throw error;
-  }
-}
-
 const actions = [];
 const conflicts = [];
 for (const platform of platforms) {
@@ -40,7 +29,7 @@ for (const platform of platforms) {
   for (const name of names) {
     const target = path.join(platform.target, name);
     const expected = path.join(platform.source, name);
-    const linkTarget = await existingLinkTarget(target);
+    const linkTarget = await readLinkTarget(target);
     if (linkTarget === undefined) actions.push({ kind: 'link', platform, name, target, expected });
     else if (linkTarget === null) conflicts.push(`${platform.name}: ${target} exists and is not a harness link`);
     else if (path.resolve(linkTarget) !== path.resolve(expected)) {
@@ -58,7 +47,7 @@ for (const platform of platforms) {
   for (const entry of installedEntries) {
     if (names.has(entry.name)) continue;
     const target = path.join(platform.target, entry.name);
-    const linkTarget = await existingLinkTarget(target);
+    const linkTarget = await readLinkTarget(target);
     if (linkTarget && isWithin(linkTarget, generatedRoot)) {
       actions.push({ kind: 'remove-obsolete', platform, name: entry.name, target });
     }

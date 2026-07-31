@@ -1,5 +1,7 @@
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import process from 'node:process';
+import { evaluateCommitBranch } from './guard-policy.mjs';
 
 function git(args, options = {}) {
   const result = spawnSync('git', args, { encoding: 'utf8', ...options });
@@ -11,12 +13,17 @@ function git(args, options = {}) {
 }
 
 const branch = git(['branch', '--show-current']).trim();
-if (/^(?:codex|claude|copilot|cursor|agent|ai)\//i.test(branch)) {
-  console.error(`[pre-commit] Branch '${branch}' exposes an AI-tool prefix. Rename it to feature/<topic>.`);
+const branchReason = evaluateCommitBranch(branch);
+if (branchReason) {
+  console.error(`[pre-commit] ${branchReason}`);
   process.exit(1);
 }
 
 const staged = git(['diff', '--cached', '--name-only', '-z']).split('\0').filter(Boolean);
+if (process.platform === 'win32') {
+  const stagedHooks = ['.githooks/pre-commit', '.githooks/commit-msg'].filter((filePath) => staged.includes(filePath) && existsSync(filePath));
+  if (stagedHooks.length > 0) git(['update-index', '--chmod=+x', '--', ...stagedHooks]);
+}
 const secretPath = staged.find((filePath) => {
   const normalized = filePath.replaceAll('\\', '/');
   const name = normalized.split('/').at(-1).toLowerCase();

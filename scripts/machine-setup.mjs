@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { mergeUnique, replaceHarnessHook } from './config-merge.mjs';
 
 const apply = process.argv.includes('--apply');
 const replaceGuidance = process.argv.includes('--replace-guidance');
@@ -48,15 +49,6 @@ async function readJson(filePath) {
     if (error.code === 'ENOENT') return {};
     throw new Error(`Cannot safely merge invalid JSON at ${filePath}: ${error.message}`);
   }
-}
-
-function mergeUnique(existing = [], additions = []) {
-  return [...new Set([...existing, ...additions])];
-}
-
-function replaceHarnessHook(groups = [], replacement) {
-  const retained = groups.filter((group) => !(group.hooks ?? []).some((hook) => String(hook.command ?? '').includes('guard-git.mjs')));
-  return [...retained, replacement];
 }
 
 const guidance = [

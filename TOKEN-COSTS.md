@@ -22,8 +22,8 @@ This is the template's central cost ledger. Static sizes are measured from files
 
 | File | Measured bytes | Estimated tokens |
 | --- | ---: | ---: |
-| global/AGENTS.md | 1484 | 371 |
-| global/CLAUDE.md | 1484 | 371 |
+| global/AGENTS.md | 1589 | 398 |
+| global/CLAUDE.md | 1589 | 398 |
 
 ## Static skill inventory
 
@@ -32,7 +32,7 @@ Metadata is the approximate always-discovered cost. Body cost is paid only when 
 | Skill | Invocation | Metadata est. tokens | Body est. tokens | Resource files / bytes |
 | --- | --- | ---: | ---: | ---: |
 | ask-alfred | user-only | 39 | 322 | 0 / 0 |
-| code-review | model-invoked | 108 | 1615 | 0 / 0 |
+| code-review | model-invoked | 108 | 1647 | 0 / 0 |
 | codebase-design | model-invoked | 71 | 1535 | 1 / 2559 |
 | diagnosing-bugs | model-invoked | 44 | 2096 | 1 / 645 |
 | domain-modeling | model-invoked | 59 | 792 | 2 / 5065 |

@@ -1,16 +1,18 @@
 import { spawnSync } from 'node:child_process';
 import process from 'node:process';
 
-// Bootstrap replaces this list with commands detected from the project. Keep the
-// sequence deterministic: locked restore -> build/analyze -> format -> tests ->
-// dependency/security gates. CI must run this same file.
-const steps = [
-  { name: 'TODO: tailor verification', command: 'node', args: ['-e', "throw new Error('Tailor scripts/verify.mjs during bootstrap')"] },
-];
+// Bootstrap replaces this marker with commands detected from the project. Keep
+// the sequence deterministic: restore -> build/analyze -> format -> tests ->
+// dependency/security gates. CI runs this same file.
+const steps = __VERIFY_STEPS__;
+const windowsShimCommands = new Set(['npm', 'pnpm', 'yarn', 'bun']);
 
 for (const step of steps) {
   console.log(`\n==> ${step.name}`);
-  const result = spawnSync(step.command, step.args, { cwd: new URL('..', import.meta.url), stdio: 'inherit', shell: false });
+  const options = { cwd: new URL('..', import.meta.url), stdio: 'inherit', shell: false };
+  const result = process.platform === 'win32' && windowsShimCommands.has(step.command)
+    ? spawnSync(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', `${step.command}.cmd`, ...step.args], options)
+    : spawnSync(step.command, step.args, options);
   if (result.error) {
     console.error(result.error.message);
     process.exit(1);
