@@ -85,7 +85,7 @@ Record runtime samples in the table below. Never parse private transcripts or ag
 | Date | Agent/version | Model | Project | Scenario | MCPs | Measured result | Method |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-07-31 | Claude Code 2.1.220 | Opus 5 | Harness session | Before optional-tool trim | 2 deferred tools | System tools 11.2k; total 30.1k / 1m | User-provided `/context` sample |
-| — | Claude Code 2.1.220 | Opus 5 | Harness session | After optional-tool trim | 2 deferred tools | Pending | Start a fresh session and run `/context` |
+| 2026-07-31 | Claude Code 2.1.220 | Opus 5 | Harness session | After optional-tool trim | 2 deferred tools | System tools 6.1k; total 25.1k / 1m | User-provided `/context` sample; saved 5.1k system-tool tokens (46%) |
 
 ## Audit triggers
 
