@@ -1,18 +1,34 @@
 {
-  "_comment": "Merge the permissions block into ~/.claude/settings.json (keep whatever keys already exist there). Deny rules at user level win over any project allow rule. Bare filenames match at any depth (gitignore semantics), so Read(.env) == Read(**/.env). disableBypassPermissionsMode self-locks bypass mode out — remove the key if you ever genuinely need it. includeCoAuthoredBy: false strips Claude Code's default AI attribution (Co-Authored-By trailer, PR footer) at the harness level.",
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "includeCoAuthoredBy": false,
+  "autoMemoryEnabled": false,
   "permissions": {
     "deny": [
       "Read(**/.env)",
-      "Read(**/.env.*)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
       "Read(**/*.pem)",
       "Read(**/*.key)",
       "Read(**/id_rsa*)",
+      "Read(**/id_ed25519*)",
       "Read(~/.ssh/**)",
       "Read(~/.aws/**)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Read(~/.azure/**)"
     ],
     "disableBypassPermissionsMode": "disable"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"{{HARNESS_ROOT}}/components/guard-git.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }

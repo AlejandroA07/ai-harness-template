@@ -1,0 +1,14 @@
+{
+  "userOnly": [
+    "ask-alfred",
+    "grill-me",
+    "grill-with-docs",
+    "handoff",
+    "implement",
+    "improve-codebase-architecture",
+    "teach",
+    "to-spec",
+    "to-tickets",
+    "wayfinder"
+  ]
+}

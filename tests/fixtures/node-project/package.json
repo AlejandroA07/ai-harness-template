@@ -1,0 +1,11 @@
+{
+  "name": "harness-fixture",
+  "private": true,
+  "scripts": {
+    "build": "node -e \"console.log('build')\"",
+    "test": "node -e \"console.log('test')\""
+  },
+  "devDependencies": {
+    "typescript": "5.9.2"
+  }
+}

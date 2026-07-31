@@ -1,0 +1,21 @@
+import { spawnSync } from 'node:child_process';
+import process from 'node:process';
+
+// Bootstrap replaces this list with commands detected from the project. Keep the
+// sequence deterministic: locked restore -> build/analyze -> format -> tests ->
+// dependency/security gates. CI must run this same file.
+const steps = [
+  { name: 'TODO: tailor verification', command: 'node', args: ['-e', "throw new Error('Tailor scripts/verify.mjs during bootstrap')"] },
+];
+
+for (const step of steps) {
+  console.log(`\n==> ${step.name}`);
+  const result = spawnSync(step.command, step.args, { cwd: new URL('..', import.meta.url), stdio: 'inherit', shell: false });
+  if (result.error) {
+    console.error(result.error.message);
+    process.exit(1);
+  }
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
+console.log('\nVerification passed.');

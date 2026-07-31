@@ -1,0 +1,7 @@
+# Reviewed fake-secret fixtures from the harness history. Fingerprints are exact,
+# so changed or newly introduced findings still fail verification.
+a067ea0a752ceb2a0f802213eaaf3119db948e7a:projects/alfred/.claude/goals/gitleaks-detects-secrets.md:generic-api-key:1
+a067ea0a752ceb2a0f802213eaaf3119db948e7a:projects/car-dealer/.claude/goals/gitleaks-detects-secrets.md:generic-api-key:1
+a067ea0a752ceb2a0f802213eaaf3119db948e7a:projects/solo-master/.claude/goals/gitleaks-detects-secrets.md:generic-api-key:1
+0521325e7e0f66a812d37465d0158be578c6ac37:project/.claude/goals/gitleaks-detects-secrets.md:generic-api-key:1
+369c2aedca9a7efe1972e21976d43e09c52b896e:BOOTSTRAP.md:generic-api-key:60
