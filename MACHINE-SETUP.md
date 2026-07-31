@@ -44,6 +44,8 @@ The apply step:
 
 It does not enable, remove, or reconfigure MCP servers.
 
+The harness uses Claude's built-in agents for delegation and skills for reusable workflows. It intentionally installs no files under `~/.claude/agents/`; the audit fails when custom agents are present because every discovered description adds startup context. Setup never deletes unknown custom agents automatically.
+
 ## 3. Trust and verify hooks
 
 Codex requires interactive trust for changed non-managed hooks. Open a new Codex session, run `/hooks`, inspect the generated command, and trust it. This step cannot be automated without bypassing the safety feature.

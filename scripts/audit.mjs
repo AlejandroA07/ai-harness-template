@@ -20,6 +20,17 @@ async function exists(filePath) {
   try { await fs.access(filePath); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; }
 }
 
+async function findMarkdownFiles(directory) {
+  if (!(await exists(directory))) return [];
+  const files = [];
+  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+    const child = path.join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...await findMarkdownFiles(child));
+    else if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) files.push(child);
+  }
+  return files;
+}
+
 async function checkTemplate() {
   const required = [
     'README.md', 'MACHINE-SETUP.md', 'BOOTSTRAP.md', 'TOKEN-COSTS.md',
@@ -53,6 +64,10 @@ async function checkTemplate() {
 
 async function checkMachine() {
   const home = os.homedir();
+  const customAgents = await findMarkdownFiles(path.join(home, '.claude', 'agents'));
+  customAgents.length === 0
+    ? pass('Claude custom-agent discovery directory is empty')
+    : fail(`Claude custom-agent discovery contains ${customAgents.length} file(s); use built-in agents and harness skills instead`);
   const claudeSettingsPath = path.join(home, '.claude', 'settings.json');
   try {
     const settings = JSON.parse(await fs.readFile(claudeSettingsPath, 'utf8'));

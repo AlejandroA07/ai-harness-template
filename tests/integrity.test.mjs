@@ -52,3 +52,9 @@ test('Windows bootstrap commits normalize Git hook executable modes', async () =
   assert.match(preCommit, /update-index/);
   assert.match(preCommit, /--chmod=\+x/);
 });
+
+test('machine audit rejects custom Claude agents', async () => {
+  const audit = await read('scripts/audit.mjs');
+  assert.match(audit, /\.claude', 'agents'/);
+  assert.match(audit, /custom-agent discovery contains/);
+});
