@@ -2,14 +2,14 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generateSkillTree, readLinkTarget } from './skill-lib.mjs';
+import { discoverSkills, generateSkillTree, readLinkTarget } from './skill-lib.mjs';
 
 const apply = process.argv.includes('--apply');
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(scriptDirectory, '..');
 const sourceRoot = path.join(root, 'skills');
 const generatedRoot = path.join(root, '.generated', 'skills');
-const skills = apply ? await generateSkillTree(sourceRoot, generatedRoot) : await (await import('./skill-lib.mjs')).discoverSkills(sourceRoot);
+const skills = apply ? await generateSkillTree(sourceRoot, generatedRoot) : await discoverSkills(sourceRoot);
 const names = new Set(skills.map((skill) => skill.name));
 
 const platforms = [

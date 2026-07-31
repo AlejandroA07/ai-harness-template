@@ -3,8 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
-import { discoverSkills, readInvocationPolicy } from './skill-lib.mjs';
+import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
+import { discoverSkills, inspectManagedSkillLink, readInvocationPolicy } from './skill-lib.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const projectIndex = process.argv.indexOf('--project');
@@ -84,11 +84,17 @@ async function checkMachine() {
     for (const shell of ['Bash', 'PowerShell']) {
       denied.has(shell) ? fail(`Claude required shell is disabled: ${shell}`) : pass(`Claude required shell remains available: ${shell}`);
     }
+    for (const obsolete of obsoleteHarnessClaudeDenials) {
+      denied.has(obsolete) ? fail(`Claude settings retain obsolete harness denial: ${obsolete}`) : pass(`Claude obsolete harness denial absent: ${obsolete}`);
+    }
   } catch (error) { fail(`cannot audit Claude settings: ${error.message}`); }
 
   if (process.platform === 'win32') {
     const memoryLock = spawnSync('powershell', ['-NoProfile', '-Command', "[Environment]::GetEnvironmentVariable('CLAUDE_CODE_DISABLE_AUTO_MEMORY','User')"], { encoding: 'utf8' });
-    memoryLock.status === 0 && memoryLock.stdout.trim() === '1' ? pass('Claude machine auto-memory lock enabled') : fail('Claude machine auto-memory lock missing');
+    if (memoryLock.error) fail(`cannot verify Claude machine auto-memory lock: ${memoryLock.error.message}`);
+    else if (memoryLock.status !== 0) fail(`cannot verify Claude machine auto-memory lock: ${memoryLock.stderr.trim() || `exit ${memoryLock.status}`}`);
+    else if (memoryLock.stdout.trim() === '1') pass('Claude machine auto-memory lock enabled');
+    else fail('Claude machine auto-memory lock missing');
   } else {
     warn('Claude environment-level auto-memory lock is not audited on this OS');
   }
@@ -102,16 +108,23 @@ async function checkMachine() {
   const features = process.platform === 'win32'
     ? spawnSync(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', 'codex features list'], { encoding: 'utf8' })
     : spawnSync('codex', ['features', 'list'], { encoding: 'utf8' });
-  if (features.status === 0 && /^memories\s+.*\sfalse$/m.test(features.stdout)) pass('Codex memories disabled');
-  else fail('Codex memories are not verifiably disabled');
+  if (features.error) fail(`cannot verify Codex memories: ${features.error.message}`);
+  else if (features.status !== 0) fail(`cannot verify Codex memories: ${features.stderr.trim() || `exit ${features.status}`}`);
+  else if (/^memories\s+.*\sfalse$/m.test(features.stdout)) pass('Codex memories disabled');
+  else fail('Codex memories are enabled or absent from the feature inventory');
 
   for (const [platform, directory] of [['Claude', path.join(home, '.claude', 'skills')], ['Codex', path.join(home, '.agents', 'skills')]]) {
     for (const skill of await discoverSkills(path.join(root, 'skills'))) {
       const target = path.join(directory, skill.name);
+      const expected = path.join(root, '.generated', 'skills', platform.toLowerCase(), skill.name);
       try {
-        const stat = await fs.lstat(target);
-        stat.isSymbolicLink() ? pass(`${platform} skill linked: ${skill.name}`) : fail(`${platform} skill is not a managed link: ${skill.name}`);
-      } catch { fail(`${platform} skill missing: ${skill.name}`); }
+        const status = await inspectManagedSkillLink(target, expected);
+        if (status === 'missing') fail(`${platform} skill missing: ${skill.name}`);
+        else if (status === 'not-link') fail(`${platform} skill is not a managed link: ${skill.name}`);
+        else if (status === 'unexpected') fail(`${platform} skill points to an unexpected target: ${skill.name}`);
+        else if (status === 'broken') fail(`${platform} skill link is broken or incomplete: ${skill.name}`);
+        else pass(`${platform} skill linked and resolved: ${skill.name}`);
+      } catch (error) { fail(`${platform} skill link cannot be resolved: ${skill.name} (${error.message})`); }
     }
   }
 }
@@ -133,6 +146,9 @@ async function checkProject(project) {
     JSON.stringify(settings.hooks ?? {}).includes('PowerShell')
       ? pass('project Claude guard covers PowerShell')
       : fail('project Claude guard does not cover PowerShell');
+    for (const obsolete of obsoleteHarnessClaudeDenials) {
+      denied.has(obsolete) ? fail(`project retains obsolete harness denial: ${obsolete}`) : pass(`project obsolete harness denial absent: ${obsolete}`);
+    }
   } catch (error) { fail(`cannot audit project Claude settings: ${error.message}`); }
 
   if (await exists(path.join(project, '.harness', 'skills'))) {

@@ -10,7 +10,7 @@ test('rejects explicit attribution signatures', () => {
     'Generated with Codex',
     'Made with AI',
     'Built by ChatGPT',
-    'AI-assisted change',
+    'AI-Assisted-By: Claude',
     'Fix auth 🤖',
   ]) assert.equal(containsAttribution(text), true);
 });
@@ -18,4 +18,6 @@ test('rejects explicit attribution signatures', () => {
 test('allows legitimate product discussion', () => {
   assert.equal(containsAttribution('Document OpenAI API behavior'), false);
   assert.equal(containsAttribution('Add AI recommendations page'), false);
+  assert.equal(containsAttribution('feat: AI-generated summaries endpoint'), false);
+  assert.equal(containsAttribution('Document AI-assisted review mode'), false);
 });

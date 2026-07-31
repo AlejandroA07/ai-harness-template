@@ -15,3 +15,7 @@ export const deniedClaudeBuiltInTools = Object.freeze([
   'TaskOutput',
   'Workflow',
 ]);
+
+export const obsoleteHarnessClaudeDenials = Object.freeze([
+  'Bash(git push:*)',
+]);

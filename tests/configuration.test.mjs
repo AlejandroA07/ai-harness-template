@@ -4,9 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
-import { replaceHarnessHook } from '../scripts/config-merge.mjs';
+import { reconcileHarnessDenials, replaceHarnessHook } from '../scripts/config-merge.mjs';
 import { buildVerificationSteps } from '../scripts/project-verification.mjs';
-import { readLinkTarget } from '../scripts/skill-lib.mjs';
+import { inspectManagedSkillLink, readLinkTarget } from '../scripts/skill-lib.mjs';
 
 test('replacing the harness hook preserves sibling hooks', () => {
   const sibling = { type: 'command', command: 'node keep-this-hook.mjs' };
@@ -34,9 +34,21 @@ test('broken harness links still reveal their intended target', async () => {
     await fs.symlink(target, link, process.platform === 'win32' ? 'junction' : 'dir');
     await fs.rm(target, { recursive: true, force: true });
     assert.equal(path.resolve(await readLinkTarget(link)), path.resolve(target));
+    assert.equal(await inspectManagedSkillLink(link, target), 'broken');
   } finally {
     await fs.rm(temporary, { recursive: true, force: true });
   }
+});
+
+test('harness denial reconciliation removes only obsolete owned rules', () => {
+  assert.deepEqual(
+    reconcileHarnessDenials(
+      ['Read(.env)', 'Bash(git push:*)', 'Bash(company-policy:*)'],
+      ['Read(.env)', 'Monitor'],
+      ['Bash(git push:*)'],
+    ),
+    ['Read(.env)', 'Bash(company-policy:*)', 'Monitor'],
+  );
 });
 
 test('project verification includes local security gates', () => {

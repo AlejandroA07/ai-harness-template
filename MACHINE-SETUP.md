@@ -30,7 +30,7 @@ Review the dry run, then:
 node scripts/machine-setup.mjs --apply --replace-guidance
 ```
 
-`--replace-guidance` is required only when existing global guidance differs. Settings are merged: unrelated permissions and hooks are preserved.
+`--replace-guidance` is required only when existing global guidance differs. Settings are merged: unrelated permissions and hooks are preserved, while explicitly retired harness-owned rules are removed.
 
 The apply step:
 
@@ -57,6 +57,8 @@ node scripts/audit.mjs
 node scripts/verify.mjs
 ```
 
+`audit.mjs` checks whether the template is correctly applied to the machine or selected project. `verify.mjs` tests the template repository itself, including its executable security gates; exit code `0` is the only definition of done.
+
 The audit will continue to warn about Codex hook trust because the public CLI does not expose a stable non-interactive trust-status check.
 
 ## 4. Context-cost baseline
@@ -71,3 +73,7 @@ Record the CLI version, model, project, enabled MCPs, and measurement method. Do
 ## Recovery
 
 Setup is idempotent. Rerun the dry run after upgrades. It stops rather than overwriting an unknown skill or invalid JSON configuration. Retired machine skills should be moved to the external archive before retrying a reported conflict.
+
+## Known limitation
+
+The settings, hooks, and harness source run under the same OS user as the agent. Audit and Git review detect drift, but they cannot make those control files tamper-proof while still allowing the agent to maintain the harness. A stricter maintenance-mode or OS-permission boundary requires a separate design decision.

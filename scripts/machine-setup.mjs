@@ -3,8 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
-import { mergeUnique, replaceHarnessHook } from './config-merge.mjs';
+import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
+import { reconcileHarnessDenials, replaceHarnessHook } from './config-merge.mjs';
 
 const apply = process.argv.includes('--apply');
 const replaceGuidance = process.argv.includes('--replace-guidance');
@@ -80,9 +80,10 @@ const claudeTemplate = JSON.parse((await fs.readFile(path.join(root, 'global', '
 claudeSettings.includeCoAuthoredBy = false;
 claudeSettings.autoMemoryEnabled = false;
 claudeSettings.permissions ??= {};
-claudeSettings.permissions.deny = mergeUnique(
+claudeSettings.permissions.deny = reconcileHarnessDenials(
   claudeSettings.permissions.deny,
   [...claudeTemplate.permissions.deny, ...deniedClaudeBuiltInTools],
+  obsoleteHarnessClaudeDenials,
 );
 claudeSettings.permissions.disableBypassPermissionsMode = 'disable';
 claudeSettings.hooks ??= {};

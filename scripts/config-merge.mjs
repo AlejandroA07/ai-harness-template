@@ -2,6 +2,11 @@ export function mergeUnique(existing = [], additions = []) {
   return [...new Set([...existing, ...additions])];
 }
 
+export function reconcileHarnessDenials(existing = [], additions = [], obsolete = []) {
+  const retired = new Set(obsolete);
+  return mergeUnique(existing.filter((rule) => !retired.has(rule)), additions);
+}
+
 export function replaceHarnessHook(groups = [], replacement) {
   const retained = [];
   for (const group of groups) {

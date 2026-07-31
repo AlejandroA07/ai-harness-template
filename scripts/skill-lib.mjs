@@ -94,6 +94,21 @@ export async function readLinkTarget(target) {
   }
 }
 
+export async function inspectManagedSkillLink(target, expected) {
+  const linkTarget = await readLinkTarget(target);
+  if (linkTarget === undefined) return 'missing';
+  if (linkTarget === null) return 'not-link';
+  if (path.resolve(linkTarget) !== path.resolve(expected)) return 'unexpected';
+  try {
+    const resolved = await fs.stat(target);
+    await fs.access(path.join(target, 'SKILL.md'));
+    return resolved.isDirectory() ? 'valid' : 'broken';
+  } catch (error) {
+    if (error.code === 'ENOENT') return 'broken';
+    throw error;
+  }
+}
+
 function titleCase(name) {
   return name.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }

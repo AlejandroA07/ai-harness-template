@@ -11,7 +11,8 @@ This is the template's central cost ledger. Static sizes are measured from files
 | Skill names and descriptions | Skill discovery | Audit unused skills; keep descriptions concise |
 | Skill bodies | When invoked or selected | User-only for deliberate workflows; progressive disclosure |
 | Skill references | When opened | Keep details in one referenced file; no duplicate README |
-| MCP tool schemas | While the MCP is enabled | Enable Context7, Playwright, and other MCPs only per project |
+| Built-in tool schemas | Every request when loaded eagerly | Disable unused optional tools only after reviewing the capability trade-off |
+| Deferred and MCP tool schemas | When the client loads them; they may show zero cost while deferred | Keep tools on demand and record deferred versus loaded cost separately |
 | Conversation messages and tool output | During the session | Start implementation tickets fresh; avoid dumping broad output |
 | Specs, issues, ADRs, and code | When read | Load the relevant artifact, not the entire history |
 | Subagents and parallel research | Per agent/session | Use only for independent work whose time or isolation benefit pays for it |
@@ -44,8 +45,8 @@ This is a capability trade-off, not just a permission-prompt change. Re-run the 
 
 | File | Measured bytes | Estimated tokens |
 | --- | ---: | ---: |
-| global/AGENTS.md | 1589 | 398 |
-| global/CLAUDE.md | 1589 | 398 |
+| global/AGENTS.md | 1678 | 420 |
+| global/CLAUDE.md | 1678 | 420 |
 
 ## Static skill inventory
 

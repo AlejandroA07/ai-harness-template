@@ -2,8 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
-import { mergeUnique, replaceHarnessHook } from './config-merge.mjs';
+import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
+import { reconcileHarnessDenials, replaceHarnessHook } from './config-merge.mjs';
 import { buildVerificationSteps } from './project-verification.mjs';
 
 const args = process.argv.slice(2);
@@ -107,9 +107,10 @@ projectClaude.$schema ??= claudeTemplate.$schema;
 projectClaude.includeCoAuthoredBy = false;
 projectClaude.autoMemoryEnabled = false;
 projectClaude.permissions ??= {};
-projectClaude.permissions.deny = mergeUnique(
+projectClaude.permissions.deny = reconcileHarnessDenials(
   projectClaude.permissions.deny,
   [...claudeTemplate.permissions.deny, ...deniedClaudeBuiltInTools],
+  obsoleteHarnessClaudeDenials,
 );
 projectClaude.hooks ??= {};
 projectClaude.hooks.PreToolUse = replaceHarnessHook(projectClaude.hooks.PreToolUse, claudeTemplate.hooks.PreToolUse[0]);
