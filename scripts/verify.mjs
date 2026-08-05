@@ -22,7 +22,7 @@ run('gitleaks', ['git', '--redact', '-v'], 'Gitleaks full-history scan');
 // Scan the whole tree, not just this repository's own workflows: project/ holds
 // the workflows and Dependabot config shipped into every bootstrapped project,
 // and CI audits them the same way.
-run('zizmor', ['--no-online-audits', '.'], 'GitHub Actions security');
+run('zizmor', ['.'], 'GitHub Actions security');
 
 const jsonFiles = [
   'skills/invocation-policy.json', 'global/claude-settings.json',

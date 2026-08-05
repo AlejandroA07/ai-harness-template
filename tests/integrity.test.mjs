@@ -50,12 +50,21 @@ test('GitHub hosting requires a working remote or explicit override', async () =
 
 test('generated verification resolves package-manager shims on Windows', async () => {
   const template = await read('project/scripts/verify.mjs.template');
-  assert.match(template, /process\.platform\s*===\s*'win32'/);
-  assert.match(template, /where\.exe/);
-  assert.match(template, /process\.execPath/);
+  const bootstrap = await read('scripts/bootstrap.mjs');
+  const resolver = await read('scripts/windows-cli.mjs');
+  assert.match(resolver, /process\.platform\s*===\s*'win32'/);
+  assert.match(template, /\.\.\/\.harness\/runtime\/windows-cli\.mjs/);
+  assert.doesNotMatch(template, /function resolveWindowsCli/);
+  assert.match(bootstrap, /scripts', 'windows-cli\.mjs/);
   assert.doesNotMatch(template, /ComSpec/);
   assert.doesNotMatch(template, /\['\/d', '\/s', '\/c'/);
   assert.doesNotMatch(template, /shell:\s*true/);
+});
+
+test('repository verification retains token-enabled Zizmor audits', async () => {
+  const verify = await read('scripts/verify.mjs');
+  assert.doesNotMatch(verify, /--no-online-audits/);
+  assert.match(verify, /run\('zizmor', \['\.'\]/);
 });
 
 test('Windows bootstrap commits normalize Git hook executable modes', async () => {
