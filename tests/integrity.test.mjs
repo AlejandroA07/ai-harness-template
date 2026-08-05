@@ -51,9 +51,11 @@ test('GitHub hosting requires a working remote or explicit override', async () =
 test('generated verification resolves package-manager shims on Windows', async () => {
   const template = await read('project/scripts/verify.mjs.template');
   assert.match(template, /process\.platform\s*===\s*'win32'/);
-  assert.match(template, /`\$\{step\.command\}\.cmd`/);
-  assert.match(template, /process\.env\.ComSpec/);
-  assert.match(template, /\['\/d', '\/s', '\/c'/);
+  assert.match(template, /where\.exe/);
+  assert.match(template, /process\.execPath/);
+  assert.doesNotMatch(template, /ComSpec/);
+  assert.doesNotMatch(template, /\['\/d', '\/s', '\/c'/);
+  assert.doesNotMatch(template, /shell:\s*true/);
 });
 
 test('Windows bootstrap commits normalize Git hook executable modes', async () => {
