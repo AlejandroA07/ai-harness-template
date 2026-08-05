@@ -159,7 +159,7 @@ if (isGithub) {
   await fs.mkdir(path.join(project, '.github', 'workflows'), { recursive: true });
   await copyAlways(path.join(root, 'project', '.github', 'workflows', 'verify.yml'), path.join(project, '.github', 'workflows', 'verify.yml'));
   await copyAlways(path.join(root, 'project', '.github', 'workflows', 'harness-security.yml'), path.join(project, '.github', 'workflows', 'harness-security.yml'));
-  const ecosystem = (name, extra = '') => `  - package-ecosystem: ${name}\n    directory: /\n    schedule:\n      interval: weekly\n${extra}`;
+  const ecosystem = (name, extra = '') => `  - package-ecosystem: ${name}\n    directory: /\n    schedule:\n      interval: weekly\n    cooldown:\n      default-days: 7\n${extra}`;
   const ecosystems = [ecosystem('github-actions')];
   if (hasNode) ecosystems.unshift(ecosystem('npm', '    groups:\n      minor-and-patch:\n        update-types: [minor, patch]\n'));
   if (hasDotnet) ecosystems.unshift(ecosystem('nuget', '    groups:\n      minor-and-patch:\n        update-types: [minor, patch]\n'));
