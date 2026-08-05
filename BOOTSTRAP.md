@@ -24,7 +24,7 @@ The script installs or generates:
 - Claude and Codex project hooks;
 - the lean Claude built-in tool policy while retaining Bash and PowerShell;
 - fail-closed Gitleaks and narrow Git-metadata hooks;
-- cross-platform `node scripts/verify.mjs` from detected real commands;
+- cross-platform `node scripts/verify.mjs` from detected real commands, with a shell-free Windows command runner under `.harness/runtime/`;
 - committed security/verification CI, CodeQL, and detected Dependabot ecosystems for GitHub projects;
 - ignored `.scratch/` state and other local-only exclusions;
 - `core.hooksPath=.githooks`;

@@ -129,7 +129,7 @@ async function checkMachine() {
 }
 
 async function checkProject(project) {
-  for (const relative of ['AGENTS.md', 'CLAUDE.md', 'scripts/verify.mjs', '.githooks/pre-commit', '.githooks/commit-msg', '.harness/hooks/guard-git.mjs']) {
+  for (const relative of ['AGENTS.md', 'CLAUDE.md', 'scripts/verify.mjs', '.githooks/pre-commit', '.githooks/commit-msg', '.harness/hooks/guard-git.mjs', '.harness/runtime/windows-cli.mjs']) {
     await exists(path.join(project, relative)) ? pass(`project has ${relative}`) : fail(`project missing ${relative}`);
   }
   const hooksPath = spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: project, encoding: 'utf8' });

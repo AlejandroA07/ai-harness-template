@@ -68,6 +68,7 @@ const componentFiles = ['guard-policy.mjs', 'guard-git.mjs', 'attribution-policy
 const planned = [
   'AGENTS.md', 'CLAUDE.md', '.claude/settings.json', '.codex/hooks.json',
   '.githooks/pre-commit', '.githooks/commit-msg', 'scripts/verify.mjs',
+  '.harness/runtime/windows-cli.mjs',
   '.gitleaks.toml', '.gitignore harness block', 'git core.hooksPath=.githooks',
   ...componentFiles.map((file) => `.harness/hooks/${file}`),
 ];
@@ -129,6 +130,7 @@ await copyAlways(path.join(root, 'project', '.githooks', 'pre-commit'), path.joi
 await copyAlways(path.join(root, 'project', '.githooks', 'commit-msg'), path.join(project, '.githooks', 'commit-msg'));
 await copyAlways(path.join(root, 'project', '.gitleaks.toml'), path.join(project, '.gitleaks.toml'));
 for (const file of componentFiles) await copyAlways(path.join(root, 'components', file), path.join(project, '.harness', 'hooks', file));
+await copyAlways(path.join(root, 'scripts', 'windows-cli.mjs'), path.join(project, '.harness', 'runtime', 'windows-cli.mjs'));
 
 const verifySteps = buildVerificationSteps({ hasDotnet, hasNode, isGithub, packageJson, relativeFiles });
 const verifyTemplate = await fs.readFile(path.join(root, 'project', 'scripts', 'verify.mjs.template'), 'utf8');
