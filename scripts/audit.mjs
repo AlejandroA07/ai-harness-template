@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
 import { discoverSkills, inspectManagedSkillLink, readInvocationPolicy } from './skill-lib.mjs';
+import { runTool } from './windows-cli.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const projectIndex = process.argv.indexOf('--project');
@@ -105,9 +106,7 @@ async function checkMachine() {
     warn('Codex hook trust is interactive; confirm it with /hooks after changes');
   } catch (error) { fail(`cannot audit Codex hooks: ${error.message}`); }
 
-  const features = process.platform === 'win32'
-    ? spawnSync(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', 'codex features list'], { encoding: 'utf8' })
-    : spawnSync('codex', ['features', 'list'], { encoding: 'utf8' });
+  const features = runTool('codex', ['features', 'list']);
   if (features.error) fail(`cannot verify Codex memories: ${features.error.message}`);
   else if (features.status !== 0) fail(`cannot verify Codex memories: ${features.stderr.trim() || `exit ${features.status}`}`);
   else if (/^memories\s+.*\sfalse$/m.test(features.stdout)) pass('Codex memories disabled');

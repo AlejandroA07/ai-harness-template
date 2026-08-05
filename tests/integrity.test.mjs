@@ -11,7 +11,7 @@ test('CI provisions the tools used by the full verification gate', async () => {
   assert.match(workflow, /fetch-depth:\s*0/);
   assert.match(workflow, /GITLEAKS_VERSION:\s*"8\.30\.1"/);
   assert.match(workflow, /gitleaks_\$\{GITLEAKS_VERSION\}_linux_x64/);
-  assert.match(workflow, /ZIZMOR_VERSION:\s*"1\.28\.0"/);
+  assert.match(workflow, /ZIZMOR_VERSION:\s*"1\.29\.0"/);
   assert.match(workflow, /zizmor==\$ZIZMOR_VERSION/);
 });
 
@@ -26,6 +26,15 @@ test('active template text is portable and has no retired source attribution', a
   const retiredNames = [`ask-${'ma'}${'tt'}`, `setup-${'ma'}${'tt'}`];
   assert.doesNotMatch(readme, /[A-Z]:\\Users\\/i);
   for (const name of retiredNames) assert.equal(audit.toLowerCase().includes(name), false);
+});
+
+test('harness scripts reach Windows tools without a shell', async () => {
+  for (const script of ['scripts/machine-setup.mjs', 'scripts/audit.mjs']) {
+    const source = await read(script);
+    assert.doesNotMatch(source, /ComSpec/);
+    assert.doesNotMatch(source, /shell:\s*true/);
+    assert.doesNotMatch(source, /'\/d', '\/s', '\/c'/);
+  }
 });
 
 test('code-review has no missing issue-tracker reference', async () => {

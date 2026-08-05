@@ -1,10 +1,10 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
 import { reconcileHarnessDenials, replaceHarnessHook } from './config-merge.mjs';
+import { runTool } from './windows-cli.mjs';
 
 const apply = process.argv.includes('--apply');
 const replaceGuidance = process.argv.includes('--replace-guidance');
@@ -12,10 +12,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const home = os.homedir();
 
 function run(command, args) {
-  if (process.platform === 'win32' && command === 'codex') {
-    return spawnSync(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', ['codex', ...args].join(' ')], { encoding: 'utf8', cwd: root });
-  }
-  return spawnSync(command, args, { encoding: 'utf8', cwd: root });
+  return runTool(command, args, { cwd: root });
 }
 
 const tools = [
