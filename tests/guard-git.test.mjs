@@ -95,6 +95,17 @@ test('blocks secret reads but permits env templates', () => {
   assert.equal(command('Get-Item Env:NODE_ENV'), null);
 });
 
+test('adversarial quoting cannot stall the guard', () => {
+  // The quoted-word branch must stay unambiguous: an escape alternative that also
+  // matches the negated class backtracks exponentially on unterminated input, which
+  // would let a padded command outlive the hook timeout instead of being judged.
+  const padded = `git reset --hard "${'\\!'.repeat(28)}`;
+  const start = performance.now();
+  const reason = command(padded);
+  assert.ok(performance.now() - start < 300);
+  assert.ok(reason);
+});
+
 test('malformed and empty hook input fail closed', () => {
   for (const input of ['not-json', '', '{}', 'null', '{"tool_input":"git status"}', '{"arguments":[]}']) assert.ok(parseHookInput(input).reason);
   assert.deepEqual(parseHookInput('{"tool_input":{"command":"git status"}}'), {

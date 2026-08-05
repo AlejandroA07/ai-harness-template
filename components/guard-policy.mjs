@@ -16,7 +16,7 @@ function containsSensitivePath(value) {
 
 function shellWords(value) {
   const words = [];
-  const pattern = /"((?:\\.|[^"])*)"|'([^']*)'|([^\s]+)/g;
+  const pattern = /"((?:\\.|[^"\\])*)"|'([^']*)'|([^\s]+)/g;
   for (const match of value.matchAll(pattern)) words.push(match[1] ?? match[2] ?? match[3]);
   return words;
 }
