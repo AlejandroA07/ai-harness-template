@@ -1,0 +1,19 @@
+{
+  "description": "Machine-wide command and secret-file guard.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"{{HARNESS_ROOT}}/components/guard-git.mjs\"",
+            "commandWindows": "node \"{{HARNESS_ROOT_WINDOWS}}\\components\\guard-git.mjs\"",
+            "timeout": 10,
+            "statusMessage": "Checking command against machine policy"
+          }
+        ]
+      }
+    ]
+  }
+}

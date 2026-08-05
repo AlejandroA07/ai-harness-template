@@ -1,23 +1,30 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "includeCoAuthoredBy": false,
+  "autoMemoryEnabled": false,
   "permissions": {
     "deny": [
-      "Read(.env)",
-      "Read(.env.*)",
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(./.env.*.local)",
       "Read(**/.env)",
-      "Read(**/.env.*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)"
-    ],
-    "allow": []
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/id_rsa*)",
+      "Read(**/id_ed25519*)"
+    ]
   },
   "hooks": {
-    "Stop": [
+    "PreToolUse": [
       {
+        "matcher": "Bash|PowerShell|Read",
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-changed.sh",
-            "timeout": 180
+            "command": "node \"$CLAUDE_PROJECT_DIR/.harness/hooks/guard-git.mjs\"",
+            "timeout": 10
           }
         ]
       }

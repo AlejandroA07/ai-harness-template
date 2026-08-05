@@ -1,67 +1,44 @@
 # <PROJECT NAME> — Agent Guide
 
-<One paragraph: what the app is, main stack, how it's orchestrated.>
-This file is the source of truth for AI coding agents (Claude Code, Codex, etc.). Keep it updated when commands or conventions change.
+<One paragraph: purpose, users, main stack, and how the application runs.>
+
+This file is the project's source of truth. Keep commands, boundaries, and the definition of done current.
 
 ## Architecture
 
-<Table or bullet list: each project/package/folder and its role. State the dependency
-direction explicitly if layered ("dependencies point inward: X → Y → Z; never reference outward").
-Name anything agents must NOT touch (legacy folders, generated code, key material).>
+<List the real modules or top-level directories, what each owns, and the dependency direction. Name generated, legacy, or sensitive areas that must not be edited.>
 
 ## Commands
 
-```bash
-# Run everything locally
-<command>
+- Start: `<command>`
+- Focused test: `<command>`
+- Full verification: `node scripts/verify.mjs`
 
-# Build & test (use the exact same filter/flags CI uses)
-<commands>
+<State the package-manager, lock-file, database, migration, and formatting conventions that actually exist. Delete this paragraph after tailoring.>
 
-# Format — CI fails on violations, so run before finishing any change
-<commands>
-```
+## Invariants
 
-<Note any package-management rules: lock files, central versions, how to add a dependency correctly.>
+- Treat every external boundary as attacker-reachable: authorize explicitly, validate untrusted input, protect secrets, and test denied paths.
+- Never read, print, hardcode, or commit secrets. Use <project secret mechanism>.
+- Never weaken, delete, or skip a check to make verification pass.
+- Work on `feature/<topic>`, never directly on the default branch. Do not use tool-branded branch prefixes. A temporary `research/<topic>` branch is the explicit exception for an approved Wayfinder research task.
+- Local commits are allowed after verification. Stage only intended paths, use a human-style message with zero AI attribution, and report the SHA.
+- Never push feature branches. A `research/*` push to `origin` requires separate explicit approval and may not force, delete, mirror, push tags, or include another refspec.
+- Agents must not run destructive Git operations that discard user work: `reset --hard|--merge|--keep`, forced clean/branch/worktree removal, whole-worktree checkout/restore/`git rm`, or `stash clear`.
 
-## Database & migrations  <!-- delete section if no DB -->
+## Workflow
 
-<Migration tool, exact create/apply commands, where migrations live.
-Rules: always inspect generated migrations before applying; never edit an applied migration.>
+- Read `CONTEXT.md` and relevant `docs/adr/` entries when they exist.
+- Follow the matching installed skill for nontrivial workflows. Project-specific skill sources live in `.harness/skills/`; `.claude/skills/` and `.agents/skills/` are generated adapters and must not be edited by hand.
+- Keep changes within the approved ticket or specification. Do not add speculative abstractions or unrelated cleanup.
+- Prefer the nearest existing pattern. If a decision is missing and materially changes scope, stop and ask.
 
-## Secrets & security (non-negotiable)
+## Definition of done
 
-- Secrets come from <.env / user-secrets / vault>. **Never** read, print, or commit them; never hardcode a secret in code, tests, or docs.
-- <List secret-holding paths agents must never touch.>
-- Every new endpoint needs: an explicit authorization decision, validation on all input, and error responses that leak no internals.
-- All data access parameterized — no string-interpolated SQL, ever.
+`node scripts/verify.mjs` must exit `0`. It is the final vote and runs the same restore, build, analysis, format, test, and security gates as CI.
 
-## NEVER (laws — exceptions require asking first)
+Before calling work complete, also confirm that new behavior is tested, applicable security-checklist items pass, the staged patch contains only intended files, and documentation reflects any durable project truth that changed.
 
-- Never edit, weaken, or delete a test to make it pass. That is a fail, always.
-- Never report work as done from your own assessment. Done = `scripts/verify.sh` exits 0.
-- Never add a dependency without proposing it first and stopping.
-- Never exceed ~200 changed lines in one commit without asking first.
-- Never invent a secret, an endpoint, or a convention. Stop and ask.
-- Never run `git commit` or `git push` — the owner does both himself. Sole exception: the owner has personally raised `.claude/git-autonomy.sh` above `off` (check `status`); then follow the `git` skill at exactly that level.
+## Project conventions
 
-## How to work
-
-Don't add features, refactor, or introduce abstractions beyond what the task requires. A bug fix doesn't need surrounding cleanup. Don't design for hypothetical future requirements: do the simplest thing that works well. Only validate at system boundaries.
-
-Before reporting progress, audit each claim against a tool result from this session. Only report work you can point to evidence for; if something is not yet verified, say so explicitly. If tests fail, say so with the output.
-
-## Definition of done — every change, before you call it finished
-
-Run `scripts/verify.sh` — it is the final vote: build, format/lint gates, and the full test suite in one deterministic command.
-
-Additionally:
-1. New behavior has new tests.
-2. New/changed endpoints pass the security checklist (see `.claude/skills/security-checklist/`).
-3. Work on a feature branch, never directly on `main`. Small, reviewable commits.
-4. Branches are `feature/<topic>`, always — including agent-created ones. If your tool defaults to another prefix (`codex/…`), rename with `git branch -m` before pushing (the pre-commit hook blocks AI-tool prefixes).
-
-## Conventions
-
-<Naming, patterns to copy ("look at a neighboring feature first and match its shape"),
-linting philosophy, anything the team decided that code alone doesn't show.>
+<Naming, patterns worth copying, compatibility constraints, and other non-obvious project-specific rules.>

@@ -1,42 +1,39 @@
 # AI Harness Template
 
-Portable starter kit for the AI coding harness: context files (AGENTS.md), guardrails (permissions, hooks, secret scanning), and verification (CI security, analyzers, architecture tests). Tool-agnostic where possible — works with Claude Code today, adaptable to Codex or others (see the mapping table in `reference-implementation.md`).
+A reusable, cross-platform workflow for Claude Code and Codex. It keeps durable project truth reviewable, makes nontrivial work move from decisions to specifications to vertical implementation tickets, and backs the important safety rules with executable checks.
 
-| Read this | When |
-|---|---|
-| `MACHINE-SETUP.md` | New machine — tools, global Claude config, carrying this template around |
-| `BOOTSTRAP.md` | New (or existing) project — step-by-step, executable by a human or an AI agent; includes the "Lessons" list of real bootstrap mistakes |
-| `reference-implementation.md` | The full write-up of the original implementation: component inventory, on/off toggle table, Claude↔Codex mapping, roadmap |
-| `HARNESS-TIERS.md` | What runs now on a Pro plan vs. what's documented-and-dormant for Max/API budget (loops, schedules, fleets, maker/checker) — with activation conditions and setup guides |
-| `RESEARCH-REVIEWS.md` | Running log of outside ideas evaluated: what was adopted, what was recorded with install-conditions, what was rejected and why |
-| `HARNESS-PARITY.md` | Component matrix across the three live projects — what's leveled everywhere, what's a justified difference, what's proposed |
-| `GUIDE-claude-projects.md` | Setting up claude.ai Projects properly — for non-coding work only (never for the code repos) |
-| `audit-harness.sh` | **Executable meta-audit** — read-only checks of the whole harness (exclusions, hooks, permissions, pins, skill links, MANUAL contract, snapshot drift) across machine + 3 projects + template. Run after changes and whenever something feels off |
-| `backup-projects.sh` / `restore-project.sh` | Snapshot each project's local-only harness state into `projects/<name>/` (incl. `.git/info/exclude` + hooksPath) / restore it onto a fresh clone — exclusions first, dry-run by default |
-| `GUIDE-what-goes-where.md` | The knowledge-encoding ladder: what belongs in the model / analyzers / AGENTS.md / skills / live docs — and the admission test that keeps the harness lean |
-| `GUIDE-ai-engineering-learning.md` | AI-engineering concepts & terminology mapped to where each already lives in this harness, plus a staged learning roadmap (model calls → RAG → tools → evals) that rides on Alfred |
-| `GUIDE-app-development-planning.md` | Evidence-led, adaptable method for moving from product framing and risk discovery to an outcome roadmap, verified delivery, release, and operation |
+## Start here
 
-Contents:
+- New machine: follow [MACHINE-SETUP.md](MACHINE-SETUP.md), beginning with `node scripts/machine-setup.mjs`.
+- New or existing project: follow [BOOTSTRAP.md](BOOTSTRAP.md), beginning with `node scripts/bootstrap.mjs <project-path>`.
+- Token cost: review [TOKEN-COSTS.md](TOKEN-COSTS.md) and update it with `node scripts/token-costs.mjs --write`.
+- Audit installed state: run `node scripts/audit.mjs`, or add `--project <path>` to check whether one project conforms to the template.
+- Verify repository correctness: run `node scripts/verify.mjs` to execute the template's tests and security gates. Exit code `0` is the definition of done.
 
-```
-project/            # copy into a repo root, then follow BOOTSTRAP.md
-  .claude/          #   agent permissions, format-on-stop hook, security-checklist skill,
-                    #   harness-mode.sh (AUTO/MANUAL autonomy switch),
-                    #   dormant switches, default OFF (tiers doc): git-autonomy.sh + git
-                    #   skill (levels commit→push→pr), sandbox-mode.sh (OS sandbox)
-  .harness/         #   tool-neutral hooks: guard-git-publish.sh (blocks agent commit/push,
-                    #   wire into Codex PreToolUse — see BOOTSTRAP step 7b)
-  .githooks/        #   gitleaks pre-commit (modern `gitleaks git` syntax)
-  .mcp.json         #   Playwright + Context7 MCP servers
-  .github/          #   CodeQL, Dependabot, secret-scan job (committed — no AI signature)
-  AGENTS.md.template
-  CLAUDE.md
-dotnet-extras/      # analyzers snippet + architecture-tests example (.NET projects)
-global/             # ~/.claude machine-wide settings + personal CLAUDE.md template
-  skills/           #   role skills for ~/.claude/skills: web-designer, backend-engineer,
-                    #   fullstack-engineer, devops, architecture-designer
-                    #   (quality bars + procedures, not language tutorials)
-```
+All mutating setup commands are dry-run by default and require `--apply`.
 
-Golden rule of the whole harness: **you don't review every line an AI writes, so the harness has to** — context teaches the agent, guardrails are enforced by tooling not trust, and verification (tests, scanners, CI) is the judge.
+## Active structure
+
+| Path | Purpose |
+| --- | --- |
+| `skills/engineering/` | Canonical engineering workflows |
+| `skills/productivity/` | Canonical user/productivity workflows |
+| `skills/invocation-policy.json` | Minimal user-only policy; inventory is discovered automatically |
+| `components/` | Deterministic guards, Git checks, and conditional MCP templates |
+| `project/` | Portable project skeleton and CI templates |
+| `global/` | Claude and Codex machine guidance/settings templates |
+| `scripts/` | Dependency-free Node setup, generation, audit, cost, and verification tools |
+
+Claude adapters are generated with Claude's `disable-model-invocation` metadata. Codex adapters are generated with `agents/openai.yaml`. The workflow body has one canonical source.
+
+## Workflow
+
+- Use `grill-with-docs` for a repository-backed idea that fits one planning session.
+- Use `wayfinder` when the decisions span several sessions.
+- Convert resolved decisions with `to-spec`, then `to-tickets`.
+- Run each approved ticket in a fresh `implement` session.
+- Use `ask-alfred` when you cannot remember the appropriate entry point.
+
+GitHub Issues is canonical when the project is on GitHub. Ignored Markdown under `.scratch/` is the local fallback.
+
+Historical snapshots and retired components belong in an external, machine-local archive outside discovery paths. The reusable template does not record that archive's absolute location.
