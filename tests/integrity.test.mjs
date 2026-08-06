@@ -6,6 +6,13 @@ import test from 'node:test';
 const root = path.resolve(import.meta.dirname, '..');
 const read = (relative) => fs.readFile(path.join(root, relative), 'utf8');
 
+function actionPins(workflow) {
+  return new Map(
+    [...workflow.matchAll(/^\s*-\s+uses:\s+([^@\s]+)@([0-9a-f]{40})/gm)]
+      .map(([, action, sha]) => [action, sha]),
+  );
+}
+
 test('CI provisions the tools used by the full verification gate', async () => {
   const workflow = await read('.github/workflows/verify.yml');
   assert.match(workflow, /fetch-depth:\s*0/);
@@ -13,6 +20,28 @@ test('CI provisions the tools used by the full verification gate', async () => {
   assert.match(workflow, /gitleaks_\$\{GITLEAKS_VERSION\}_linux_x64/);
   assert.match(workflow, /ZIZMOR_VERSION:\s*"1\.29\.0"/);
   assert.match(workflow, /zizmor==\$ZIZMOR_VERSION/);
+});
+
+test('portable workflows retain active action pins', async () => {
+  const pairs = [
+    ['.github/workflows/security.yml', 'project/.github/workflows/harness-security.yml'],
+    ['.github/workflows/verify.yml', 'project/.github/workflows/verify.yml'],
+  ];
+
+  for (const [activePath, portablePath] of pairs) {
+    const activePins = actionPins(await read(activePath));
+    const portablePins = actionPins(await read(portablePath));
+    for (const [action, sha] of activePins) {
+      assert.equal(portablePins.get(action), sha, `${portablePath}: ${action} must match ${activePath}`);
+    }
+  }
+});
+
+test('portable verification retains the active Zizmor version', async () => {
+  const active = await read('.github/workflows/verify.yml');
+  const portable = await read('project/.github/workflows/verify.yml');
+  const version = /ZIZMOR_VERSION:\s*"([^"]+)"/;
+  assert.equal(portable.match(version)?.[1], active.match(version)?.[1]);
 });
 
 test('the harness repository carries CodeQL and Dependabot', async () => {
