@@ -19,12 +19,15 @@ All mutating setup commands are dry-run by default and require `--apply`.
 | `skills/engineering/` | Canonical engineering workflows |
 | `skills/productivity/` | Canonical user/productivity workflows |
 | `skills/invocation-policy.json` | Minimal user-only policy; inventory is discovered automatically |
+| `skills/upstream-sources.json` | Exact/adapted/local ownership and reviewed Pocock commit |
 | `components/` | Deterministic guards, Git checks, and conditional MCP templates |
 | `project/` | Portable project skeleton and CI templates |
 | `global/` | Claude and Codex machine guidance/settings templates |
 | `scripts/` | Dependency-free Node setup, generation, audit, cost, and verification tools |
 
 Claude adapters are generated with Claude's `disable-model-invocation` metadata. Codex adapters are generated with `agents/openai.yaml`. The workflow body has one canonical source.
+
+Exact-tracked Pocock skills are updated with `node scripts/upstream-skills.mjs`; adapted and local skills are reported for review and are never overwritten. The full plugin is intentionally not installed, avoiding duplicate skill selection in either Claude or Codex.
 
 ## Workflow
 

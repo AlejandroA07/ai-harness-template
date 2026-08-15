@@ -5,13 +5,19 @@ import { fileURLToPath } from 'node:url';
 import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
 import { reconcileHarnessDenials, replaceHarnessHook } from './config-merge.mjs';
 import { buildVerificationSteps } from './project-verification.mjs';
+import { detectDomainSignals, inspectExistingDomainConfiguration, inspectExistingDomainContract, inspectExistingTrackerConfiguration, renderDomainInstructions, renderTrackerInstructions } from './project-configuration.mjs';
 
 const args = process.argv.slice(2);
 const apply = args.includes('--apply');
 const githubOverride = args.includes('--github');
+const domainLayoutArg = args.find((arg) => arg.startsWith('--domain-layout='))?.split('=')[1] ?? null;
+if (domainLayoutArg && !['single', 'multi'].includes(domainLayoutArg)) {
+  console.error('Domain layout must be --domain-layout=single or --domain-layout=multi');
+  process.exit(2);
+}
 const targetArg = args.find((arg) => !arg.startsWith('--'));
 if (!targetArg) {
-  console.error('Usage: node scripts/bootstrap.mjs <project-path> [--github] [--apply]');
+  console.error('Usage: node scripts/bootstrap.mjs <project-path> [--github] [--domain-layout=single|multi] [--apply]');
   process.exit(2);
 }
 
@@ -48,7 +54,24 @@ const hasUi = ['react', 'next', 'vue', 'svelte', '@angular/core'].some((name) =>
 const hasGlobalJson = await exists(path.join(project, 'global.json'));
 const hasDocker = relativeFiles.some((file) => /(^|\/)Dockerfile(?:\.|$)/i.test(file));
 const ghCheck = spawnSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { cwd: project, encoding: 'utf8' });
-const isGithub = githubOverride || ghCheck.status === 0;
+const originCheck = spawnSync('git', ['remote', 'get-url', 'origin'], { cwd: project, encoding: 'utf8' });
+const hasGitHubRemote = originCheck.status === 0 && /(?:github\.com|github\.enterprise)/i.test(originCheck.stdout);
+const isGithub = githubOverride || ghCheck.status === 0 || hasGitHubRemote;
+const domainSignals = detectDomainSignals(relativeFiles, packageJson);
+const existingDomain = await inspectExistingDomainConfiguration(project);
+const existingDomainContract = await inspectExistingDomainContract(project);
+const existingTracker = await inspectExistingTrackerConfiguration(project, isGithub);
+const domainFileLayout = existingDomain.state === 'single-context' ? 'single' : existingDomain.state === 'multi-context' ? 'multi' : null;
+const contractLayout = existingDomainContract.state === 'configured' ? existingDomainContract.layout : null;
+const domainSourcesConflict = domainFileLayout && contractLayout && domainFileLayout !== contractLayout;
+const existingLayout = domainFileLayout ?? contractLayout;
+let domainLayout = domainLayoutArg;
+if (!domainLayout) {
+  if (existingLayout === 'single' && domainSignals.length === 0) domainLayout = 'single';
+  else if (existingLayout === 'multi') domainLayout = 'multi';
+  else if (existingDomain.state === 'unconfigured' && domainSignals.length === 0) domainLayout = 'single';
+}
+const domainLayoutConflict = existingLayout && domainLayoutArg && existingLayout !== domainLayoutArg;
 
 function recommendation(label, state, reason, trigger) {
   console.log(`${state} ${label}: ${reason}`);
@@ -58,15 +81,29 @@ function recommendation(label, state, reason, trigger) {
 console.log(`Bootstrap ${apply ? 'APPLY' : 'DRY RUN'} for ${project}\n`);
 recommendation('base harness', 'RECOMMENDED', 'portable guidance, verification interface, hooks, and guards');
 recommendation('GitHub CI', isGithub ? 'RECOMMENDED' : 'NOT CURRENTLY', isGithub ? 'GitHub project detected' : 'no GitHub project detected', 'the project is hosted on GitHub');
+if (existingTracker.state === 'conflict') console.log(`BLOCKED issue tracker: ${existingTracker.reason} Reconcile it before applying bootstrap.`);
 recommendation('Context7 MCP', 'NOT CURRENTLY', 'only useful when work repeatedly needs current third-party documentation', 'the project depends on fast-moving external APIs or frameworks');
 recommendation('Playwright MCP', hasUi ? 'RECOMMENDED' : 'NOT CURRENTLY', hasUi ? 'UI framework detected' : 'no browser UI detected', 'the project gains a browser-driven UI');
 recommendation('.NET analyzer tightening', hasDotnet ? 'RECOMMENDED' : 'NOT CURRENTLY', hasDotnet ? 'review built-in analyzers and current Sonar rules; ratchet legacy warnings' : 'no .NET project detected');
 recommendation('architecture tests', csProjects.length >= 3 ? 'RECOMMENDED' : 'NOT CURRENTLY', csProjects.length >= 3 ? 'several .NET projects may represent real dependency boundaries' : 'no stable multi-module boundary detected', 'a boundary becomes important and repeatedly violated');
 recommendation('mutation testing', 'NOT CURRENTLY', 'reserve it for mature, high-risk test suites', 'critical logic has a stable suite whose fault-detection strength matters');
+if (existingDomain.state === 'conflict' || existingDomainContract.state === 'conflict' || domainSourcesConflict || domainLayoutConflict) {
+  const reason = existingDomain.reason
+    ?? existingDomainContract.reason
+    ?? (domainSourcesConflict ? `Domain files declare ${domainFileLayout}-context while docs/agents/domain.md declares ${contractLayout}-context.` : null)
+    ?? `Existing ${existingLayout}-context files conflict with --domain-layout=${domainLayoutArg}.`;
+  console.log(`BLOCKED domain configuration: ${reason} Resolve the contradiction before applying bootstrap.`);
+} else if (!domainLayout && domainSignals.length > 0) {
+  console.log(`REVIEW REQUIRED domain layout: structural signals found (${domainSignals.join(', ')}). Choose --domain-layout=single or --domain-layout=multi after checking whether these projects represent distinct domain contexts.`);
+} else {
+  const detected = domainSignals.length > 0 ? `; reviewed signals: ${domainSignals.join(', ')}` : '';
+  console.log(`RECOMMENDED domain layout: ${domainLayout === 'multi' ? 'multi-context' : 'single-context'}${detected}`);
+}
 
 const componentFiles = ['guard-policy.mjs', 'guard-git.mjs', 'attribution-policy.mjs', 'check-attribution.mjs', 'pre-commit.mjs'];
 const planned = [
   'AGENTS.md', 'CLAUDE.md', '.claude/settings.json', '.codex/hooks.json',
+  'docs/agents/issue-tracker.md', 'docs/agents/domain.md',
   '.githooks/pre-commit', '.githooks/commit-msg', 'scripts/verify.mjs',
   '.harness/runtime/windows-cli.mjs',
   '.gitleaks.toml', '.gitignore harness block', 'git core.hooksPath=.githooks',
@@ -80,6 +117,15 @@ for (const item of planned) console.log(`${apply ? 'APPLY' : 'WOULD APPLY'} ${it
 if (!apply) {
   console.log('\nDry run complete. The agent must still tailor AGENTS.md, verification, architecture, and conditional recommendations from project evidence.');
   process.exit(0);
+}
+
+if (existingTracker.state === 'conflict') throw new Error(existingTracker.reason);
+if (existingDomain.state === 'conflict') throw new Error(existingDomain.reason);
+if (existingDomainContract.state === 'conflict') throw new Error(existingDomainContract.reason);
+if (domainSourcesConflict) throw new Error(`Domain files declare ${domainFileLayout}-context while docs/agents/domain.md declares ${contractLayout}-context.`);
+if (domainLayoutConflict) throw new Error(`Existing ${existingLayout}-context files conflict with --domain-layout=${domainLayoutArg}.`);
+if (!domainLayout) {
+  throw new Error(`Domain layout needs review because bootstrap found: ${domainSignals.join(', ')}. Rerun with --domain-layout=single or --domain-layout=multi.`);
 }
 
 async function copyIfMissing(source, destination) {
@@ -101,6 +147,11 @@ async function readJson(filePath) {
 
 await copyIfMissing(path.join(root, 'project', 'AGENTS.md.template'), path.join(project, 'AGENTS.md'));
 await copyIfMissing(path.join(root, 'project', 'CLAUDE.md'), path.join(project, 'CLAUDE.md'));
+const trackerPath = path.join(project, 'docs', 'agents', 'issue-tracker.md');
+const domainPath = path.join(project, 'docs', 'agents', 'domain.md');
+await fs.mkdir(path.dirname(trackerPath), { recursive: true });
+if (!(await exists(trackerPath))) await fs.writeFile(trackerPath, renderTrackerInstructions({ github: isGithub }));
+if (!(await exists(domainPath))) await fs.writeFile(domainPath, renderDomainInstructions({ multiContext: domainLayout === 'multi' }));
 const projectClaudePath = path.join(project, '.claude', 'settings.json');
 const projectClaude = await readJson(projectClaudePath);
 const claudeTemplate = await readJson(path.join(root, 'project', '.claude', 'settings.json'));

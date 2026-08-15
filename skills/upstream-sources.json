@@ -1,0 +1,34 @@
+{
+  "repository": "https://github.com/mattpocock/skills.git",
+  "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df",
+  "skills": {
+    "ask-alfred": { "mode": "adapted", "upstreamPath": "skills/engineering/ask-matt", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "code-review": { "mode": "adapted", "upstreamPath": "skills/engineering/code-review", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "codebase-design": { "mode": "exact", "upstreamPath": "skills/engineering/codebase-design", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "diagnosing-bugs": { "mode": "adapted", "upstreamPath": "skills/engineering/diagnosing-bugs", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "domain-modeling": { "mode": "exact", "upstreamPath": "skills/engineering/domain-modeling", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "grill-me": { "mode": "exact", "upstreamPath": "skills/productivity/grill-me", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "grill-with-docs": { "mode": "exact", "upstreamPath": "skills/engineering/grill-with-docs", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "grilling": { "mode": "exact", "upstreamPath": "skills/productivity/grilling", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "handoff": { "mode": "exact", "upstreamPath": "skills/productivity/handoff", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "implement": { "mode": "adapted", "upstreamPath": "skills/engineering/implement", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "improve-codebase-architecture": { "mode": "exact", "upstreamPath": "skills/engineering/improve-codebase-architecture", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "prototype": { "mode": "exact", "upstreamPath": "skills/engineering/prototype", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "research": { "mode": "exact", "upstreamPath": "skills/engineering/research", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "security-checklist": { "mode": "local" },
+    "tdd": { "mode": "exact", "upstreamPath": "skills/engineering/tdd", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "teach": { "mode": "exact", "upstreamPath": "skills/productivity/teach", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "to-questionnaire": { "mode": "exact", "upstreamPath": "skills/productivity/to-questionnaire", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "to-spec": { "mode": "adapted", "upstreamPath": "skills/engineering/to-spec", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "to-tickets": { "mode": "adapted", "upstreamPath": "skills/engineering/to-tickets", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "wait-what": { "mode": "exact", "upstreamPath": "skills/productivity/wait-what", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "wayfinder": { "mode": "adapted", "upstreamPath": "skills/engineering/wayfinder", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" },
+    "writing-for-agents": { "mode": "exact", "upstreamPath": "skills/productivity/writing-for-agents", "reviewedCommit": "8b78b531ab965735c5dc74f6f7a219e1e37326df" }
+  },
+  "rejected": [
+    "resolving-merge-conflicts",
+    "setup-matt-pocock-skills",
+    "triage",
+    "wizard"
+  ]
+}

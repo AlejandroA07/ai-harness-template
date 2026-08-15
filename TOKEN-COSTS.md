@@ -45,8 +45,8 @@ This is a capability trade-off, not just a permission-prompt change. Re-run the 
 
 | File | Measured bytes | Estimated tokens |
 | --- | ---: | ---: |
-| global/AGENTS.md | 1678 | 420 |
-| global/CLAUDE.md | 1678 | 420 |
+| global/AGENTS.md | 2182 | 546 |
+| global/CLAUDE.md | 2182 | 546 |
 
 ## Static skill inventory
 
@@ -54,25 +54,28 @@ Metadata is the approximate always-discovered cost. Body cost is paid only when 
 
 | Skill | Invocation | Metadata est. tokens | Body est. tokens | Resource files / bytes |
 | --- | --- | ---: | ---: | ---: |
-| ask-alfred | user-only | 39 | 322 | 0 / 0 |
-| code-review | model-invoked | 108 | 1647 | 0 / 0 |
-| codebase-design | model-invoked | 71 | 1535 | 1 / 2559 |
-| diagnosing-bugs | model-invoked | 44 | 2096 | 1 / 645 |
-| domain-modeling | model-invoked | 59 | 792 | 2 / 5065 |
+| ask-alfred | user-only | 25 | 2549 | 1 / 4406 |
+| code-review | model-invoked | 109 | 1639 | 0 / 0 |
+| codebase-design | model-invoked | 71 | 1545 | 2 / 5250 |
+| diagnosing-bugs | model-invoked | 44 | 2267 | 2 / 1964 |
+| domain-modeling | model-invoked | 42 | 792 | 2 / 5065 |
 | grill-me | user-only | 16 | 7 | 0 / 0 |
-| grill-with-docs | user-only | 42 | 154 | 0 / 0 |
-| grilling | model-invoked | 41 | 164 | 0 / 0 |
+| grill-with-docs | user-only | 31 | 16 | 0 / 0 |
+| grilling | model-invoked | 41 | 421 | 0 / 0 |
 | handoff | user-only | 24 | 168 | 0 / 0 |
-| implement | user-only | 55 | 434 | 0 / 0 |
-| improve-codebase-architecture | user-only | 39 | 1456 | 1 / 6685 |
-| prototype | model-invoked | 48 | 646 | 2 / 12596 |
+| implement | user-only | 55 | 436 | 0 / 0 |
+| improve-codebase-architecture | user-only | 39 | 1449 | 1 / 6685 |
+| prototype | model-invoked | 48 | 685 | 2 / 13052 |
 | research | model-invoked | 62 | 131 | 0 / 0 |
 | security-checklist | model-invoked | 76 | 838 | 0 / 0 |
-| tdd | model-invoked | 39 | 758 | 2 / 3695 |
+| tdd | model-invoked | 39 | 847 | 2 / 3695 |
 | teach | user-only | 17 | 2332 | 4 / 8387 |
-| to-spec | user-only | 41 | 704 | 0 / 0 |
-| to-tickets | user-only | 66 | 1313 | 0 / 0 |
-| wayfinder | user-only | 54 | 2943 | 0 / 0 |
+| to-questionnaire | user-only | 27 | 690 | 0 / 0 |
+| to-spec | user-only | 41 | 733 | 0 / 0 |
+| to-tickets | user-only | 66 | 1352 | 0 / 0 |
+| wait-what | user-only | 16 | 51 | 0 / 0 |
+| wayfinder | user-only | 54 | 2896 | 0 / 0 |
+| writing-for-agents | model-invoked | 31 | 2704 | 1 / 2651 |
 
 ## Runtime measurement protocol
 

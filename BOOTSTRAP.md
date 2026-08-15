@@ -10,20 +10,24 @@ node scripts/bootstrap.mjs <project-path>
 
 Add `--github` only when GitHub hosting is intended but cannot yet be detected.
 
+Bootstrap validates an existing `CONTEXT.md` or `CONTEXT-MAP.md` instead of trusting it blindly. For an unconfigured repository, Node/TypeScript, .NET, and Java workspace/module signals trigger a domain-layout review. They are evidence of possible boundaries, not proof of multiple domain contexts. If review is required, rerun with either `--domain-layout=single` or `--domain-layout=multi`.
+
 The dry run reports each conditional component as `RECOMMENDED`, `NOT CURRENTLY`, or `BLOCKED`, with a trigger for reconsideration. It makes no changes.
 
 ## 2. Apply the mechanical baseline
 
 ```powershell
-node scripts/bootstrap.mjs <project-path> --github --apply
+node scripts/bootstrap.mjs <project-path> --github --domain-layout=single --apply
 ```
 
 The script installs or generates:
 
 - root `AGENTS.md` and thin `CLAUDE.md` when missing;
+- `docs/agents/issue-tracker.md`, selecting GitHub Issues when a GitHub remote exists and ignored local Markdown otherwise;
+- `docs/agents/domain.md`, recording the reviewed single-context or multi-context layout while leaving glossaries and ADRs lazy;
 - Claude and Codex project hooks;
 - the lean Claude built-in tool policy while retaining Bash and PowerShell;
-- fail-closed Gitleaks and narrow Git-metadata hooks;
+- fail-closed Gitleaks, branch/push guards, and model/tool self-attribution checks;
 - cross-platform `node scripts/verify.mjs` from detected real commands, with a shell-free Windows command runner under `.harness/runtime/`;
 - committed security/verification CI, CodeQL, and detected Dependabot ecosystems for GitHub projects;
 - ignored `.scratch/` state and other local-only exclusions;
@@ -72,6 +76,8 @@ Create these lazily:
 - `docs/adr/NNNN-slug.md`: only for a hard-to-reverse, surprising decision with a real trade-off.
 - GitHub Issues: specifications, Wayfinder maps/decision tickets, and implementation tickets.
 - `.scratch/`: ignored local fallback when no GitHub remote exists.
+
+The bootstrap-generated files under `docs/agents/` are operational contracts, not domain content. Skills read them so tracker commands and context layout are defined once. Rerunning bootstrap preserves existing files; review and update them deliberately when hosting or repository structure changes.
 
 Wayfinder uses its five routing labels: `wayfinder:map`, `wayfinder:research`, `wayfinder:prototype`, `wayfinder:grilling`, and `wayfinder:task`. Do not add the rejected triage state machine.
 

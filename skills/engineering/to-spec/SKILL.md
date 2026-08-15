@@ -3,9 +3,9 @@ name: to-spec
 description: Turn the current conversation into a spec and publish it to the project issue tracker — no interview, just synthesis of what you've already discussed.
 ---
 
-This skill takes the current conversation context and codebase understanding and produces a spec (you may know this document as a PRD). Do NOT interview the user — just synthesize what you already know.
+This skill takes the current conversation context and codebase understanding and produces a spec. Do NOT interview the user — just synthesize what you already know.
 
-Use GitHub Issues when the repository has a GitHub remote. Otherwise publish to ignored local Markdown under `.scratch/`.
+Read `docs/agents/issue-tracker.md` for the repository's GitHub-or-local publication workflow. If it is missing, use GitHub Issues for a GitHub remote and local Markdown under `.scratch/` otherwise, then recommend rerunning harness bootstrap.
 
 ## Process
 
@@ -15,7 +15,7 @@ Use GitHub Issues when the repository has a GitHub remote. Otherwise publish to 
 
 Check with the user that these seams match their expectations.
 
-3. Write the spec using the template below, then publish it to the project issue tracker. Do not apply triage-state labels.
+3. Write the spec using the template below, then publish it to the project issue tracker. Apply the `ready-for-agent` label; the spec is ready to use directly.
 
 <spec-template>
 

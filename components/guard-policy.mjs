@@ -81,9 +81,9 @@ export function parseHookInput(raw) {
 }
 
 export function evaluateCommitBranch(branch) {
-  if (!branch) return 'Commits from detached HEAD are blocked. Switch to a feature/<topic> or research/<topic> branch.';
-  if (!/^(?:feature|research)\/[a-zA-Z0-9._/-]+$/.test(branch)) {
-    return `Branch '${branch}' is not eligible for agent commits. Use feature/<topic>, or research/<topic> for an approved Wayfinder research task.`;
+  if (!branch) return 'Commits from detached HEAD are blocked. Switch to a feature/<topic>, research/<topic>, or prototype/<topic> branch.';
+  if (!/^(?:feature|research|prototype)\/[a-zA-Z0-9._/-]+$/.test(branch)) {
+    return `Branch '${branch}' is not eligible for agent commits. Use feature/<topic>, research/<topic> for approved Wayfinder research, or prototype/<topic> for a throwaway prototype.`;
   }
   return null;
 }
@@ -106,12 +106,12 @@ export function evaluateHook(input, currentBranch = '') {
   if (destructiveReason) return `${destructiveReason} is permanently blocked for agents because it can destroy user work.`;
 
   if (/\bgit(?:\.exe)?\b[\s\S]*?\bpush\b/i.test(command)) {
-    const allowed = command.match(/^git(?:\.exe)?\s+push\s+(?:(?:-u|--set-upstream)\s+)?origin\s+(research\/[a-zA-Z0-9._/-]+)$/i);
+    const allowed = command.match(/^git(?:\.exe)?\s+push\s+(?:(?:-u|--set-upstream)\s+)?origin\s+((?:research|prototype)\/[a-zA-Z0-9._/-]+)$/i);
     if (!allowed) {
-      return 'Feature pushes are blocked. The only agent-eligible form is an explicitly approved `git push origin research/<name>` with no force, tags, deletion, mirror, or extra refspecs.';
+      return 'Feature pushes are blocked. Only an explicitly approved `git push origin research/<name>` or `git push origin prototype/<name>` is eligible, with no force, tags, deletion, mirror, or extra refspecs.';
     }
     if (!currentBranch || currentBranch.toLowerCase() !== allowed[1].toLowerCase()) {
-      return `The pushed research branch must be the current branch (${currentBranch || 'detached HEAD'}).`;
+      return `The pushed research or prototype branch must be the current branch (${currentBranch || 'detached HEAD'}).`;
     }
   }
   return null;

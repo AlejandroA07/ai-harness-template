@@ -7,7 +7,7 @@ description: Break a plan, spec, or the current conversation into a set of trace
 
 Break a plan, spec, or conversation into a set of **tickets** — tracer-bullet vertical slices, each declaring the tickets that **block** it.
 
-Use GitHub Issues when the repository has a GitHub remote. Otherwise publish to ignored local Markdown under `.scratch/`.
+Read `docs/agents/issue-tracker.md` for the repository's GitHub-or-local publication and dependency operations. If it is missing, use GitHub Issues for a GitHub remote and local Markdown under `.scratch/` otherwise, then recommend rerunning harness bootstrap.
 
 ## Process
 
@@ -56,10 +56,10 @@ Iterate until the user approves the breakdown.
 
 ### 5. Publish the tickets to the configured tracker
 
-Publish the approved tickets to GitHub Issues when the repository has a GitHub remote; otherwise use the local fallback. The tickets are the same either way, only the shape of the blocking edges changes:
+Publish the approved tickets using `docs/agents/issue-tracker.md` — the tickets are the same either way, only the shape of the blocking edges changes:
 
 - **Local files** → write one file per ticket under `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01` in dependency order (blockers first). Each file's "Blocked by" lists the numbers/titles it depends on. Use the per-ticket file template below — one ticket per file, never a single combined file.
-- **GitHub Issues** → publish one issue per ticket in dependency order (blockers first) so each ticket's blocking edges can reference real identifiers. Use native blocking and sub-issue relationships when available; otherwise state the issue links under "Blocked by". Do not apply triage-state labels.
+- **GitHub Issues** → publish one issue per ticket in dependency order (blockers first) so each ticket's blocking edges can reference real identifiers. Use GitHub's native blocking / sub-issue relationships as specified by the tracker document. Apply the `ready-for-agent` label unless instructed otherwise — the tickets are ready to implement by construction.
 
 Work the **frontier**: any ticket whose blockers are all done. For a purely linear chain that means top to bottom.
 
@@ -73,7 +73,7 @@ Do NOT close or modify any parent issue.
 
 **Blocked by:** the numbers/titles of the tickets that gate this one, or "None — can start immediately".
 
-**Status:** ready
+**Status:** ready-for-agent
 
 - [ ] Acceptance criterion 1
 - [ ] Acceptance criterion 2

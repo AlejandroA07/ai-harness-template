@@ -16,7 +16,7 @@ Implement only the approved specification or ticket. If the requested behavior, 
 7. Stage only the intended paths. Never use broad staging when unrelated changes exist.
 8. Run `code-review` against `git diff --cached`, along separate Standards and Spec axes. Resolve material findings and re-stage only the intended paths.
 9. Run `node scripts/verify.mjs`. Exit code `0` is the only definition of done, then inspect the final staged diff.
-10. Create one clean local commit with a concise human-style message and zero AI attribution. Report the commit SHA.
+10. Create one clean local commit with a concise human-style message and no model/tool self-attribution. Report the commit SHA.
 
 Never push a feature branch. A `research/*` branch may be pushed only to `origin`, only after the user explicitly approves that individual push, and never with force, tags, deletion, mirrors, or extra refspecs.
 
