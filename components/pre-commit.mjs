@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import process from 'node:process';
 import { evaluateCommitBranch } from './guard-policy.mjs';
+import { attributionTextForScan, containsAttribution, shouldScanAttributionPath } from './attribution-policy.mjs';
 
 function git(args, options = {}) {
   const result = spawnSync('git', args, { encoding: 'utf8', ...options });
@@ -19,7 +20,7 @@ if (branchReason) {
   process.exit(1);
 }
 
-const staged = git(['diff', '--cached', '--name-only', '-z']).split('\0').filter(Boolean);
+const staged = git(['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']).split('\0').filter(Boolean);
 if (process.platform === 'win32') {
   const stagedHooks = ['.githooks/pre-commit', '.githooks/commit-msg'].filter((filePath) => staged.includes(filePath) && existsSync(filePath));
   if (stagedHooks.length > 0) git(['update-index', '--chmod=+x', '--', ...stagedHooks]);
@@ -36,6 +37,20 @@ const secretPath = staged.find((filePath) => {
 if (secretPath) {
   console.error(`[pre-commit] Secret-bearing path cannot be committed: ${secretPath}`);
   process.exit(1);
+}
+
+for (const filePath of staged) {
+  if (!shouldScanAttributionPath(filePath)) continue;
+  const contents = spawnSync('git', ['show', `:${filePath}`], { encoding: null, maxBuffer: 50 * 1024 * 1024 });
+  if (contents.status !== 0) {
+    console.error(`[pre-commit] Cannot safely inspect staged content for self-attribution: ${filePath}`);
+    process.exit(1);
+  }
+  if (contents.stdout.includes(0)) continue;
+  if (containsAttribution(attributionTextForScan(filePath, contents.stdout.toString('utf8')))) {
+    console.error(`[pre-commit] Model/tool self-attribution is not allowed in repository content: ${filePath}`);
+    process.exit(1);
+  }
 }
 
 const gitleaks = spawnSync('gitleaks', ['git', '--pre-commit', '--staged', '--redact', '-v'], { stdio: 'inherit' });

@@ -37,6 +37,7 @@ async function checkTemplate() {
     'README.md', 'MACHINE-SETUP.md', 'BOOTSTRAP.md', 'TOKEN-COSTS.md',
     'scripts/machine-setup.mjs', 'scripts/bootstrap.mjs', 'scripts/verify.mjs',
     'components/guard-git.mjs', 'components/claude-tool-policy.mjs', 'skills/invocation-policy.json',
+    'skills/upstream-sources.json', 'scripts/upstream-skills.mjs',
   ];
   for (const relative of required) {
     if (await exists(path.join(root, relative))) pass(`template has ${relative}`);
@@ -51,12 +52,16 @@ async function checkTemplate() {
 
   const skills = await discoverSkills(path.join(root, 'skills'));
   const policy = await readInvocationPolicy(path.join(root, 'skills'));
+  const ownership = JSON.parse(await fs.readFile(path.join(root, 'skills', 'upstream-sources.json'), 'utf8'));
   const names = new Set(skills.map((skill) => skill.name));
-  if (skills.length === 19) pass('canonical skill inventory has 19 skills');
-  else fail(`canonical skill inventory has ${skills.length}, expected 19`);
+  if (skills.length === 22) pass('canonical skill inventory has 22 skills');
+  else fail(`canonical skill inventory has ${skills.length}, expected 22`);
+  if (Object.keys(ownership.skills).length === skills.length) pass('upstream ownership covers every canonical skill');
+  else fail('upstream ownership count does not match canonical skill inventory');
+  for (const name of names) if (!ownership.skills[name]) fail(`skill has no upstream ownership mode: ${name}`);
   for (const name of policy) if (!names.has(name)) fail(`invocation policy references missing skill: ${name}`);
 
-  const forbidden = /(?:ready-for-agent|writing-great-skills|resolving-merge-conflicts)/i;
+  const forbidden = /(?:setup-matt-pocock-skills|resolving-merge-conflicts|\btriage\b|\bwizard\b)/i;
   for (const skill of skills) {
     const text = await fs.readFile(path.join(skill.directory, 'SKILL.md'), 'utf8');
     if (forbidden.test(text)) fail(`retired workflow reference in ${skill.name}`);

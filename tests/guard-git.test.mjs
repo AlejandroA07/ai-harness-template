@@ -16,14 +16,17 @@ test('blocks normal and dangerous pushes', () => {
   ]) assert.ok(command(value));
 });
 
-test('allows only the current research branch shape', () => {
+test('allows only the current research or prototype branch shape', () => {
   assert.equal(command('git push origin research/auth-options', 'research/auth-options'), null);
+  assert.equal(command('git push origin prototype/auth-options', 'prototype/auth-options'), null);
   assert.ok(command('git push origin research/another', 'research/auth-options'));
+  assert.ok(command('git push origin prototype/another', 'prototype/auth-options'));
 });
 
-test('allows commits only on feature and research branches', () => {
+test('allows commits only on feature, research, and prototype branches', () => {
   assert.equal(evaluateCommitBranch('feature/auth-flow'), null);
   assert.equal(evaluateCommitBranch('research/auth-options'), null);
+  assert.equal(evaluateCommitBranch('prototype/auth-options'), null);
   for (const branch of ['', 'main', 'master', 'fix/auth-flow', 'codex/auth-flow']) {
     assert.ok(evaluateCommitBranch(branch));
   }

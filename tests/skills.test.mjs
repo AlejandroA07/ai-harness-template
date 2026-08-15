@@ -12,10 +12,13 @@ test('canonical skill inventory and invocation policy are consistent', async () 
   const skills = await discoverSkills(source);
   const names = new Set(skills.map((skill) => skill.name));
   const userOnly = await readInvocationPolicy(source);
-  assert.equal(skills.length, 19);
+  assert.equal(skills.length, 22);
   for (const name of userOnly) assert.ok(names.has(name), `missing user-only skill ${name}`);
   assert.ok(userOnly.has('teach'));
+  assert.ok(userOnly.has('to-questionnaire'));
+  assert.ok(userOnly.has('wait-what'));
   assert.ok(!userOnly.has('research'));
+  assert.ok(!userOnly.has('writing-for-agents'));
 });
 
 test('Claude and Codex adapters encode user-only policy differently', async () => {

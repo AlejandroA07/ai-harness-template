@@ -28,7 +28,7 @@ for (let index = 0; index < paths.length; index += 1) {
 let failed = false;
 for (const text of texts) {
   if (containsAttribution(text)) {
-    console.error('Explicit AI attribution is not allowed in Git metadata.');
+    console.error('Model/tool self-attribution is not allowed.');
     failed = true;
   }
 }
