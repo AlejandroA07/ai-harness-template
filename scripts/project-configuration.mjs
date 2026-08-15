@@ -3,6 +3,30 @@ import path from 'node:path';
 
 const normalized = (value) => value.replaceAll('\\', '/');
 
+async function readValidatedFile(file, label) {
+  let handle;
+  try {
+    handle = await fs.open(file, 'r');
+    const opened = await handle.stat({ bigint: true });
+    const current = await fs.lstat(file, { bigint: true });
+    if (current.isSymbolicLink()) return { state: 'conflict', reason: `${label} must not be a symbolic link.` };
+    if (!opened.isFile() || !current.isFile()) return { state: 'conflict', reason: `${label} must be a regular file.` };
+    if (opened.dev !== current.dev || opened.ino !== current.ino) {
+      return { state: 'conflict', reason: `${label} changed while it was being inspected.` };
+    }
+    return { state: 'read', text: await handle.readFile('utf8') };
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return handle
+        ? { state: 'conflict', reason: `${label} changed while it was being inspected.` }
+        : { state: 'missing' };
+    }
+    throw error;
+  } finally {
+    await handle?.close();
+  }
+}
+
 export function detectDomainSignals(relativeFiles, packageJson = {}) {
   const files = new Set(relativeFiles.map(normalized));
   const signals = [];
@@ -78,49 +102,42 @@ ${layout}
 
 export async function inspectExistingTrackerConfiguration(projectRoot, github) {
   const tracker = path.join(projectRoot, 'docs', 'agents', 'issue-tracker.md');
-  try {
-    const stat = await fs.lstat(tracker);
-    if (stat.isSymbolicLink()) return { state: 'conflict', reason: 'docs/agents/issue-tracker.md must not be a symbolic link.' };
-    const text = await fs.readFile(tracker, 'utf8');
-    const actual = /^# Issue tracker: GitHub\s*$/m.test(text) ? 'github'
-      : /^# Issue tracker: Local Markdown\s*$/m.test(text) ? 'local'
-        : 'custom';
-    const expected = github ? 'github' : 'local';
-    if (actual !== expected) return { state: 'conflict', reason: `Existing tracker contract is ${actual}; detected tracker is ${expected}.` };
-    return { state: 'aligned', tracker: expected };
-  } catch (error) {
-    if (error.code === 'ENOENT') return { state: 'unconfigured' };
-    throw error;
-  }
+  const inspected = await readValidatedFile(tracker, 'docs/agents/issue-tracker.md');
+  if (inspected.state === 'missing') return { state: 'unconfigured' };
+  if (inspected.state === 'conflict') return inspected;
+  const actual = /^# Issue tracker: GitHub\s*$/m.test(inspected.text) ? 'github'
+    : /^# Issue tracker: Local Markdown\s*$/m.test(inspected.text) ? 'local'
+      : 'custom';
+  const expected = github ? 'github' : 'local';
+  if (actual !== expected) return { state: 'conflict', reason: `Existing tracker contract is ${actual}; detected tracker is ${expected}.` };
+  return { state: 'aligned', tracker: expected };
 }
 
 export async function inspectExistingDomainContract(projectRoot) {
   const contract = path.join(projectRoot, 'docs', 'agents', 'domain.md');
-  try {
-    const stat = await fs.lstat(contract);
-    if (stat.isSymbolicLink()) return { state: 'conflict', reason: 'docs/agents/domain.md must not be a symbolic link.' };
-    const text = await fs.readFile(contract, 'utf8');
-    if (/CONTEXT-MAP\.md/.test(text)) return { state: 'configured', layout: 'multi' };
-    if (/Read root `CONTEXT\.md`/.test(text)) return { state: 'configured', layout: 'single' };
-    return { state: 'conflict', reason: 'docs/agents/domain.md does not declare a recognized single-context or multi-context layout.' };
-  } catch (error) {
-    if (error.code === 'ENOENT') return { state: 'unconfigured' };
-    throw error;
-  }
+  const inspected = await readValidatedFile(contract, 'docs/agents/domain.md');
+  if (inspected.state === 'missing') return { state: 'unconfigured' };
+  if (inspected.state === 'conflict') return inspected;
+  if (/CONTEXT-MAP\.md/.test(inspected.text)) return { state: 'configured', layout: 'multi' };
+  if (/Read root `CONTEXT\.md`/.test(inspected.text)) return { state: 'configured', layout: 'single' };
+  return { state: 'conflict', reason: 'docs/agents/domain.md does not declare a recognized single-context or multi-context layout.' };
 }
 
 export async function inspectExistingDomainConfiguration(projectRoot) {
   const context = path.join(projectRoot, 'CONTEXT.md');
   const map = path.join(projectRoot, 'CONTEXT-MAP.md');
+  const [inspectedContext, inspectedMap] = await Promise.all([
+    readValidatedFile(context, 'CONTEXT.md'),
+    readValidatedFile(map, 'CONTEXT-MAP.md'),
+  ]);
+  if (inspectedContext.state === 'conflict') return inspectedContext;
+  if (inspectedMap.state === 'conflict') return inspectedMap;
+  const hasContext = inspectedContext.state === 'read';
+  const hasMap = inspectedMap.state === 'read';
   const has = async (file) => { try { await fs.access(file); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } };
-  const [hasContext, hasMap] = await Promise.all([has(context), has(map)]);
-  for (const [label, file, present] of [['CONTEXT.md', context, hasContext], ['CONTEXT-MAP.md', map, hasMap]]) {
-    if (present && (await fs.lstat(file)).isSymbolicLink()) return { state: 'conflict', reason: `${label} must not be a symbolic link.` };
-  }
   if (hasContext && hasMap) return { state: 'conflict', reason: 'Both CONTEXT.md and CONTEXT-MAP.md exist at the root.' };
   if (hasMap) {
-    const text = await fs.readFile(map, 'utf8');
-    const references = [...text.matchAll(/\(([^)]+CONTEXT\.md)\)/gi)].map((match) => match[1].split('#')[0]);
+    const references = [...inspectedMap.text.matchAll(/\(([^)]+CONTEXT\.md)\)/gi)].map((match) => match[1].split('#')[0]);
     if (references.length === 0) return { state: 'conflict', reason: 'CONTEXT-MAP.md does not point to any context CONTEXT.md files.' };
     const missing = [];
     for (const reference of references) {
@@ -136,8 +153,7 @@ export async function inspectExistingDomainConfiguration(projectRoot) {
     return { state: 'multi-context' };
   }
   if (hasContext) {
-    const text = await fs.readFile(context, 'utf8');
-    if (!/^#\s+\S/m.test(text)) return { state: 'conflict', reason: 'CONTEXT.md is empty or has no Markdown heading.' };
+    if (!/^#\s+\S/m.test(inspectedContext.text)) return { state: 'conflict', reason: 'CONTEXT.md is empty or has no Markdown heading.' };
     return { state: 'single-context' };
   }
   return { state: 'unconfigured' };

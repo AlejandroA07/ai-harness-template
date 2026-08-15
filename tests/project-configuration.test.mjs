@@ -46,6 +46,35 @@ test('existing generated domain contracts preserve the reviewed lazy layout', as
   }
 });
 
+test('domain contract inspection reads the same file object that it validates', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'domain-contract-race-'));
+  try {
+    const contract = path.join(root, 'docs', 'agents', 'domain.md');
+    const replacement = path.join(root, 'replacement.md');
+    await fs.mkdir(path.dirname(contract), { recursive: true });
+    await fs.writeFile(contract, '# Custom domain instructions\n');
+    await fs.writeFile(replacement, renderDomainInstructions());
+
+    const originalLstat = fs.lstat.bind(fs);
+    let replaced = false;
+    t.mock.method(fs, 'lstat', async (file, ...args) => {
+      const stat = await originalLstat(file, ...args);
+      if (!replaced && path.resolve(file) === contract) {
+        replaced = true;
+        await fs.rm(contract);
+        await fs.rename(replacement, contract);
+      }
+      return stat;
+    });
+
+    const result = await inspectExistingDomainContract(root);
+    assert.equal(result.state, 'conflict');
+    assert.match(result.reason, /recognized/);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 test('existing tracker contracts must match deterministic hosting detection', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tracker-config-'));
   try {
@@ -60,6 +89,35 @@ test('existing tracker contracts must match deterministic hosting detection', as
   }
 });
 
+test('tracker inspection reads the same file object that it validates', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'tracker-race-'));
+  try {
+    const tracker = path.join(root, 'docs', 'agents', 'issue-tracker.md');
+    const replacement = path.join(root, 'replacement.md');
+    await fs.mkdir(path.dirname(tracker), { recursive: true });
+    await fs.writeFile(tracker, '# Custom tracker\n');
+    await fs.writeFile(replacement, renderTrackerInstructions({ github: true }));
+
+    const originalLstat = fs.lstat.bind(fs);
+    let replaced = false;
+    t.mock.method(fs, 'lstat', async (file, ...args) => {
+      const stat = await originalLstat(file, ...args);
+      if (!replaced && path.resolve(file) === tracker) {
+        replaced = true;
+        await fs.rm(tracker);
+        await fs.rename(replacement, tracker);
+      }
+      return stat;
+    });
+
+    const result = await inspectExistingTrackerConfiguration(root, true);
+    assert.equal(result.state, 'conflict');
+    assert.match(result.reason, /custom/);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
 test('existing contradictory root domain files require review', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'domain-config-'));
   try {
@@ -68,6 +126,34 @@ test('existing contradictory root domain files require review', async () => {
     assert.deepEqual(await inspectExistingDomainConfiguration(root), { state: 'single-context' });
     await fs.writeFile(path.join(root, 'CONTEXT-MAP.md'), '# Map\n');
     assert.equal((await inspectExistingDomainConfiguration(root)).state, 'conflict');
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('root domain inspection reads the same file object that it validates', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'domain-config-race-'));
+  try {
+    const context = path.join(root, 'CONTEXT.md');
+    const replacement = path.join(root, 'replacement.md');
+    await fs.writeFile(context, 'not a valid context file\n');
+    await fs.writeFile(replacement, '# Replacement context\n');
+
+    const originalLstat = fs.lstat.bind(fs);
+    let replaced = false;
+    t.mock.method(fs, 'lstat', async (file, ...args) => {
+      const stat = await originalLstat(file, ...args);
+      if (!replaced && path.resolve(file) === context) {
+        replaced = true;
+        await fs.rm(context);
+        await fs.rename(replacement, context);
+      }
+      return stat;
+    });
+
+    const result = await inspectExistingDomainConfiguration(root);
+    assert.equal(result.state, 'conflict');
+    assert.match(result.reason, /heading/);
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }
