@@ -60,23 +60,24 @@ for (const platform of platforms) {
     const installedEntry = matchingEntries[0];
     if (installedEntry) claimedEntries.add(installedEntry.name);
     const target = path.join(platform.target, installedEntry?.name ?? name);
+    const installTarget = path.join(platform.target, name);
     const expected = path.join(platform.source, name);
     const linkTarget = await readLinkTarget(target);
-    if (linkTarget === undefined) actions.push({ kind: 'link', archiveExisting: false, removeExisting: false, installLink: true, platform, name, target, expected });
+    if (linkTarget === undefined) actions.push({ kind: 'link', archiveExisting: false, removeExisting: false, installLink: true, platform, name, target, installTarget, expected });
     else if (installedEntry?.name !== name) {
       const stat = await fs.lstat(target);
       if (stat.isDirectory() || stat.isSymbolicLink()) {
-        actions.push({ kind: 'archive-and-link', archiveExisting: true, archiveEntryName: installedEntry.name, removeExisting: false, installLink: true, platform, name, target, expected });
+        actions.push({ kind: 'archive-and-link', archiveExisting: true, archiveEntryName: installedEntry.name, removeExisting: false, installLink: true, platform, name, target, installTarget, expected });
       } else conflicts.push(`${platform.name}: ${target} exists but is not a skill directory or link`);
     }
     else if (linkTarget === null) {
       const stat = await fs.lstat(target);
-      if (stat.isDirectory()) actions.push({ kind: 'archive-and-link', archiveExisting: true, archiveEntryName: name, removeExisting: false, installLink: true, platform, name, target, expected });
+      if (stat.isDirectory()) actions.push({ kind: 'archive-and-link', archiveExisting: true, archiveEntryName: name, removeExisting: false, installLink: true, platform, name, target, installTarget, expected });
       else conflicts.push(`${platform.name}: ${target} exists but is not a skill directory or link`);
     }
     else if (path.resolve(linkTarget) !== path.resolve(expected)) {
-      if (isWithin(linkTarget, generatedRoot)) actions.push({ kind: 'replace', archiveExisting: false, removeExisting: true, installLink: true, platform, name, target, expected });
-      else actions.push({ kind: 'archive-and-link', archiveExisting: true, archiveEntryName: name, removeExisting: false, installLink: true, platform, name, target, expected });
+      if (isWithin(linkTarget, generatedRoot)) actions.push({ kind: 'replace', archiveExisting: false, removeExisting: true, installLink: true, platform, name, target, installTarget, expected });
+      else actions.push({ kind: 'archive-and-link', archiveExisting: true, archiveEntryName: name, removeExisting: false, installLink: true, platform, name, target, installTarget, expected });
     }
   }
 
@@ -120,7 +121,10 @@ for (const action of actions) {
   const archiveTarget = action.archiveExisting
     ? path.join(archiveSession ?? path.join(archiveBase, '<new-session>'), action.platform.archiveName, action.archiveEntryName)
     : undefined;
-  console.log(`${apply ? 'APPLY' : 'WOULD'} ${action.kind}: ${action.target}${archiveTarget ? ` -> ${archiveTarget}` : ''}`);
+  const linkDescription = action.installLink && action.installTarget !== action.target
+    ? `; link -> ${action.installTarget}`
+    : '';
+  console.log(`${apply ? 'APPLY' : 'WOULD'} ${action.kind}: ${action.target}${archiveTarget ? ` -> ${archiveTarget}` : ''}${linkDescription}`);
   if (!apply) continue;
   if (archiveTarget) {
     await fs.mkdir(path.dirname(archiveTarget), { recursive: true });
@@ -131,7 +135,7 @@ for (const action of actions) {
   if (action.installLink) {
     const type = process.platform === 'win32' ? 'junction' : 'dir';
     try {
-      await fs.symlink(action.expected, action.target, type);
+      await fs.symlink(action.expected, action.installTarget, type);
     } catch (error) {
       if (archiveTarget) {
         try { await fs.rename(archiveTarget, action.target); } catch (rollbackError) {

@@ -129,6 +129,7 @@ test('case-variant canonical entries are archived once before the canonical link
     const installed = path.join(codexSkills, 'canonical');
     const expected = path.join(fixture.root, '.generated', 'skills', 'codex', 'canonical');
     assert.equal(await fs.realpath(installed), await fs.realpath(expected));
+    assert.ok((await fs.readdir(codexSkills)).includes('canonical'), 'canonical link must use the exact canonical name');
     const sessions = await fs.readdir(path.join(fixture.home, '.ai-harness-skill-archive'));
     const codexArchive = path.join(fixture.home, '.ai-harness-skill-archive', sessions[0], 'codex');
     assert.deepEqual(await fs.readdir(codexArchive), ['Canonical']);
