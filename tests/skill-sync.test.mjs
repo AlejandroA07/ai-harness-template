@@ -24,9 +24,12 @@ async function createFixture({ machineSetup = false } = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-skill-sync-'));
   const home = path.join(root, 'home');
   const files = [
+    'components/claude-tool-policy.mjs',
+    'scripts/audit.mjs',
     'scripts/sync-skills.mjs',
     'scripts/skill-lib.mjs',
     'scripts/skill-installation.mjs',
+    'scripts/windows-cli.mjs',
   ];
   if (machineSetup) {
     files.push(
@@ -54,6 +57,15 @@ async function createFixture({ machineSetup = false } = {}) {
     '',
   ].join('\n'));
   await fs.writeFile(path.join(root, 'skills', 'invocation-policy.json'), '{"userOnly":[]}\n');
+  await fs.writeFile(path.join(root, 'skills', 'upstream-sources.json'), [
+    '{',
+    '  "repository": "https://github.com/mattpocock/skills.git",',
+    `  "reviewedCommit": "${'a'.repeat(40)}",`,
+    '  "skills": { "canonical": { "mode": "local" } },',
+    '  "rejected": []',
+    '}',
+    '',
+  ].join('\n'));
   return { root, home };
 }
 
@@ -84,8 +96,8 @@ test('skill sync archives displaced skills and installs the exact canonical inve
 
     const expectedCodex = path.join(fixture.root, '.generated', 'skills', 'codex', 'canonical');
     const expectedClaude = path.join(fixture.root, '.generated', 'skills', 'claude', 'canonical');
-    assert.equal(path.resolve(await fs.readlink(path.join(codexSkills, 'canonical'))), path.resolve(expectedCodex));
-    assert.equal(path.resolve(await fs.readlink(path.join(claudeSkills, 'canonical'))), path.resolve(expectedClaude));
+    assert.equal(await fs.realpath(path.join(codexSkills, 'canonical')), await fs.realpath(expectedCodex));
+    assert.equal(await fs.realpath(path.join(claudeSkills, 'canonical')), await fs.realpath(expectedClaude));
     await assert.rejects(fs.access(path.join(codexSkills, 'retired')), { code: 'ENOENT' });
     await assert.rejects(fs.access(path.join(claudeSkills, 'retired')), { code: 'ENOENT' });
     await fs.access(path.join(codexSkills, '.system'));
@@ -98,6 +110,60 @@ test('skill sync archives displaced skills and installs the exact canonical inve
     assert.equal(await fs.readFile(path.join(session, 'codex', 'canonical', 'keep.txt'), 'utf8'), 'manual canonical copy\n');
     assert.equal(await fs.readFile(path.join(session, 'codex', 'retired', 'keep.txt'), 'utf8'), 'retired codex skill\n');
     assert.equal(await fs.readFile(path.join(session, 'claude', 'retired', 'keep.txt'), 'utf8'), 'retired claude skill\n');
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('case-variant canonical entries are archived once before the canonical link is installed', async () => {
+  const fixture = await createFixture();
+  try {
+    const codexSkills = path.join(fixture.home, '.agents', 'skills');
+    await fs.mkdir(path.join(codexSkills, 'Canonical'), { recursive: true });
+    await fs.writeFile(path.join(codexSkills, 'Canonical', 'keep.txt'), 'case variant\n');
+
+    const result = runScript(fixture.root, fixture.home, 'scripts/sync-skills.mjs', ['--apply']);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /archive-and-link: .*Canonical/);
+
+    const installed = path.join(codexSkills, 'canonical');
+    const expected = path.join(fixture.root, '.generated', 'skills', 'codex', 'canonical');
+    assert.equal(await fs.realpath(installed), await fs.realpath(expected));
+    const sessions = await fs.readdir(path.join(fixture.home, '.ai-harness-skill-archive'));
+    const codexArchive = path.join(fixture.home, '.ai-harness-skill-archive', sessions[0], 'codex');
+    assert.deepEqual(await fs.readdir(codexArchive), ['Canonical']);
+    assert.equal(await fs.readFile(path.join(codexArchive, 'Canonical', 'keep.txt'), 'utf8'), 'case variant\n');
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('skill sync rejects linked discovery roots before planning actions', async () => {
+  const fixture = await createFixture();
+  try {
+    const outside = path.join(fixture.root, 'outside-skills');
+    const agents = path.join(fixture.home, '.agents');
+    await fs.mkdir(outside, { recursive: true });
+    await fs.mkdir(agents, { recursive: true });
+    await fs.symlink(outside, path.join(agents, 'skills'), process.platform === 'win32' ? 'junction' : 'dir');
+
+    const result = runScript(fixture.root, fixture.home, 'scripts/sync-skills.mjs');
+    assert.notEqual(result.status, 0);
+    assert.match(`${result.stdout}\n${result.stderr}`, /skill root must be absent or a real directory/i);
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('machine audit rejects additional visible skills outside the canonical inventory', async () => {
+  const fixture = await createFixture();
+  try {
+    const sync = runScript(fixture.root, fixture.home, 'scripts/sync-skills.mjs', ['--apply']);
+    assert.equal(sync.status, 0, sync.stderr || sync.stdout);
+    await fs.mkdir(path.join(fixture.home, '.agents', 'skills', 'retired'));
+
+    const audit = runScript(fixture.root, fixture.home, 'scripts/audit.mjs');
+    assert.match(`${audit.stdout}\n${audit.stderr}`, /Codex skill inventory contains noncanonical entry: retired/);
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });
   }
