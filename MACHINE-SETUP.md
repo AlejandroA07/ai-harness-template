@@ -44,7 +44,7 @@ The apply step:
 
 It does not enable, remove, or reconfigure MCP servers.
 
-The canonical `skills/` tree is the complete source of truth for harness-managed user skills. After apply, every visible skill directory or link under `~/.claude/skills/` and `~/.agents/skills/` is either a canonical harness link or has been moved to a recoverable archive under `~/.ai-harness-skill-archive/<session>/<claude|codex>/`. This includes an older manual copy whose name is now canonical. The synchronizer never deletes the displaced entry. Hidden platform-managed entries and ordinary non-skill files are left alone; Codex system and plugin skills outside these two directories are not owned by the harness.
+The canonical `skills/` tree is the complete source of truth for harness-managed user skills. After apply, every visible skill directory or link under `~/.claude/skills/` and `~/.agents/skills/` is either a canonical harness link or has been moved to a recoverable archive under `~/.ai-harness-skill-archive/<session>/<claude|codex>/`. This includes an older manual copy whose name is now canonical and any case-variant spelling of a canonical name. The synchronizer never deletes the displaced entry. The two skill roots themselves must be absent or real directories; linked roots fail closed before enumeration. Hidden platform-managed entries and ordinary non-skill files are left alone; Codex system and plugin skills outside these two directories are not owned by the harness.
 
 The reviewed 22-skill inventory and the deliberately excluded skills are listed in `POCOCK-SKILLS-COMPARISON.md`. A skill absent from the canonical tree is not part of this harness, even when a historical or manually installed copy still exists on the machine.
 
@@ -63,7 +63,7 @@ node scripts/verify.mjs
 
 `audit.mjs` checks whether the template is correctly applied to the machine or selected project. `verify.mjs` tests the template repository itself, including its executable security gates; exit code `0` is the only definition of done.
 
-The audit will continue to warn about Codex hook trust because the public CLI does not expose a stable non-interactive trust-status check.
+The audit enforces the same exact visible skill inventory and rejects linked skill roots, noncanonical entries, case variants, stale links, and missing canonical links. It will continue to warn about Codex hook trust because the public CLI does not expose a stable non-interactive trust-status check.
 
 ## 4. Context-cost baseline
 

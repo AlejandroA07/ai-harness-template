@@ -117,8 +117,20 @@ async function checkMachine() {
   else if (/^memories\s+.*\sfalse$/m.test(features.stdout)) pass('Codex memories disabled');
   else fail('Codex memories are enabled or absent from the feature inventory');
 
+  const canonicalSkills = await discoverSkills(path.join(root, 'skills'));
+  const canonicalNames = new Set(canonicalSkills.map((skill) => skill.name));
   for (const [platform, directory] of [['Claude', path.join(home, '.claude', 'skills')], ['Codex', path.join(home, '.agents', 'skills')]]) {
-    for (const skill of await discoverSkills(path.join(root, 'skills'))) {
+    let rootStat;
+    try { rootStat = await fs.lstat(directory); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (!rootStat || rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
+      fail(`${platform} skill root is missing or is not a real directory: ${directory}`);
+      continue;
+    }
+    for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+      if (entry.name.startsWith('.') || (!entry.isDirectory() && !entry.isSymbolicLink())) continue;
+      if (!canonicalNames.has(entry.name)) fail(`${platform} skill inventory contains noncanonical entry: ${entry.name}`);
+    }
+    for (const skill of canonicalSkills) {
       const target = path.join(directory, skill.name);
       const expected = path.join(root, '.generated', 'skills', platform.toLowerCase(), skill.name);
       try {
