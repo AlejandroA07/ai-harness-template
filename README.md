@@ -39,4 +39,4 @@ Exact-tracked Pocock skills are updated with `node scripts/upstream-skills.mjs`;
 
 GitHub Issues is canonical when the project is on GitHub. Ignored Markdown under `.scratch/` is the local fallback.
 
-Historical snapshots and retired components belong in an external, machine-local archive outside discovery paths. The reusable template does not record that archive's absolute location.
+Historical snapshots and retired components belong outside discovery paths. Machine setup treats the canonical `skills/` tree as the exact visible user-skill inventory and moves displaced skill directories or links to the recoverable machine-local archive at `~/.ai-harness-skill-archive/`; it does not manage hidden platform entries, Codex system skills, or plugin caches.

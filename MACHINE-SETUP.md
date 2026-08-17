@@ -20,7 +20,7 @@ Run the inventory:
 node scripts/machine-setup.mjs
 ```
 
-The command reports `FOUND`, `MISSING`, or `OPTIONAL`. Install anything marked `MISSING`, then rerun. On Windows, prefer `winget`; on macOS, prefer Homebrew; on Linux, use the vendor's supported package path.
+The command first preflights skill reconciliation, before any machine configuration can be written, and then reports each tool as `FOUND`, `MISSING`, or `OPTIONAL`. Install anything marked `MISSING`, then rerun. On Windows, prefer `winget`; on macOS, prefer Homebrew; on Linux, use the vendor's supported package path.
 
 ## 2. Apply
 
@@ -39,10 +39,14 @@ The apply step:
 - disables Claude's automatic Git attribution;
 - removes the optional Claude built-ins listed in `components/claude-tool-policy.mjs` while retaining Bash and PowerShell;
 - installs the machine-wide command/secret guard;
-- generates Claude/Codex skill adapters and safely links them into their official user locations;
+- reconciles the visible user skills to the canonical `skills/` inventory, generates Claude/Codex adapters, and safely links them into their official user locations;
 - enables this template's Git hooks.
 
 It does not enable, remove, or reconfigure MCP servers.
+
+The canonical `skills/` tree is the complete source of truth for harness-managed user skills. After apply, every visible skill directory or link under `~/.claude/skills/` and `~/.agents/skills/` is either a canonical harness link or has been moved to a recoverable archive under `~/.ai-harness-skill-archive/<session>/<claude|codex>/`. This includes an older manual copy whose name is now canonical. The synchronizer never deletes the displaced entry. Hidden platform-managed entries and ordinary non-skill files are left alone; Codex system and plugin skills outside these two directories are not owned by the harness.
+
+The reviewed 22-skill inventory and the deliberately excluded skills are listed in `POCOCK-SKILLS-COMPARISON.md`. A skill absent from the canonical tree is not part of this harness, even when a historical or manually installed copy still exists on the machine.
 
 The harness uses Claude's built-in agents for delegation and skills for reusable workflows. It intentionally installs no files under `~/.claude/agents/`; the audit fails when custom agents are present because every discovered description adds startup context. Setup never deletes unknown custom agents automatically.
 
@@ -72,7 +76,7 @@ Record the CLI version, model, project, enabled MCPs, and measurement method. Do
 
 ## Recovery
 
-Setup is idempotent. Rerun the dry run after upgrades. It stops rather than overwriting an unknown skill or invalid JSON configuration. Retired machine skills should be moved to the external archive before retrying a reported conflict.
+Setup is idempotent. Rerun the dry run after upgrades. The dry run reports every skill that will be archived before apply. Apply moves displaced skill directories and links to the external archive automatically, then installs the exact canonical inventory. It stops before machine writes when an entry cannot be reconciled safely, the archive path is not a real directory, or JSON configuration is invalid. Restore an archived entry by moving it out of the archive after first removing or relocating the harness link that replaced it.
 
 ## Known limitation
 
