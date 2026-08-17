@@ -25,6 +25,72 @@ function isWithin(candidate, parent) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
+const actionShapes = {
+  'archive-and-link': { archive: ['source', 'entryName'], remove: [], link: ['source', 'target'] },
+  'archive-obsolete': { archive: ['source', 'entryName'], remove: [], link: [] },
+  link: { archive: [], remove: [], link: ['source', 'target'] },
+  replace: { archive: [], remove: ['target'], link: ['source', 'target'] },
+};
+
+function defineAction(action) {
+  const expectedShape = actionShapes[action.kind];
+  if (!expectedShape) throw new Error(`Unknown skill reconciliation action: ${action.kind}`);
+  for (const operation of ['archive', 'remove', 'link']) {
+    const requiredFields = expectedShape[operation];
+    const operationPresent = Object.hasOwn(action, operation);
+    if (operationPresent !== Boolean(requiredFields.length)) {
+      throw new Error(`Invalid ${action.kind} action: ${operation} operation must be ${requiredFields.length ? 'present' : 'absent'}`);
+    }
+    if (operationPresent && (typeof action[operation] !== 'object' || action[operation] === null || Array.isArray(action[operation]))) {
+      throw new Error(`Invalid ${action.kind} action: ${operation} operation must be an object`);
+    }
+    for (const field of requiredFields) {
+      if (typeof action[operation][field] !== 'string' || action[operation][field].length === 0) {
+        throw new Error(`Invalid ${action.kind} action: ${operation}.${field} must be a non-empty string`);
+      }
+    }
+  }
+  return Object.freeze({
+    ...action,
+    ...(action.archive && { archive: Object.freeze(action.archive) }),
+    ...(action.remove && { remove: Object.freeze(action.remove) }),
+    ...(action.link && { link: Object.freeze(action.link) }),
+  });
+}
+
+function linkAction({ platform, name, target, expected }) {
+  return defineAction({ kind: 'link', platform, name, link: { source: expected, target } });
+}
+
+function archiveAndLinkAction({ platform, name, target, archiveEntryName, installTarget, expected }) {
+  return defineAction({
+    kind: 'archive-and-link',
+    platform,
+    name,
+    archive: { source: target, entryName: archiveEntryName },
+    link: { source: expected, target: installTarget },
+  });
+}
+
+function replaceAction({ platform, name, target, expected }) {
+  return defineAction({
+    kind: 'replace',
+    platform,
+    name,
+    remove: { target },
+    link: { source: expected, target },
+  });
+}
+
+function archiveObsoleteAction({ platform, name, target }) {
+  return defineAction({
+    kind: 'archive-obsolete',
+    platform,
+    name,
+    archive: { source: target, entryName: name },
+  });
+}
+
 const actions = [];
 const conflicts = [];
 for (const platform of platforms) {
@@ -63,21 +129,21 @@ for (const platform of platforms) {
     const installTarget = path.join(platform.target, name);
     const expected = path.join(platform.source, name);
     const linkTarget = await readLinkTarget(target);
-    if (linkTarget === undefined) actions.push({ kind: 'link', archiveExisting: false, removeExisting: false, installLink: true, platform, name, target, installTarget, expected });
+    if (linkTarget === undefined) actions.push(linkAction({ platform, name, target: installTarget, expected }));
     else if (installedEntry?.name !== name) {
       const stat = await fs.lstat(target);
       if (stat.isDirectory() || stat.isSymbolicLink()) {
-        actions.push({ kind: 'archive-and-link', archiveExisting: true, archiveEntryName: installedEntry.name, removeExisting: false, installLink: true, platform, name, target, installTarget, expected });
+        actions.push(archiveAndLinkAction({ platform, name, target, archiveEntryName: installedEntry.name, installTarget, expected }));
       } else conflicts.push(`${platform.name}: ${target} exists but is not a skill directory or link`);
     }
     else if (linkTarget === null) {
       const stat = await fs.lstat(target);
-      if (stat.isDirectory()) actions.push({ kind: 'archive-and-link', archiveExisting: true, archiveEntryName: name, removeExisting: false, installLink: true, platform, name, target, installTarget, expected });
+      if (stat.isDirectory()) actions.push(archiveAndLinkAction({ platform, name, target, archiveEntryName: name, installTarget, expected }));
       else conflicts.push(`${platform.name}: ${target} exists but is not a skill directory or link`);
     }
     else if (path.resolve(linkTarget) !== path.resolve(expected)) {
-      if (isWithin(linkTarget, generatedRoot)) actions.push({ kind: 'replace', archiveExisting: false, removeExisting: true, installLink: true, platform, name, target, installTarget, expected });
-      else actions.push({ kind: 'archive-and-link', archiveExisting: true, archiveEntryName: name, removeExisting: false, installLink: true, platform, name, target, installTarget, expected });
+      if (isWithin(linkTarget, generatedRoot)) actions.push(replaceAction({ platform, name, target, expected }));
+      else actions.push(archiveAndLinkAction({ platform, name, target, archiveEntryName: name, installTarget, expected }));
     }
   }
 
@@ -86,12 +152,12 @@ for (const platform of platforms) {
     const target = path.join(platform.target, entry.name);
     const stat = await fs.lstat(target);
     if (stat.isDirectory() || stat.isSymbolicLink()) {
-      actions.push({ kind: 'archive-obsolete', archiveExisting: true, archiveEntryName: entry.name, removeExisting: false, installLink: false, platform, name: entry.name, target });
+      actions.push(archiveObsoleteAction({ platform, name: entry.name, target }));
     }
   }
 }
 
-const archiveActions = actions.filter((action) => action.archiveExisting);
+const archiveActions = actions.filter((action) => action.archive);
 if (archiveActions.length) {
   try {
     const stat = await fs.lstat(archiveBase);
@@ -118,27 +184,28 @@ if (apply && archiveActions.length) {
 }
 
 for (const action of actions) {
-  const archiveTarget = action.archiveExisting
-    ? path.join(archiveSession ?? path.join(archiveBase, '<new-session>'), action.platform.archiveName, action.archiveEntryName)
+  const archiveTarget = action.archive
+    ? path.join(archiveSession ?? path.join(archiveBase, '<new-session>'), action.platform.archiveName, action.archive.entryName)
     : undefined;
-  const linkDescription = action.installLink && action.installTarget !== action.target
-    ? `; link -> ${action.installTarget}`
+  const actionTarget = action.archive?.source ?? action.remove?.target ?? action.link.target;
+  const linkDescription = action.link && action.link.target !== actionTarget
+    ? `; link -> ${action.link.target}`
     : '';
-  console.log(`${apply ? 'APPLY' : 'WOULD'} ${action.kind}: ${action.target}${archiveTarget ? ` -> ${archiveTarget}` : ''}${linkDescription}`);
+  console.log(`${apply ? 'APPLY' : 'WOULD'} ${action.kind}: ${actionTarget}${archiveTarget ? ` -> ${archiveTarget}` : ''}${linkDescription}`);
   if (!apply) continue;
   if (archiveTarget) {
     await fs.mkdir(path.dirname(archiveTarget), { recursive: true });
-    await fs.rename(action.target, archiveTarget);
-  } else if (action.removeExisting) {
-    await fs.unlink(action.target);
+    await fs.rename(action.archive.source, archiveTarget);
+  } else if (action.remove) {
+    await fs.unlink(action.remove.target);
   }
-  if (action.installLink) {
+  if (action.link) {
     const type = process.platform === 'win32' ? 'junction' : 'dir';
     try {
-      await fs.symlink(action.expected, action.installTarget, type);
+      await fs.symlink(action.link.source, action.link.target, type);
     } catch (error) {
       if (archiveTarget) {
-        try { await fs.rename(archiveTarget, action.target); } catch (rollbackError) {
+        try { await fs.rename(archiveTarget, action.archive.source); } catch (rollbackError) {
           throw new Error(`Failed to install ${action.name} and restore its archived entry: ${error.message}; rollback failed: ${rollbackError.message}`);
         }
       }

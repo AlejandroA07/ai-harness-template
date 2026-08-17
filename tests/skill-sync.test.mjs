@@ -35,8 +35,6 @@ async function createFixture({ machineSetup = false } = {}) {
     files.push(
       'scripts/machine-setup.mjs',
       'scripts/config-merge.mjs',
-      'scripts/windows-cli.mjs',
-      'components/claude-tool-policy.mjs',
       'global/CLAUDE.md',
       'global/AGENTS.md',
       'global/claude-settings.json',
@@ -134,6 +132,30 @@ test('case-variant canonical entries are archived once before the canonical link
     const codexArchive = path.join(fixture.home, '.ai-harness-skill-archive', sessions[0], 'codex');
     assert.deepEqual(await fs.readdir(codexArchive), ['Canonical']);
     assert.equal(await fs.readFile(path.join(codexArchive, 'Canonical', 'keep.txt'), 'utf8'), 'case variant\n');
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('stale managed links are replaced without archiving user content', async () => {
+  const fixture = await createFixture();
+  try {
+    const initial = runScript(fixture.root, fixture.home, 'scripts/sync-skills.mjs', ['--apply']);
+    assert.equal(initial.status, 0, initial.stderr || initial.stdout);
+
+    const codexSkills = path.join(fixture.home, '.agents', 'skills');
+    const installed = path.join(codexSkills, 'canonical');
+    const staleTarget = path.join(fixture.root, '.generated', 'skills', 'codex', 'stale-canonical');
+    await fs.unlink(installed);
+    await fs.mkdir(staleTarget, { recursive: true });
+    await fs.symlink(staleTarget, installed, process.platform === 'win32' ? 'junction' : 'dir');
+
+    const result = runScript(fixture.root, fixture.home, 'scripts/sync-skills.mjs', ['--apply']);
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /replace: .*canonical/);
+    const expected = path.join(fixture.root, '.generated', 'skills', 'codex', 'canonical');
+    assert.equal(await fs.realpath(installed), await fs.realpath(expected));
+    await assert.rejects(fs.access(path.join(fixture.home, '.ai-harness-skill-archive')), { code: 'ENOENT' });
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });
   }
