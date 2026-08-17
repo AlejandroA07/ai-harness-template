@@ -15,6 +15,12 @@ function run(command, args) {
   return runTool(command, args, { cwd: root });
 }
 
+const syncScript = path.join(root, 'scripts', 'sync-skills.mjs');
+const syncPreflight = run(process.execPath, [syncScript]);
+process.stdout.write(syncPreflight.stdout ?? '');
+process.stderr.write(syncPreflight.stderr ?? '');
+if (syncPreflight.status !== 0) process.exit(syncPreflight.status ?? 1);
+
 const tools = [
   { command: 'node', args: ['--version'], required: true },
   { command: 'git', args: ['--version'], required: true },
@@ -112,6 +118,11 @@ if (!apply) {
   process.exit(0);
 }
 
+const sync = run(process.execPath, [syncScript, '--apply']);
+process.stdout.write(sync.stdout ?? '');
+process.stderr.write(sync.stderr ?? '');
+if (sync.status !== 0) process.exit(sync.status ?? 1);
+
 for (const item of guidance) {
   await fs.mkdir(path.dirname(item.target), { recursive: true });
   await fs.writeFile(item.target, item.expected);
@@ -133,10 +144,5 @@ if (process.platform === 'win32') {
 
 const hooksPath = run('git', ['config', 'core.hooksPath', '.githooks']);
 if (hooksPath.status !== 0) throw new Error(hooksPath.stderr || 'Failed to enable template Git hooks');
-
-const sync = run(process.execPath, [path.join(root, 'scripts', 'sync-skills.mjs'), '--apply']);
-process.stdout.write(sync.stdout ?? '');
-process.stderr.write(sync.stderr ?? '');
-if (sync.status !== 0) process.exit(sync.status ?? 1);
 
 console.log('\nMachine setup applied. Open Codex and run /hooks once to review and trust the generated user hook definition.');
