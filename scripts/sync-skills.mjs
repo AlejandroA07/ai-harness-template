@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { discoverSkills, generateSkillTree, readLinkTarget } from './skill-lib.mjs';
+import { discoverSkills, generateSkillTree, isPathWithin, readLinkTarget } from './skill-lib.mjs';
 
 const apply = process.argv.includes('--apply');
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -19,11 +19,6 @@ const platforms = [
   { name: 'Claude', archiveName: 'claude', source: path.join(generatedRoot, 'claude'), target: path.join(home, '.claude', 'skills') },
   { name: 'Codex', archiveName: 'codex', source: path.join(generatedRoot, 'codex'), target: path.join(home, '.agents', 'skills') },
 ];
-
-function isWithin(candidate, parent) {
-  const relative = path.relative(parent, candidate);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
-}
 
 const actionShapes = {
   'archive-and-link': { archive: ['source', 'entryName'], remove: [], link: ['source', 'target'] },
@@ -142,7 +137,7 @@ for (const platform of platforms) {
       else conflicts.push(`${platform.name}: ${target} exists but is not a skill directory or link`);
     }
     else if (path.resolve(linkTarget) !== path.resolve(expected)) {
-      if (isWithin(linkTarget, generatedRoot)) actions.push(replaceAction({ platform, name, target, expected }));
+      if (await isPathWithin(linkTarget, generatedRoot)) actions.push(replaceAction({ platform, name, target, expected }));
       else actions.push(archiveAndLinkAction({ platform, name, target, archiveEntryName: name, installTarget, expected }));
     }
   }

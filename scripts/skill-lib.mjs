@@ -94,6 +94,34 @@ export async function readLinkTarget(target) {
   }
 }
 
+async function canonicalPath(filePath) {
+  let current = path.resolve(filePath);
+  const missingSegments = [];
+
+  while (true) {
+    try {
+      const resolved = await fs.realpath(current);
+      return path.join(resolved, ...missingSegments.reverse());
+    } catch (error) {
+      if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error;
+      const parent = path.dirname(current);
+      if (parent === current) return path.resolve(filePath);
+      missingSegments.push(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
+export async function isPathWithin(candidate, parent) {
+  const [canonicalCandidate, canonicalParent] = await Promise.all([
+    canonicalPath(candidate),
+    canonicalPath(parent),
+  ]);
+  const relative = path.relative(canonicalParent, canonicalCandidate);
+  return relative === ''
+    || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
 export async function inspectManagedSkillLink(target, expected) {
   const linkTarget = await readLinkTarget(target);
   if (linkTarget === undefined) return 'missing';
