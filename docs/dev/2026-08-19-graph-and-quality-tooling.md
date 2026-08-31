@@ -3,6 +3,7 @@
 - **Date:** 2026-08-19
 - **Type:** research and decision-support guide
 - **Decision:** make no harness workflow change in this phase. Learn graph engineering from the C# example, evaluate Graphify before starting a separate C# viewer project, and evaluate existing .NET quality tools on demand before considering harness integration.
+- **Progress tracker:** follow the living [graph and quality tooling adoption roadmap](graph-and-quality-adoption-roadmap.md) to see the current step, evidence, and next action.
 
 ## Source note
 
