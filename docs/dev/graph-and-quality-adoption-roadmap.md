@@ -1,9 +1,9 @@
 # Graph and quality tooling adoption roadmap
 
 - **Kind:** living progress tracker
-- **Last updated:** 2026-09-10
-- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M0 safety corrections and isolated fixtures are complete; M1–M8 remain pending. Westcoast Cars remains selected with its baseline pending.
-- **Next action:** implement M1 catalog/planning, then M2 selective installation before permanent integrations. Retain the [M0 evidence and lifecycle limits](modularity-m0-safety.md). Westcoast Cars evaluation can proceed independently.
+- **Last updated:** 2026-09-11
+- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M0 safety corrections and M1 catalog/planning are complete; M2–M8 remain pending. Westcoast Cars remains selected with its baseline pending.
+- **Next action:** implement M2 single-capability installation/update/removal and audit using the [M1 selection contract](modularity-m1-catalog.md). Retain the [M0 evidence and lifecycle limits](modularity-m0-safety.md). Westcoast Cars evaluation can proceed independently.
 
 This file is the durable checklist for the graph-engineering, Graphify, architecture-viewer, CRAP, and hardening work. Update it after every completed step so progress does not depend on remembering a conversation.
 
@@ -39,7 +39,7 @@ Modularity comes first for permanent integration because it establishes ownershi
 - [x] Show workflow → skill → tool/project-check relationships explicitly, without copying skill instructions.
 - [x] Review all tracked path families and classify the existing 22 capabilities; record R1–R10 and shared internal ownership.
 - [x] Produce a self-contained implementation contract, dependency-ordered slices, recovery rules, test matrix, and fresh-task handoff.
-- [ ] Classify current responsibilities and declare module dependencies, platforms, scopes, and file ownership.
+- [x] Classify all 22 capabilities and declare required capability dependencies, platforms, scopes, and source ownership (M1). Executable installation ownership remains M2–M4 work.
 - [ ] Implement selective installation and matching audit behavior while preserving unrelated user skills.
 - [ ] Verify the first useful installation selection and preserve the full-harness profile.
 - [ ] Integrate Graphify with all capabilities and documented invocation/configuration choices.
@@ -50,7 +50,7 @@ Modularity comes first for permanent integration because it establishes ownershi
 | Slice | Status | Completion evidence to record |
 |---|---|---|
 | M0 — Safety corrections and isolated fixtures | Complete | [Manifest/path, exact-hook, preflight and baseline-equivalence evidence](modularity-m0-safety.md); local commit containing this update |
-| M1 — Catalog and pure selection planner | Pending | All capability IDs/classifications; dependency and dry-run tests; verified commit |
+| M1 — Catalog and pure selection planner | Complete | [All 22 classifications, dependency planning and read-only fixture evidence](modularity-m1-catalog.md); local commit containing this update |
 | M2 — Single-capability install/update/remove/audit | Pending | Receipt and ownership lifecycle tests; verified commit |
 | M3 — Global-only platform selection | Pending | Independent-platform and legacy global-migration evidence |
 | M4 — Project-only configuration and gates | Pending | Self-contained runtime, preserved verifier/settings and adapter drift checks |
