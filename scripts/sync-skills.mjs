@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { discoverSkills, generateSkillTree, isPathWithin, readLinkTarget } from './skill-lib.mjs';
+import { discoverSkills, generateSkillTree, assertSafeDirectory, isPathWithin, readLinkTarget } from './skill-lib.mjs';
 
 const apply = process.argv.includes('--apply');
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -12,7 +12,7 @@ const sourceRoot = path.join(root, 'skills');
 const generatedRoot = path.join(root, '.generated', 'skills');
 const home = os.homedir();
 const archiveBase = path.join(home, '.ai-harness-skill-archive');
-const skills = apply ? await generateSkillTree(sourceRoot, generatedRoot) : await discoverSkills(sourceRoot);
+const skills = await discoverSkills(sourceRoot);
 const names = new Set(skills.map((skill) => skill.name));
 
 const platforms = [
@@ -89,6 +89,12 @@ function archiveObsoleteAction({ platform, name, target }) {
 const actions = [];
 const conflicts = [];
 for (const platform of platforms) {
+  try {
+    await assertSafeDirectory(home, platform.target);
+  } catch (error) {
+    conflicts.push(error.message);
+    continue;
+  }
   let rootStat;
   try {
     rootStat = await fs.lstat(platform.target);
@@ -98,14 +104,6 @@ for (const platform of platforms) {
   if (rootStat && (rootStat.isSymbolicLink() || !rootStat.isDirectory())) {
     conflicts.push(`${platform.name} skill root must be absent or a real directory: ${platform.target}`);
     continue;
-  }
-  if (!rootStat && apply) {
-    await fs.mkdir(platform.target, { recursive: true });
-    rootStat = await fs.lstat(platform.target);
-    if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
-      conflicts.push(`${platform.name} skill root must be absent or a real directory: ${platform.target}`);
-      continue;
-    }
   }
   let installedEntries = [];
   try {
@@ -168,6 +166,11 @@ if (conflicts.length) {
   console.error('Skill sync stopped on conflicts:');
   for (const conflict of conflicts) console.error(`- ${conflict}`);
   process.exit(1);
+}
+
+if (apply) {
+  await generateSkillTree(sourceRoot, generatedRoot);
+  for (const platform of platforms) await fs.mkdir(platform.target, { recursive: true });
 }
 
 let archiveSession;

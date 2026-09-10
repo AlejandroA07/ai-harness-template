@@ -31,6 +31,9 @@ async function createFixture({ machineSetup = false } = {}) {
     'scripts/skill-lib.mjs',
     'scripts/skill-installation.mjs',
     'scripts/windows-cli.mjs',
+    'scripts/config-merge.mjs',
+    'global/claude-settings.json',
+    'global/codex-hooks/hooks.json.template',
   ];
   if (machineSetup) {
     files.push(
@@ -228,5 +231,84 @@ test('machine setup rejects an unreconcilable skill entry before machine writes'
     await assert.rejects(fs.access(path.join(fixture.home, '.claude', 'settings.json')), { code: 'ENOENT' });
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+async function snapshotTree(directory) {
+  const entries = {};
+  async function walk(current, relative) {
+    let stat;
+    try { stat = await fs.lstat(current); } catch (error) {
+      if (error.code === 'ENOENT') return;
+      throw error;
+    }
+    if (stat.isSymbolicLink()) entries[relative] = { link: await fs.readlink(current) };
+    else if (stat.isDirectory()) {
+      entries[relative] = { directory: true };
+      for (const child of (await fs.readdir(current)).sort()) await walk(path.join(current, child), `${relative}/${child}`);
+    } else entries[relative] = { content: await fs.readFile(current, 'utf8') };
+  }
+  await walk(directory, '');
+  return entries;
+}
+
+test('apply preflight conflicts leave generated payloads, installed links and absent roots unchanged', async () => {
+  for (const kind of ['file', 'linked-root', 'linked-parent', 'archive']) {
+    const fixture = await createFixture();
+    try {
+      const generated = path.join(fixture.root, '.generated', 'skills');
+      await fs.mkdir(path.join(generated, 'codex', 'canonical'), { recursive: true });
+      await fs.writeFile(path.join(generated, 'codex', 'canonical', 'SKILL.md'), 'Previous live payload');
+      const outside = path.join(fixture.root, 'outside');
+      await fs.mkdir(outside);
+      await fs.writeFile(path.join(outside, 'sentinel'), 'Keep me');
+      const agents = path.join(fixture.home, '.agents');
+      const skills = path.join(agents, 'skills');
+      await fs.mkdir(fixture.home, { recursive: true });
+      if (kind === 'linked-parent') await fs.symlink(outside, agents, process.platform === 'win32' ? 'junction' : 'dir');
+      else {
+        await fs.mkdir(agents);
+        if (kind === 'linked-root') await fs.symlink(outside, skills, process.platform === 'win32' ? 'junction' : 'dir');
+        else {
+          await fs.mkdir(skills);
+          if (kind === 'file') await fs.writeFile(path.join(skills, 'canonical'), 'Conflict');
+          else {
+            await fs.mkdir(path.join(skills, 'retired'));
+            await fs.symlink(outside, path.join(fixture.home, '.ai-harness-skill-archive'), process.platform === 'win32' ? 'junction' : 'dir');
+          }
+        }
+      }
+      const liveLink = path.join(fixture.home, 'live-link');
+      await fs.symlink(path.join(generated, 'codex', 'canonical'), liveLink, process.platform === 'win32' ? 'junction' : 'dir');
+      const before = await snapshotTree(fixture.root);
+      const result = runScript(fixture.root, fixture.home, 'scripts/sync-skills.mjs', ['--apply']);
+      assert.notEqual(result.status, 0, kind);
+      assert.deepEqual(await snapshotTree(fixture.root), before, kind);
+      assert.equal(await fs.readFile(path.join(liveLink, 'SKILL.md'), 'utf8'), 'Previous live payload');
+    } finally { await fs.rm(fixture.root, { recursive: true, force: true }); }
+  }
+});
+
+test('skill sync dry run writes nothing', async () => {
+  const fixture = await createFixture();
+  try {
+    const before = await snapshotTree(fixture.root);
+    const result = runScript(fixture.root, fixture.home, 'scripts/sync-skills.mjs');
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(await snapshotTree(fixture.root), before);
+  } finally { await fs.rm(fixture.root, { recursive: true, force: true }); }
+});
+
+test('invalid invocation policy and unsafe resources fail apply without creating live or generated roots', async () => {
+  for (const kind of ['policy', 'resource']) {
+    const fixture = await createFixture();
+    try {
+      if (kind === 'policy') await fs.writeFile(path.join(fixture.root, 'skills', 'invocation-policy.json'), '{"userOnly":["unknown"]}');
+      else await fs.symlink(path.join(fixture.root, 'missing'), path.join(fixture.root, 'skills', 'engineering', 'canonical', 'linked-resource'), process.platform === 'win32' ? 'junction' : 'dir');
+      const before = await snapshotTree(fixture.root);
+      const result = runScript(fixture.root, fixture.home, 'scripts/sync-skills.mjs', ['--apply']);
+      assert.notEqual(result.status, 0);
+      assert.deepEqual(await snapshotTree(fixture.root), before);
+    } finally { await fs.rm(fixture.root, { recursive: true, force: true }); }
   }
 });

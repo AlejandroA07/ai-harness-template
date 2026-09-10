@@ -2,8 +2,8 @@
 
 - **Kind:** living progress tracker
 - **Last updated:** 2026-09-10
-- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. The detailed M0–M8 migration plan is ready for a fresh task; implementation has not started. Westcoast Cars remains selected with its baseline pending.
-- **Next action:** start a fresh implementation task from the plan's handoff. Complete M0 safety/fixture work, then M1 catalog/planning and M2 selective installation before permanent integrations. Westcoast Cars evaluation can proceed independently.
+- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M0 safety corrections and isolated fixtures are complete; M1–M8 remain pending. Westcoast Cars remains selected with its baseline pending.
+- **Next action:** implement M1 catalog/planning, then M2 selective installation before permanent integrations. Retain the [M0 evidence and lifecycle limits](modularity-m0-safety.md). Westcoast Cars evaluation can proceed independently.
 
 This file is the durable checklist for the graph-engineering, Graphify, architecture-viewer, CRAP, and hardening work. Update it after every completed step so progress does not depend on remembering a conversation.
 
@@ -49,7 +49,7 @@ Modularity comes first for permanent integration because it establishes ownershi
 
 | Slice | Status | Completion evidence to record |
 |---|---|---|
-| M0 — Safety corrections and isolated fixtures | Pending | Manifest/path, hook collision and preflight tests; verified commit |
+| M0 — Safety corrections and isolated fixtures | Complete | [Manifest/path, exact-hook, preflight and baseline-equivalence evidence](modularity-m0-safety.md); local commit containing this update |
 | M1 — Catalog and pure selection planner | Pending | All capability IDs/classifications; dependency and dry-run tests; verified commit |
 | M2 — Single-capability install/update/remove/audit | Pending | Receipt and ownership lifecycle tests; verified commit |
 | M3 — Global-only platform selection | Pending | Independent-platform and legacy global-migration evidence |

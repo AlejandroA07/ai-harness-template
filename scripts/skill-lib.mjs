@@ -200,10 +200,42 @@ export async function generateSkillTree(sourceRoot, outputRoot) {
     if (!knownNames.has(name)) throw new Error(`Invocation policy names missing skill: ${name}`);
   }
 
-  await fs.rm(outputRoot, { recursive: true, force: true });
-  for (const skill of skills) {
-    await renderSkill(skill, path.join(outputRoot, 'claude', skill.name), 'claude', userOnly.has(skill.name));
-    await renderSkill(skill, path.join(outputRoot, 'codex', skill.name), 'codex', userOnly.has(skill.name));
+  await assertSafeDirectory(path.dirname(outputRoot), outputRoot);
+  let stagingParent = path.dirname(outputRoot);
+  while (true) {
+    try { await fs.access(stagingParent); break; } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      stagingParent = path.dirname(stagingParent);
+    }
+  }
+  const staging = await fs.mkdtemp(path.join(stagingParent, '.skill-generation-'));
+  const payload = path.join(staging, 'payload');
+  const backup = path.join(staging, 'previous');
+  let moved = false;
+  try {
+    await fs.mkdir(payload);
+    for (const skill of skills) {
+      await assertRegularTree(skill.directory);
+      await renderSkill(skill, path.join(payload, 'claude', skill.name), 'claude', userOnly.has(skill.name));
+      await renderSkill(skill, path.join(payload, 'codex', skill.name), 'codex', userOnly.has(skill.name));
+    }
+    await assertSafeDirectory(path.dirname(outputRoot), outputRoot);
+    await fs.mkdir(path.dirname(outputRoot), { recursive: true });
+    try { await fs.rename(outputRoot, backup); moved = true; } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    try { await fs.rename(payload, outputRoot); } catch (error) {
+      if (moved) {
+        try { await fs.rename(backup, outputRoot); moved = false; } catch (rollbackError) {
+          throw new Error(`Generation failed; previous output retained at ${backup}: ${rollbackError.message}`, { cause: error });
+        }
+      }
+      throw error;
+    }
+    moved = false;
+  } finally {
+    // Retain the backup if restoring it failed.
+    if (!moved) await fs.rm(staging, { recursive: true, force: true });
   }
   return skills;
 }
@@ -215,15 +247,49 @@ export async function hashDirectory(directory) {
     entries.sort((left, right) => left.name.localeCompare(right.name));
     for (const entry of entries) {
       const relative = path.posix.join(prefix, entry.name);
-      if (entry.isDirectory()) await walk(path.join(current, entry.name), relative);
+      if (entry.isDirectory()) {
+        hash.update(`directory\0${relative}\0`);
+        await walk(path.join(current, entry.name), relative);
+      }
       else {
+        hash.update('file\0');
         hash.update(relative);
         hash.update('\0');
-        hash.update(await fs.readFile(path.join(current, entry.name)));
+        hash.update(crypto.createHash('sha256').update(await fs.readFile(path.join(current, entry.name))).digest());
         hash.update('\0');
       }
     }
   }
   await walk(directory);
   return hash.digest('hex');
+}
+
+// Reject linked roots and descendants while tolerating OS aliases above the anchor.
+export async function assertSafeDirectory(anchor, directory) {
+  const relative = path.relative(anchor, directory);
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error('Directory escapes its approved root');
+  }
+  let current = anchor;
+  for (const segment of ['', ...relative.split(path.sep).filter(Boolean)]) {
+    current = path.join(current, segment);
+    try {
+      const stat = await fs.lstat(current);
+      if (stat.isSymbolicLink() || !stat.isDirectory()) {
+        throw new Error(`Skill root must be absent or a real directory: ${current}`);
+      }
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+}
+
+export async function assertRegularTree(directory) {
+  const stat = await fs.lstat(directory);
+  if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`Unsafe adapter directory: ${directory}`);
+  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+    const child = path.join(directory, entry.name);
+    if (entry.isDirectory()) await assertRegularTree(child);
+    else if (!entry.isFile()) throw new Error(`Unsafe adapter resource: ${child}`);
+  }
 }

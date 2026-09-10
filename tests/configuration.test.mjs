@@ -4,15 +4,15 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
-import { reconcileHarnessDenials, replaceHarnessHook } from '../scripts/config-merge.mjs';
+import { hasHarnessHook, reconcileHarnessDenials, replaceHarnessHook } from '../scripts/config-merge.mjs';
 import { buildVerificationSteps } from '../scripts/project-verification.mjs';
 import { inspectManagedSkillLink, readLinkTarget } from '../scripts/skill-lib.mjs';
 
-test('replacing the harness hook preserves sibling hooks', () => {
+test('replacing the exact harness hook preserves sibling hooks and is idempotent', () => {
   const sibling = { type: 'command', command: 'node keep-this-hook.mjs' };
   const metadata = { matcher: 'Read', description: 'reserved by another tool' };
   const groups = [{ matcher: 'Bash', hooks: [
-    { type: 'command', command: 'node old/guard-git.mjs' },
+    { type: 'command', command: 'node new/guard-git.mjs' },
     sibling,
   ] }, metadata];
   const replacement = { matcher: 'Bash', hooks: [{ type: 'command', command: 'node new/guard-git.mjs' }] };
@@ -23,6 +23,21 @@ test('replacing the harness hook preserves sibling hooks', () => {
     metadata,
     replacement,
   ]);
+  assert.deepEqual(replaceHarnessHook(result, replacement), result);
+  assert.ok(hasHarnessHook(result, replacement));
+});
+
+test('hook ownership includes the exact command, Windows command, metadata and group context', () => {
+  const replacement = { matcher: 'Bash|Read', hooks: [{ type: 'command', command: 'node "/harness/guard-git.mjs"', commandWindows: 'node harness-guard', timeout: 10 }] };
+  const unrelated = [
+    { ...replacement, hooks: [{ ...replacement.hooks[0], command: 'node "/company/guard-git.mjs"' }] },
+    { ...replacement, matcher: 'Read' },
+    { ...replacement, hooks: [{ ...replacement.hooks[0], commandWindows: 'node company-guard' }] },
+    { ...replacement, hooks: [{ ...replacement.hooks[0], timeout: 20 }] },
+    { ...replacement, description: 'User customization' },
+  ];
+  assert.deepEqual(replaceHarnessHook(unrelated, replacement), [...unrelated, replacement]);
+  for (const group of unrelated) assert.equal(hasHarnessHook([group], replacement), false);
 });
 
 test('broken harness links still reveal their intended target', async () => {
