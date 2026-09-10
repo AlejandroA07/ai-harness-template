@@ -2,8 +2,8 @@
 
 - **Kind:** living progress tracker
 - **Last updated:** 2026-09-10
-- **Current position:** Step 1 is complete. A bounded Graphify pilot on this JavaScript harness passed with limitations; the representative C# repository for Step 2 is still not selected.
-- **Next action:** design the user-only Graphify interface and pin Archify for a canonical skill trial, then select the C# repository needed for the remaining evidence.
+- **Current position:** learning and the harness Graphify pilot are complete. Five harness modules and Graphify adoption with all capabilities are agreed. Westcoast Cars is selected for C# evaluation; its location, commit, and test/coverage baseline still need confirmation.
+- **Next action:** implement the smallest modular installation foundation, then integrate Graphify through Tool integrations. Prepare and evaluate Westcoast Cars independently of that reorganization.
 
 This file is the durable checklist for the graph-engineering, Graphify, architecture-viewer, CRAP, and hardening work. Update it after every completed step so progress does not depend on remembering a conversation.
 
@@ -14,20 +14,42 @@ This file is the durable checklist for the graph-engineering, Graphify, architec
 | Learn the concepts and C# example | [Original teaching guide](2026-08-19-graph-and-quality-tooling.md) |
 | Read the current conclusions and detailed comparisons | [2026-09-10 follow-up guide](2026-09-10-graphify-architecture-quality-follow-up.md) |
 | See what is done and what is next | This roadmap |
+| Implement the five-module organization and selective setup | [Harness modularity plan](harness-modularity-plan.md) |
 | Inspect the current harness relationship graph | [Graphify relationship view](../../.scratch/graphify-harness-2026-09-10/graph.html) |
 | Browse the current harness by directory and symbol | [Graphify tree view](../../.scratch/graphify-harness-2026-09-10/GRAPH_TREE.html) |
 | Understand model-context and token accounting | [Token-cost ledger](../../TOKEN-COSTS.md) |
 
 The Graphify artifacts are local, Git-ignored, and regenerable. The Markdown guides and roadmap are the durable source of truth.
 
+## Recommended execution order
+
+1. Implement the modular foundation: Global configuration, Project configuration, Skills, Workflows, and Tool integrations, with shared setup and module-specific installation definitions.
+2. Integrate Graphify with all capabilities through Tool integrations. Support user invocation across projects; configure watchers, hooks, semantic processing, and MCP explicitly. Full capability support does not mean all features run automatically.
+3. Add Archify through the agreed installation mechanism and compare its architectural view with Graphify evidence.
+4. Prepare Westcoast Cars and perform the C# tool evaluations below. This work can proceed alongside steps 1–3; it does not depend on modularization.
+5. Use the evidence to choose quality gates, any additional Roslyn viewer work, and an optional graph workflow.
+
+Modularity comes first for permanent integration because it establishes ownership, dependencies, and installation behavior once. Complete folder migration or a polished architecture viewer is not a prerequisite for installing tools through the new interface. The original eight checkpoints below remain stable so earlier references still work.
+
+### Modular foundation checklist
+
+- [x] Agree on five modules, with Skills and Workflows separate.
+- [x] Keep one repository and shared setup; give each module its own installation definition and templates where needed.
+- [x] Show workflow → skill → tool/project-check relationships explicitly, without copying skill instructions.
+- [ ] Classify current responsibilities and declare module dependencies, platforms, scopes, and file ownership.
+- [ ] Implement selective installation and matching audit behavior while preserving unrelated user skills.
+- [ ] Verify the first useful installation selection and preserve the full-harness profile.
+- [ ] Integrate Graphify with all capabilities and documented invocation/configuration choices.
+- [ ] Generate the logical architecture overview and evaluate its connection to Graphify.
+
 ## Status at a glance
 
 | Step | Outcome | Status | Existing artifact or evidence |
 |---|---|---|---|
 | 1 | Learn the graph-engineering model | **Complete** | [Research and teaching guide](2026-08-19-graph-and-quality-tooling.md); user confirmed it was read |
-| 2 | Select one representative C# repository | **Not started** | No repository selected |
+| 2 | Select and prepare one representative C# repository | **Selected — baseline pending** | Westcoast Cars; location, commit, verification, and coverage to confirm |
 | 3 | Run isolated Graphify evaluations | **In progress — harness pilot complete; C# pilot waiting** | [2026-09-10 pilot evidence](2026-09-10-graphify-architecture-quality-follow-up.md#completed-harness-pilot) |
-| 4 | Evaluate Microsoft's CRAP skills | **Waiting for Steps 2–3** | [CRAP findings](2026-08-19-graph-and-quality-tooling.md#crap-a-metric-not-an-ai-reviewer) |
+| 4 | Evaluate Microsoft's CRAP skills | **Waiting for Westcoast Cars coverage baseline** | [Trial guide](2026-09-10-graphify-architecture-quality-follow-up.md#trial-guide); independent of Graphify |
 | 5 | Add project-local architecture tests where useful | **Waiting for Step 2** | [Architecture-enforcer findings](2026-08-19-graph-and-quality-tooling.md#architect-and-hardender-roles-not-magic-binaries) |
 | 6 | Measure whether the quality tools improve decisions | **Waiting for Steps 3–5** | Measurement criteria below |
 | 7 | Decide whether to start the C# architecture viewer | **In progress — Graphify/Archify comparison pending** | [Tool comparison](2026-09-10-graphify-architecture-quality-follow-up.md#3-archify-compared-with-graphify-uncle-bobs-viewer-roslyn-and-archunitnet) |
@@ -67,9 +89,13 @@ scope
 
 > Teach me Step 1 from `docs/dev/graph-and-quality-adoption-roadmap.md`. Use the C# order-cancellation example, pause for my questions, and check that I understand the three graph types and when graph engineering is worth the cost.
 
-## Step 2 — Select one representative C# repository
+## Step 2 — Prepare Westcoast Cars for C# evaluation
 
-Choose a repository that is safe to inspect and representative of the work the harness normally performs. Prefer one that:
+Westcoast Cars is the user's selected C# repository. Its exact location and contents have not yet been verified in this task. A bounded search under the local development directory found no directory name matching `*west*`; do not infer that the repository is unavailable elsewhere.
+
+Use it to test the tools on application code rather than only on this documentation-heavy harness. The evaluation asks whether Graphify captures real C# dependencies and helps navigation, whether Graphify/Archify supplies the desired hierarchy, whether CRAP identifies useful hotspots from real coverage, and whether architecture, mutation, or duplication checks add value. These are tool evaluations, not an instruction to rewrite the application or adopt every quality gate.
+
+Confirm that it:
 
 - contains a solution with several projects or meaningful namespaces;
 - has real tests and can produce coverage;
@@ -80,10 +106,13 @@ Choose a repository that is safe to inspect and representative of the work the h
 
 Record the choice here when made:
 
-- **Repository:** not selected
-- **Commit:** not selected
-- **Why representative:** not recorded
-- **Verification command:** not recorded
+- **Repository:** Westcoast Cars (selected by the user)
+- **Local path or remote:** pending confirmation
+- **Commit:** pending baseline capture
+- **Why representative:** selected as a real C# application; project structure and suitability still to inspect
+- **Verification command:** pending inspection
+- **Coverage artifact/command:** pending inspection; use real Cobertura for CRAP
+- **Evaluation scope and data exclusions:** pending inspection
 
 **Complete Step 2 when:** the repository, exact commit, verification command, data-safety decision, and reason for choosing it are recorded here.
 
@@ -91,7 +120,7 @@ Record the choice here when made:
 
 The JavaScript harness pilot is complete. It used `graphifyy==0.9.56` in a temporary runtime, code-only extraction, and no installer, hooks, watcher, MCP registration, global graph, or tracked artifacts. It found 273 nodes and 416 edges, reported zero model tokens for extraction, and estimated a 6.0× query reduction. The result was only a qualified pass: Markdown instructions were omitted, 122 symbols were weakly connected, and one 1,000-token query was still broad and truncated. See the [full pilot evidence](2026-09-10-graphify-architecture-quality-follow-up.md#completed-harness-pilot).
 
-The C# evaluation remains pending and still requires a selected repository. Follow the full [safe, non-installing evaluation plan](2026-08-19-graph-and-quality-tooling.md#safe-non-installing-evaluation): review and pin the source first, use an isolated runtime, deny unnecessary network access, and do not install hooks or persistent harness instructions.
+The C# evaluation remains pending until Westcoast Cars has a recorded baseline. Begin with a reproducible code-only run and five known-answer questions, then evaluate additional Graphify capabilities as needed. Graphify adoption is already agreed; this evaluation determines its C# accuracy, useful configuration, limitations, and actual context savings. The earlier pilot restrictions were experiment settings, not permanent exclusions from the adopted integration.
 
 Capture the future result in a dated report under `docs/dev/`. The report should include:
 
@@ -167,14 +196,16 @@ Do not add graph orchestration or hardening profiles merely because the tools ex
 
 Record durable harness decisions in [`decisions.md`](decisions.md), including rejected options and the evidence that would justify reconsideration.
 
-**Complete Step 8 when:** each proposed integration has an explicit adopt, reject, or defer decision. Until then, the harness remains unchanged.
+**Complete Step 8 when:** each proposed integration has an explicit adopt, reject, or defer decision. Graphify adoption and the modular direction are already agreed; implementation is tracked above. The other integrations retain their own evaluation checkpoints.
 
 ## Decisions already made
 
 - [x] Learn the three graph types from the teaching guide.
 - [x] Reject `geng`; the existing prototype skill already covers prototype work.
 - [x] Keep graph engineering optional and user-invoked; begin without loops.
-- [x] Accept Graphify for a controlled integration trial.
+- [x] Adopt Graphify with all capabilities in Tool integrations, available across projects and invoked by the user.
+- [x] Separate Skills and Workflows, with explicit dependency relationships and one source for each skill.
+- [x] Select Westcoast Cars as the C# evaluation repository.
 - [x] Accept `tt-a1i/archify` for a controlled user-invoked skill trial.
 - [x] Keep the C# Roslyn viewer deferred until Graphify plus Archify is tested.
 - [x] Trial Microsoft's CRAP workflows from real Cobertura evidence before any permanent skill installation.
@@ -188,11 +219,10 @@ Record durable harness decisions in [`decisions.md`](decisions.md), including re
 
 ## Decisions still open
 
-- [ ] Graphify refresh control: manual build only, or manual build plus an agent-requested refresh that requires confirmation?
-- [ ] Graphify query surface: CLI only first, or also a read-only MCP interface after the CLI trial?
+- [ ] Graphify configuration: specify how a project enables and invokes builds, queries, watchers, hooks, semantic processing, and MCP. All capabilities are in scope; defaults and setup details remain to implement.
 - [ ] Graphify persistence: project-local ignored cache, checked-in graph, or external per-user cache?
 - [ ] Archify retention: keep it after the direct-read versus Graphify-fed comparison only if its diagrams improve human understanding enough to justify agent context cost.
-- [ ] C# project: choose a representative repository for Graphify, CRAP, Stryker, and architecture-rule evidence.
+- [ ] Westcoast Cars: confirm its location and record the commit, verification command, and coverage baseline before evaluation.
 - [ ] Graph runtime: remain a documented no-loop workflow, or prototype LangGraph.js only after persisted state, pause/resume, or reusable branching becomes necessary?
 
 ## Progress update rule

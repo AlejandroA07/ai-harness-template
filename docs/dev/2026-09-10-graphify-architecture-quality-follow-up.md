@@ -1,5 +1,7 @@
 # Graphify, architecture, and quality-tooling follow-up
 
+> Historical research and pilot record. Later decisions in the [living checklist](graph-and-quality-adoption-roadmap.md) supersede the initial integration restrictions below: Graphify is adopted with all capabilities, the harness will have five selectable modules, and Westcoast Cars is selected for C# evaluation. See the [modularity implementation plan](harness-modularity-plan.md).
+
 - **Date:** 2026-09-10
 - **Type:** research and decision guide
 - **Scope:** clarify the user's current mental model, identify the tool called “Archify,” run a bounded Graphify pilot, and propose an evidence-first adoption path
