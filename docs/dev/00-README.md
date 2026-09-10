@@ -5,6 +5,7 @@ Current state: skill reconciliation handles filesystem aliases when classifying 
 | File | What it contains | Kind |
 |---|---|---|
 | `decisions.md` | Implementation decisions that should remain stable across changes. | living log |
+| `harness-modularity-plan.md` | Proposed selective adoption of global configuration, project configuration, skills/workflows, and integrations, with a readable architecture catalog. | implementation proposal |
 | `graph-and-quality-adoption-roadmap.md` | Living eight-step checklist for learning, evaluations, project-local quality gates, and later harness decisions. | living roadmap |
 | `2026-09-10-graphify-architecture-quality-follow-up.md` | Current conclusions, Graphify pilot evidence, Archify/Roslyn comparison, activation/token map, and decided-versus-open checklist. | dated report |
 | `2026-08-19-graph-and-quality-tooling.md` | Teaching guide and disposition for graph engineering, Graphify, architecture viewing, CRAP, and agent quality gates. | dated report |
