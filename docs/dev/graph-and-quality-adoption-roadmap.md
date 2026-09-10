@@ -2,8 +2,8 @@
 
 - **Kind:** living progress tracker
 - **Last updated:** 2026-09-10
-- **Current position:** learning and the harness Graphify pilot are complete. Five harness modules and Graphify adoption with all capabilities are agreed. Westcoast Cars is selected for C# evaluation; its location, commit, and test/coverage baseline still need confirmation.
-- **Next action:** implement the smallest modular installation foundation, then integrate Graphify through Tool integrations. Prepare and evaluate Westcoast Cars independently of that reorganization.
+- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. The detailed M0–M8 migration plan is ready for a fresh task; implementation has not started. Westcoast Cars remains selected with its baseline pending.
+- **Next action:** start a fresh implementation task from the plan's handoff. Complete M0 safety/fixture work, then M1 catalog/planning and M2 selective installation before permanent integrations. Westcoast Cars evaluation can proceed independently.
 
 This file is the durable checklist for the graph-engineering, Graphify, architecture-viewer, CRAP, and hardening work. Update it after every completed step so progress does not depend on remembering a conversation.
 
@@ -15,6 +15,7 @@ This file is the durable checklist for the graph-engineering, Graphify, architec
 | Read the current conclusions and detailed comparisons | [2026-09-10 follow-up guide](2026-09-10-graphify-architecture-quality-follow-up.md) |
 | See what is done and what is next | This roadmap |
 | Implement the five-module organization and selective setup | [Harness modularity plan](harness-modularity-plan.md) |
+| Inspect the repository-wide ownership map and migration risks | [Modularity review](harness-modularity-review.md) |
 | Inspect the current harness relationship graph | [Graphify relationship view](../../.scratch/graphify-harness-2026-09-10/graph.html) |
 | Browse the current harness by directory and symbol | [Graphify tree view](../../.scratch/graphify-harness-2026-09-10/GRAPH_TREE.html) |
 | Understand model-context and token accounting | [Token-cost ledger](../../TOKEN-COSTS.md) |
@@ -23,7 +24,7 @@ The Graphify artifacts are local, Git-ignored, and regenerable. The Markdown gui
 
 ## Recommended execution order
 
-1. Implement the modular foundation: Global configuration, Project configuration, Skills, Workflows, and Tool integrations, with shared setup and module-specific installation definitions.
+1. Follow [M0–M8](harness-modularity-plan.md#ordered-implementation-slices), starting with manifest/path validation, exact hook ownership, and generation/preflight corrections. Then implement the catalog, selective setup, and owned lifecycle for the five modules.
 2. Integrate Graphify with all capabilities through Tool integrations. Support user invocation across projects; configure watchers, hooks, semantic processing, and MCP explicitly. Full capability support does not mean all features run automatically.
 3. Add Archify through the agreed installation mechanism and compare its architectural view with Graphify evidence.
 4. Prepare Westcoast Cars and perform the C# tool evaluations below. This work can proceed alongside steps 1–3; it does not depend on modularization.
@@ -36,11 +37,29 @@ Modularity comes first for permanent integration because it establishes ownershi
 - [x] Agree on five modules, with Skills and Workflows separate.
 - [x] Keep one repository and shared setup; give each module its own installation definition and templates where needed.
 - [x] Show workflow → skill → tool/project-check relationships explicitly, without copying skill instructions.
+- [x] Review all tracked path families and classify the existing 22 capabilities; record R1–R10 and shared internal ownership.
+- [x] Produce a self-contained implementation contract, dependency-ordered slices, recovery rules, test matrix, and fresh-task handoff.
 - [ ] Classify current responsibilities and declare module dependencies, platforms, scopes, and file ownership.
 - [ ] Implement selective installation and matching audit behavior while preserving unrelated user skills.
 - [ ] Verify the first useful installation selection and preserve the full-harness profile.
 - [ ] Integrate Graphify with all capabilities and documented invocation/configuration choices.
 - [ ] Generate the logical architecture overview and evaluate its connection to Graphify.
+
+### Implementation slice tracker
+
+| Slice | Status | Completion evidence to record |
+|---|---|---|
+| M0 — Safety corrections and isolated fixtures | Pending | Manifest/path, hook collision and preflight tests; verified commit |
+| M1 — Catalog and pure selection planner | Pending | All capability IDs/classifications; dependency and dry-run tests; verified commit |
+| M2 — Single-capability install/update/remove/audit | Pending | Receipt and ownership lifecycle tests; verified commit |
+| M3 — Global-only platform selection | Pending | Independent-platform and legacy global-migration evidence |
+| M4 — Project-only configuration and gates | Pending | Self-contained runtime, preserved verifier/settings and adapter drift checks |
+| M5 — Workflow composition and discovery | Pending | Dependency closure, conditional prerequisites and unchanged invocation behavior |
+| M6 — Provenance and tool integrations | Pending | Graphify full-capability integration and Archify trial with owned setup |
+| M7 — Architecture overview and cost reporting | Pending | Catalog-derived views and preserved runtime measurements |
+| M8 — Full-profile migration and compatibility | Pending | Rehearsal, cross-platform evidence, final documentation and verification |
+
+See the plan for exact prerequisites. Mark a slice complete only after its acceptance evidence and the repository gate pass. The review identified implementation risks; it did not fix them.
 
 ## Status at a glance
 
