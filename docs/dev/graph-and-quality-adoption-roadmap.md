@@ -1,24 +1,37 @@
 # Graph and quality tooling adoption roadmap
 
 - **Kind:** living progress tracker
-- **Last updated:** 2026-08-31
-- **Current position:** Step 1 material is ready; the guided learning walkthrough is still pending. Step 2 has not started because no representative C# repository has been selected.
-- **Next action:** work through Step 1 with the [research and teaching guide](2026-08-19-graph-and-quality-tooling.md#the-word-graph-hides-three-different-ideas), then record the C# repository selected for Step 2.
+- **Last updated:** 2026-09-10
+- **Current position:** Step 1 is complete. A bounded Graphify pilot on this JavaScript harness passed with limitations; the representative C# repository for Step 2 is still not selected.
+- **Next action:** design the user-only Graphify interface and pin Archify for a canonical skill trial, then select the C# repository needed for the remaining evidence.
 
 This file is the durable checklist for the graph-engineering, Graphify, architecture-viewer, CRAP, and hardening work. Update it after every completed step so progress does not depend on remembering a conversation.
+
+## Where everything lives
+
+| Need | Open this |
+|---|---|
+| Learn the concepts and C# example | [Original teaching guide](2026-08-19-graph-and-quality-tooling.md) |
+| Read the current conclusions and detailed comparisons | [2026-09-10 follow-up guide](2026-09-10-graphify-architecture-quality-follow-up.md) |
+| See what is done and what is next | This roadmap |
+| Inspect the current harness relationship graph | [Graphify relationship view](../../.scratch/graphify-harness-2026-09-10/graph.html) |
+| Browse the current harness by directory and symbol | [Graphify tree view](../../.scratch/graphify-harness-2026-09-10/GRAPH_TREE.html) |
+| Understand model-context and token accounting | [Token-cost ledger](../../TOKEN-COSTS.md) |
+
+The Graphify artifacts are local, Git-ignored, and regenerable. The Markdown guides and roadmap are the durable source of truth.
 
 ## Status at a glance
 
 | Step | Outcome | Status | Existing artifact or evidence |
 |---|---|---|---|
-| 1 | Learn the graph-engineering model | **Ready — walkthrough pending** | [Research and teaching guide](2026-08-19-graph-and-quality-tooling.md) |
+| 1 | Learn the graph-engineering model | **Complete** | [Research and teaching guide](2026-08-19-graph-and-quality-tooling.md); user confirmed it was read |
 | 2 | Select one representative C# repository | **Not started** | No repository selected |
-| 3 | Run an isolated Graphify evaluation | **Waiting for Step 2 and separate approval** | [Evaluation procedure](2026-08-19-graph-and-quality-tooling.md#safe-non-installing-evaluation) |
+| 3 | Run isolated Graphify evaluations | **In progress — harness pilot complete; C# pilot waiting** | [2026-09-10 pilot evidence](2026-09-10-graphify-architecture-quality-follow-up.md#completed-harness-pilot) |
 | 4 | Evaluate Microsoft's CRAP skills | **Waiting for Steps 2–3** | [CRAP findings](2026-08-19-graph-and-quality-tooling.md#crap-a-metric-not-an-ai-reviewer) |
 | 5 | Add project-local architecture tests where useful | **Waiting for Step 2** | [Architecture-enforcer findings](2026-08-19-graph-and-quality-tooling.md#architect-and-hardender-roles-not-magic-binaries) |
 | 6 | Measure whether the quality tools improve decisions | **Waiting for Steps 3–5** | Measurement criteria below |
-| 7 | Decide whether to start the C# architecture viewer | **Waiting for Graphify evidence** | [Separate-project Roslyn brief](2026-08-19-graph-and-quality-tooling.md#separate-project-handoff-c-architecture-viewer) |
-| 8 | Decide whether any workflow belongs in the harness | **Waiting for all earlier evidence** | No harness change approved |
+| 7 | Decide whether to start the C# architecture viewer | **In progress — Graphify/Archify comparison pending** | [Tool comparison](2026-09-10-graphify-architecture-quality-follow-up.md#3-archify-compared-with-graphify-uncle-bobs-viewer-roslyn-and-archunitnet) |
+| 8 | Decide whether any workflow belongs in the harness | **In progress — provisional decisions recorded** | [Decision matrix](2026-09-10-graphify-architecture-quality-follow-up.md#11-decision-matrix-and-checklist) |
 
 Status meanings:
 
@@ -48,9 +61,9 @@ scope
   → human decision
 ```
 
-**Complete Step 1 when:** you can distinguish a workflow graph, a code knowledge graph, and an architecture graph; explain why real commands are stronger gates than model confidence; and identify when one agent loop is cheaper than a graph.
+**Completion recorded 2026-09-10:** the guide was read and the follow-up questions correctly distinguished Graphify's code knowledge graph from graph-engineered execution and an architecture viewer. The remaining questions are answered in the [follow-up guide](2026-09-10-graphify-architecture-quality-follow-up.md).
 
-**Suggested next-chat request:**
+**Optional refresher request:**
 
 > Teach me Step 1 from `docs/dev/graph-and-quality-adoption-roadmap.md`. Use the C# order-cancellation example, pause for my questions, and check that I understand the three graph types and when graph engineering is worth the cost.
 
@@ -76,7 +89,9 @@ Record the choice here when made:
 
 ## Step 3 — Evaluate Graphify safely
 
-This requires a separate explicit approval because it involves obtaining and running external software. Follow the full [safe, non-installing evaluation plan](2026-08-19-graph-and-quality-tooling.md#safe-non-installing-evaluation): review and pin the source first, use an isolated prototype, deny unnecessary network access, test a synthetic fixture before the representative repository, and do not install hooks or persistent harness instructions.
+The JavaScript harness pilot is complete. It used `graphifyy==0.9.56` in a temporary runtime, code-only extraction, and no installer, hooks, watcher, MCP registration, global graph, or tracked artifacts. It found 273 nodes and 416 edges, reported zero model tokens for extraction, and estimated a 6.0× query reduction. The result was only a qualified pass: Markdown instructions were omitted, 122 symbols were weakly connected, and one 1,000-token query was still broad and truncated. See the [full pilot evidence](2026-09-10-graphify-architecture-quality-follow-up.md#completed-harness-pilot).
+
+The C# evaluation remains pending and still requires a selected repository. Follow the full [safe, non-installing evaluation plan](2026-08-19-graph-and-quality-tooling.md#safe-non-installing-evaluation): review and pin the source first, use an isolated runtime, deny unnecessary network access, and do not install hooks or persistent harness instructions.
 
 Capture the future result in a dated report under `docs/dev/`. The report should include:
 
@@ -88,7 +103,7 @@ Capture the future result in a dated report under `docs/dev/`. The report should
 - runtime and artifact size; and
 - a clear adopt, reject, or investigate-further decision.
 
-**Complete Step 3 when:** the isolated evaluation report exists and contains evidence from both the controlled fixture and the selected representative repository.
+**Complete Step 3 when:** the report also contains five known-answer C# questions, extraction-accuracy checks, and measured source-read/token evidence from the representative repository.
 
 ## Step 4 — Evaluate CRAP for C#
 
@@ -153,6 +168,32 @@ Do not add graph orchestration or hardening profiles merely because the tools ex
 Record durable harness decisions in [`decisions.md`](decisions.md), including rejected options and the evidence that would justify reconsideration.
 
 **Complete Step 8 when:** each proposed integration has an explicit adopt, reject, or defer decision. Until then, the harness remains unchanged.
+
+## Decisions already made
+
+- [x] Learn the three graph types from the teaching guide.
+- [x] Reject `geng`; the existing prototype skill already covers prototype work.
+- [x] Keep graph engineering optional and user-invoked; begin without loops.
+- [x] Accept Graphify for a controlled integration trial.
+- [x] Accept `tt-a1i/archify` for a controlled user-invoked skill trial.
+- [x] Keep the C# Roslyn viewer deferred until Graphify plus Archify is tested.
+- [x] Trial Microsoft's CRAP workflows from real Cobertura evidence before any permanent skill installation.
+- [x] Keep architecture rules project-owned rather than universal harness policy.
+- [x] Treat ArchUnitNET as conditional; add it only where named C# dependency rules are currently unenforced.
+- [x] Record that Stryker.NET is not active in this template; inspect the chosen C# repository separately.
+- [x] Treat jscpd as an optional deterministic duplication check, not an LLM tool.
+- [x] Keep acceptance tests project-owned and keep human review as the final pre-push decision.
+- [x] Keep hardening an optional profile, not a standalone product.
+- [x] Treat “video-only claims” as an evidence label, not a tool.
+
+## Decisions still open
+
+- [ ] Graphify refresh control: manual build only, or manual build plus an agent-requested refresh that requires confirmation?
+- [ ] Graphify query surface: CLI only first, or also a read-only MCP interface after the CLI trial?
+- [ ] Graphify persistence: project-local ignored cache, checked-in graph, or external per-user cache?
+- [ ] Archify retention: keep it after the direct-read versus Graphify-fed comparison only if its diagrams improve human understanding enough to justify agent context cost.
+- [ ] C# project: choose a representative repository for Graphify, CRAP, Stryker, and architecture-rule evidence.
+- [ ] Graph runtime: remain a documented no-loop workflow, or prototype LangGraph.js only after persisted state, pause/resume, or reusable branching becomes necessary?
 
 ## Progress update rule
 
