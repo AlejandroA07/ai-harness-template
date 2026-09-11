@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
 import { discoverSkills, inspectManagedSkillLink, readInvocationPolicy } from './skill-lib.mjs';
 import { runTool } from './windows-cli.mjs';
+import { hasHarnessHook } from './config-merge.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const projectIndex = process.argv.indexOf('--project');
@@ -70,6 +71,11 @@ async function checkTemplate() {
 
 async function checkMachine() {
   const home = os.homedir();
+  const claudeTemplate = JSON.parse((await fs.readFile(path.join(root, 'global', 'claude-settings.json'), 'utf8'))
+    .replaceAll('{{HARNESS_ROOT}}', root.replaceAll('\\', '/')));
+  const codexTemplate = JSON.parse((await fs.readFile(path.join(root, 'global', 'codex-hooks', 'hooks.json.template'), 'utf8'))
+    .replaceAll('{{HARNESS_ROOT}}', root.replaceAll('\\', '/'))
+    .replaceAll('{{HARNESS_ROOT_WINDOWS}}', root.replaceAll('\\', '\\\\')));
   const customAgents = await findMarkdownFiles(path.join(home, '.claude', 'agents'));
   customAgents.length === 0
     ? pass('Claude custom-agent discovery directory is empty')
@@ -79,9 +85,8 @@ async function checkMachine() {
     const settings = JSON.parse(await fs.readFile(claudeSettingsPath, 'utf8'));
     settings.autoMemoryEnabled === false ? pass('Claude auto-memory disabled') : fail('Claude auto-memory is not disabled');
     settings.includeCoAuthoredBy === false ? pass('Claude attribution disabled') : fail('Claude attribution setting is not disabled');
-    const hookText = JSON.stringify(settings.hooks ?? {});
-    hookText.includes('guard-git.mjs') ? pass('Claude machine guard configured') : fail('Claude machine guard missing');
-    hookText.includes('PowerShell') ? pass('Claude machine guard covers PowerShell') : fail('Claude machine guard does not cover PowerShell');
+    hasHarnessHook(settings.hooks?.PreToolUse, claudeTemplate.hooks.PreToolUse[0])
+      ? pass('Claude machine guard configured with shell and read coverage') : fail('Claude machine guard missing or modified');
     const denied = new Set(settings.permissions?.deny ?? []);
     const missingToolDenials = deniedClaudeBuiltInTools.filter((tool) => !denied.has(tool));
     missingToolDenials.length === 0
@@ -107,7 +112,8 @@ async function checkMachine() {
 
   try {
     const hooks = JSON.parse(await fs.readFile(path.join(home, '.codex', 'hooks.json'), 'utf8'));
-    JSON.stringify(hooks).includes('guard-git.mjs') ? pass('Codex machine guard configured') : fail('Codex machine guard missing');
+    hasHarnessHook(hooks.hooks?.PreToolUse, codexTemplate.hooks.PreToolUse[0])
+      ? pass('Codex machine guard configured') : fail('Codex machine guard missing or modified');
     warn('Codex hook trust is interactive; confirm it with /hooks after changes');
   } catch (error) { fail(`cannot audit Codex hooks: ${error.message}`); }
 
