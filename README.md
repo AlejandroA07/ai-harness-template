@@ -12,6 +12,13 @@ A reusable, cross-platform workflow for Claude Code and Codex. It keeps durable 
 
 All mutating setup commands are dry-run by default and require `--apply`.
 
+Preview selective adoption with `node scripts/setup.mjs list` and
+`node scripts/setup.mjs plan --select implement --platform codex --scope machine`.
+These new commands are read-only: they resolve required capabilities and show
+conditional uses without inspecting or changing an installation. See the
+[catalog and planning guide](docs/dev/modularity-m1-catalog.md) for module selection,
+JSON output, and the remaining installation work.
+
 ## Active structure
 
 | Path | Purpose |
@@ -24,6 +31,7 @@ All mutating setup commands are dry-run by default and require `--apply`.
 | `project/` | Portable project skeleton and CI templates |
 | `global/` | Claude and Codex machine guidance/settings templates |
 | `scripts/` | Dependency-free Node setup, generation, audit, cost, and verification tools |
+| `catalog/` | Versioned module definitions and capability relationships; canonical content stays in `skills/` |
 
 Claude adapters are generated with Claude's `disable-model-invocation` metadata. Codex adapters are generated with `agents/openai.yaml`. The workflow body has one canonical source.
 

@@ -1,0 +1,1005 @@
+{
+  "version": 1,
+  "modules": [
+    {
+      "id": "global-configuration",
+      "label": "Global configuration",
+      "visibility": "public",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine"
+      ],
+      "sources": [
+        "global"
+      ],
+      "description": "Machine-wide guidance and platform settings."
+    },
+    {
+      "id": "project-configuration",
+      "label": "Project configuration",
+      "visibility": "public",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "project"
+      ],
+      "sources": [
+        "project",
+        "scripts/bootstrap.mjs",
+        "scripts/project-configuration.mjs",
+        "scripts/project-verification.mjs"
+      ],
+      "description": "Repository guidance, verification and optional CI."
+    },
+    {
+      "id": "skills",
+      "label": "Skills",
+      "visibility": "public",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "sources": [
+        "skills"
+      ],
+      "description": "Individual reusable capabilities; ownership is refined per capability."
+    },
+    {
+      "id": "workflows",
+      "label": "Workflows",
+      "visibility": "public",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "sources": [
+        "skills"
+      ],
+      "description": "Ordered compositions packaged through the existing skill adapters."
+    },
+    {
+      "id": "tool-integrations",
+      "label": "Tool integrations",
+      "visibility": "public",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "sources": [
+        "components/mcp"
+      ],
+      "description": "Optional tool configurations; installation definitions arrive in M6."
+    },
+    {
+      "id": "installation-core",
+      "label": "Installation core",
+      "visibility": "internal",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "sources": [
+        "catalog",
+        "scripts/module-catalog.mjs",
+        "scripts/catalog-loader.mjs",
+        "scripts/setup.mjs",
+        "scripts/machine-setup.mjs",
+        "scripts/config-merge.mjs",
+        "scripts/skill-lib.mjs",
+        "scripts/sync-skills.mjs",
+        "scripts/generate-skills.mjs",
+        "scripts/generate-project-skills.mjs",
+        "scripts/audit.mjs"
+      ],
+      "description": "Shared selection, generation, installation and audit machinery."
+    },
+    {
+      "id": "shared-policy-runtime",
+      "label": "Shared policy/runtime",
+      "visibility": "internal",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "sources": [
+        "components/guard-policy.mjs",
+        "components/guard-git.mjs",
+        "components/attribution-policy.mjs",
+        "components/check-attribution.mjs",
+        "components/pre-commit.mjs",
+        "components/claude-tool-policy.mjs",
+        "scripts/windows-cli.mjs"
+      ],
+      "description": "Shared guards, attribution policy and portable process execution."
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "ask-alfred",
+      "label": "Ask Alfred",
+      "module": "workflows",
+      "source": "skills/engineering/ask-alfred/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [
+        "code-review",
+        "codebase-design",
+        "diagnosing-bugs",
+        "domain-modeling",
+        "grill-me",
+        "grill-with-docs",
+        "grilling",
+        "handoff",
+        "implement",
+        "improve-codebase-architecture",
+        "prototype",
+        "research",
+        "security-checklist",
+        "tdd",
+        "teach",
+        "to-questionnaire",
+        "to-spec",
+        "to-tickets",
+        "wait-what",
+        "wayfinder",
+        "writing-for-agents"
+      ],
+      "prerequisites": [
+        "Routes describe available canonical capabilities, not observed installation state; installed-state routing is M5 work."
+      ],
+      "resources": [
+        "skills/engineering/ask-alfred/PHASE-BOUNDARIES.md"
+      ],
+      "workflow": {
+        "stages": [
+          {
+            "id": "route",
+            "label": "Explain the suitable capability or flow",
+            "invokes": [],
+            "approval": "The user chooses whether to invoke a recommended capability.",
+            "artifacts": []
+          }
+        ]
+      },
+      "provenanceRef": "ask-alfred"
+    },
+    {
+      "id": "code-review",
+      "label": "Code Review",
+      "module": "skills",
+      "source": "skills/engineering/code-review/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [
+        "Read docs/agents/issue-tracker.md when present; otherwise use GitHub Issues for a GitHub remote or local Markdown under .scratch/.",
+        "Invocation requires Git and parallel review agents; remote issue access is conditional on the tracker."
+      ],
+      "resources": [],
+      "provenanceRef": "code-review"
+    },
+    {
+      "id": "codebase-design",
+      "label": "Codebase Design",
+      "module": "skills",
+      "source": "skills/engineering/codebase-design/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [
+        "The optional design-it-twice resource uses parallel agents when explicitly invoked."
+      ],
+      "resources": [
+        "skills/engineering/codebase-design/DEEPENING.md",
+        "skills/engineering/codebase-design/DESIGN-IT-TWICE.md"
+      ],
+      "provenanceRef": "codebase-design"
+    },
+    {
+      "id": "diagnosing-bugs",
+      "label": "Diagnosing Bugs",
+      "module": "skills",
+      "source": "skills/engineering/diagnosing-bugs/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [
+        "improve-codebase-architecture"
+      ],
+      "prerequisites": [
+        "Invocation requires a reproducible failing command; platform-specific diagnostic loop templates are optional resources."
+      ],
+      "resources": [
+        "skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.ps1",
+        "skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh"
+      ],
+      "provenanceRef": "diagnosing-bugs"
+    },
+    {
+      "id": "domain-modeling",
+      "label": "Domain Modeling",
+      "module": "skills",
+      "source": "skills/engineering/domain-modeling/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [
+        "Consult CONTEXT-MAP.md when present; create CONTEXT.md and docs/adr/ lazily under the documented fallback layout."
+      ],
+      "resources": [
+        "skills/engineering/domain-modeling/ADR-FORMAT.md",
+        "skills/engineering/domain-modeling/CONTEXT-FORMAT.md"
+      ],
+      "provenanceRef": "domain-modeling"
+    },
+    {
+      "id": "grill-me",
+      "label": "Grill Me",
+      "module": "workflows",
+      "source": "skills/productivity/grill-me/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [
+        "grilling"
+      ],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [],
+      "resources": [],
+      "workflow": {
+        "stages": [
+          {
+            "id": "interview",
+            "label": "Sharpen the plan through decision rounds",
+            "invokes": [
+              "grilling"
+            ],
+            "approval": "The user answers each decision frontier before the next round.",
+            "artifacts": []
+          }
+        ]
+      },
+      "provenanceRef": "grill-me"
+    },
+    {
+      "id": "grill-with-docs",
+      "label": "Grill With Docs",
+      "module": "workflows",
+      "source": "skills/engineering/grill-with-docs/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [
+        "grilling",
+        "domain-modeling"
+      ],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [
+        "Invocation writes domain artifacts in the current repository using the domain-modeling layout."
+      ],
+      "resources": [],
+      "workflow": {
+        "stages": [
+          {
+            "id": "interview-and-record",
+            "label": "Sharpen decisions and record durable domain knowledge",
+            "invokes": [
+              "grilling",
+              "domain-modeling"
+            ],
+            "approval": "The user answers each decision frontier before the next round.",
+            "artifacts": [
+              "CONTEXT.md glossary updates",
+              "docs/adr decision records"
+            ]
+          }
+        ]
+      },
+      "provenanceRef": "grill-with-docs"
+    },
+    {
+      "id": "grilling",
+      "label": "Grilling",
+      "module": "skills",
+      "source": "skills/productivity/grilling/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [
+        "Fact-finding may require a subagent; user decisions require a human response."
+      ],
+      "resources": [],
+      "provenanceRef": "grilling"
+    },
+    {
+      "id": "handoff",
+      "label": "Handoff",
+      "module": "skills",
+      "source": "skills/productivity/handoff/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [],
+      "resources": [],
+      "provenanceRef": "handoff"
+    },
+    {
+      "id": "implement",
+      "label": "Implement",
+      "module": "workflows",
+      "source": "skills/engineering/implement/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [
+        "tdd",
+        "code-review"
+      ],
+      "uses": [
+        {
+          "id": "security-checklist",
+          "when": "When changes touch an attacker-reachable interface or security-sensitive configuration."
+        }
+      ],
+      "routes": [],
+      "prerequisites": [
+        "Invocation requires an approved specification or ticket and the project verification command node scripts/verify.mjs.",
+        "Git operations require Git; project checks may require stack-specific tools."
+      ],
+      "resources": [],
+      "workflow": {
+        "stages": [
+          {
+            "id": "scope",
+            "label": "Read the approved work and define the exact patch",
+            "invokes": [],
+            "approval": "An approved specification or ticket defines behavior, test seams, authorization and scope.",
+            "artifacts": []
+          },
+          {
+            "id": "implement",
+            "label": "Build verified vertical slices",
+            "invokes": [
+              "tdd"
+            ],
+            "artifacts": [
+              "tested source patch"
+            ]
+          },
+          {
+            "id": "security-review",
+            "label": "Review security-sensitive changes",
+            "invokes": [
+              "security-checklist"
+            ],
+            "when": "The patch touches an attacker-reachable interface or security-sensitive configuration.",
+            "artifacts": [
+              "security checklist verdicts"
+            ]
+          },
+          {
+            "id": "review",
+            "label": "Review the exact staged patch",
+            "invokes": [
+              "code-review"
+            ],
+            "artifacts": [
+              "standards and specification review"
+            ]
+          },
+          {
+            "id": "verify-and-commit",
+            "label": "Run the project gate and create the local commit",
+            "invokes": [],
+            "artifacts": [
+              "verified local Git commit"
+            ]
+          }
+        ]
+      },
+      "provenanceRef": "implement"
+    },
+    {
+      "id": "improve-codebase-architecture",
+      "label": "Improve Codebase Architecture",
+      "module": "workflows",
+      "source": "skills/engineering/improve-codebase-architecture/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [
+        "codebase-design"
+      ],
+      "uses": [
+        {
+          "id": "grilling",
+          "when": "After the user selects a candidate."
+        },
+        {
+          "id": "domain-modeling",
+          "when": "As domain decisions crystallize while exploring the selected candidate."
+        }
+      ],
+      "routes": [
+        "grill-with-docs"
+      ],
+      "prerequisites": [
+        "Invocation uses a subagent and opens an HTML report; domain glossary and ADRs are consulted when present."
+      ],
+      "resources": [
+        "skills/engineering/improve-codebase-architecture/HTML-REPORT.md"
+      ],
+      "workflow": {
+        "stages": [
+          {
+            "id": "explore",
+            "label": "Find deepening opportunities using the shared vocabulary",
+            "invokes": [
+              "codebase-design"
+            ],
+            "artifacts": []
+          },
+          {
+            "id": "present",
+            "label": "Present candidates in an architecture report",
+            "invokes": [],
+            "approval": "The user selects which candidate to explore.",
+            "artifacts": [
+              "temporary architecture review HTML"
+            ]
+          },
+          {
+            "id": "design",
+            "label": "Work through the selected module design",
+            "invokes": [
+              "grilling",
+              "domain-modeling"
+            ],
+            "when": "The user selects a candidate.",
+            "artifacts": [
+              "CONTEXT.md glossary updates when needed",
+              "docs/adr decision records when needed"
+            ]
+          }
+        ]
+      },
+      "provenanceRef": "improve-codebase-architecture"
+    },
+    {
+      "id": "prototype",
+      "label": "Prototype",
+      "module": "skills",
+      "source": "skills/engineering/prototype/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [
+        "Invocation requires an isolated prototype branch from the default branch; project-specific runtimes depend on the prototype."
+      ],
+      "resources": [
+        "skills/engineering/prototype/LOGIC.md",
+        "skills/engineering/prototype/UI.md"
+      ],
+      "provenanceRef": "prototype"
+    },
+    {
+      "id": "research",
+      "label": "Research",
+      "module": "skills",
+      "source": "skills/engineering/research/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [
+        "Invocation requires a background agent and access to primary sources."
+      ],
+      "resources": [],
+      "provenanceRef": "research"
+    },
+    {
+      "id": "security-checklist",
+      "label": "Security Checklist",
+      "module": "skills",
+      "source": "skills/engineering/security-checklist/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [],
+      "resources": [],
+      "provenanceRef": "security-checklist"
+    },
+    {
+      "id": "tdd",
+      "label": "Tdd",
+      "module": "skills",
+      "source": "skills/engineering/tdd/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [
+        {
+          "id": "codebase-design",
+          "when": "When the shape of the test interface is in question."
+        }
+      ],
+      "routes": [
+        "code-review"
+      ],
+      "prerequisites": [],
+      "resources": [
+        "skills/engineering/tdd/mocking.md",
+        "skills/engineering/tdd/tests.md"
+      ],
+      "provenanceRef": "tdd"
+    },
+    {
+      "id": "teach",
+      "label": "Teach",
+      "module": "workflows",
+      "source": "skills/productivity/teach/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [],
+      "resources": [
+        "skills/productivity/teach/GLOSSARY-FORMAT.md",
+        "skills/productivity/teach/LEARNING-RECORD-FORMAT.md",
+        "skills/productivity/teach/MISSION-FORMAT.md",
+        "skills/productivity/teach/RESOURCES-FORMAT.md"
+      ],
+      "workflow": {
+        "stages": [
+          {
+            "id": "establish-mission",
+            "label": "Ground teaching in the learner's mission",
+            "invokes": [],
+            "approval": "The user clarifies an absent mission and confirms any later mission change.",
+            "artifacts": [
+              "MISSION.md",
+              "RESOURCES.md"
+            ]
+          },
+          {
+            "id": "teach",
+            "label": "Create and run a focused interactive lesson",
+            "invokes": [],
+            "artifacts": [
+              "lesson HTML",
+              "reusable lesson assets",
+              "reference HTML"
+            ]
+          },
+          {
+            "id": "record",
+            "label": "Record durable learning and teaching preferences",
+            "invokes": [],
+            "artifacts": [
+              "learning record Markdown",
+              "NOTES.md"
+            ]
+          }
+        ]
+      },
+      "provenanceRef": "teach"
+    },
+    {
+      "id": "to-questionnaire",
+      "label": "To Questionnaire",
+      "module": "skills",
+      "source": "skills/productivity/to-questionnaire/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [],
+      "resources": [],
+      "provenanceRef": "to-questionnaire"
+    },
+    {
+      "id": "to-spec",
+      "label": "To Spec",
+      "module": "workflows",
+      "source": "skills/engineering/to-spec/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [
+        "Read docs/agents/issue-tracker.md when present; otherwise use GitHub Issues for a GitHub remote or local Markdown under .scratch/.",
+        "Remote publication requires explicit authorization and tracker access; planning does not access a tracker."
+      ],
+      "resources": [],
+      "workflow": {
+        "stages": [
+          {
+            "id": "explore",
+            "label": "Explore the repository and existing decisions",
+            "invokes": [],
+            "artifacts": []
+          },
+          {
+            "id": "confirm-test-seams",
+            "label": "Choose the highest practical test seams",
+            "invokes": [],
+            "approval": "The user confirms that the proposed test seams match expectations.",
+            "artifacts": [
+              "testing decisions"
+            ]
+          },
+          {
+            "id": "publish",
+            "label": "Write and publish the specification",
+            "invokes": [],
+            "artifacts": [
+              "ready-for-agent specification"
+            ]
+          }
+        ]
+      },
+      "provenanceRef": "to-spec"
+    },
+    {
+      "id": "to-tickets",
+      "label": "To Tickets",
+      "module": "workflows",
+      "source": "skills/engineering/to-tickets/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [
+        "Read docs/agents/issue-tracker.md when present; otherwise use GitHub Issues for a GitHub remote or local Markdown under .scratch/.",
+        "Remote publication requires explicit authorization and tracker access; planning does not access a tracker."
+      ],
+      "resources": [],
+      "workflow": {
+        "stages": [
+          {
+            "id": "gather-and-draft",
+            "label": "Gather context and draft dependency-ordered vertical slices",
+            "invokes": [],
+            "artifacts": [
+              "proposed ticket breakdown"
+            ]
+          },
+          {
+            "id": "approve",
+            "label": "Quiz and refine the breakdown",
+            "invokes": [],
+            "approval": "The user approves ticket granularity and blocking relationships.",
+            "artifacts": [
+              "approved ticket breakdown"
+            ]
+          },
+          {
+            "id": "publish",
+            "label": "Publish tickets and their blocking relationships",
+            "invokes": [],
+            "artifacts": [
+              "ready-for-agent tickets",
+              "ticket blocking relationships"
+            ]
+          }
+        ]
+      },
+      "provenanceRef": "to-tickets"
+    },
+    {
+      "id": "wait-what",
+      "label": "Wait What",
+      "module": "skills",
+      "source": "skills/productivity/wait-what/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [],
+      "resources": [],
+      "provenanceRef": "wait-what"
+    },
+    {
+      "id": "wayfinder",
+      "label": "Wayfinder",
+      "module": "workflows",
+      "source": "skills/engineering/wayfinder/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [
+        "grilling",
+        "domain-modeling"
+      ],
+      "uses": [
+        {
+          "id": "research",
+          "when": "When resolving a research ticket."
+        },
+        {
+          "id": "prototype",
+          "when": "When resolving a prototype ticket."
+        }
+      ],
+      "routes": [
+        "to-spec",
+        "to-tickets",
+        "implement"
+      ],
+      "prerequisites": [
+        "Read docs/agents/issue-tracker.md when present; otherwise use GitHub Issues for a GitHub remote or local Markdown under .scratch/.",
+        "Remote publication requires explicit authorization and tracker access; planning does not access a tracker."
+      ],
+      "resources": [],
+      "workflow": {
+        "stages": [
+          {
+            "id": "name-destination",
+            "label": "Resolve the destination with the user",
+            "invokes": [
+              "grilling",
+              "domain-modeling"
+            ],
+            "when": "Chart mode: starting a new map.",
+            "approval": "The user settles the destination and each human-in-the-loop decision.",
+            "artifacts": [
+              "destination and domain decisions"
+            ]
+          },
+          {
+            "id": "chart-map",
+            "label": "Create the map, tickets and blocking relationships",
+            "invokes": [],
+            "when": "Chart mode: the destination needs a multi-session decision map. Stop after charting; do not resolve tickets in this invocation.",
+            "artifacts": [
+              "wayfinder map issue",
+              "decision tickets",
+              "blocking relationships"
+            ]
+          },
+          {
+            "id": "research",
+            "label": "Resolve research tickets in parallel",
+            "invokes": [
+              "research"
+            ],
+            "when": "Chart mode created research tickets, or work mode selected a research ticket.",
+            "artifacts": [
+              "research branch findings",
+              "ticket context pointers"
+            ]
+          },
+          {
+            "id": "prototype",
+            "label": "Resolve a prototype ticket with the user",
+            "invokes": [
+              "prototype"
+            ],
+            "when": "Work mode selected a prototype ticket that needs a concrete artifact to support a decision.",
+            "approval": "The user evaluates the prototype as part of the decision.",
+            "artifacts": [
+              "linked prototype evidence"
+            ]
+          },
+          {
+            "id": "discuss-decision",
+            "label": "Resolve a decision through discussion",
+            "invokes": [
+              "grilling",
+              "domain-modeling"
+            ],
+            "when": "Work mode selected a grilling ticket, the ticket notes name these capabilities, or the approach is unclear.",
+            "approval": "The user supplies the human side of each decision.",
+            "artifacts": [
+              "decision answer"
+            ]
+          },
+          {
+            "id": "record-resolution",
+            "label": "Record the resolution and update the map",
+            "invokes": [],
+            "when": "Work mode: after the selected ticket is resolved. Do not run the chart-mode stages first.",
+            "artifacts": [
+              "resolution comments",
+              "updated decisions and frontier"
+            ]
+          }
+        ]
+      },
+      "provenanceRef": "wayfinder"
+    },
+    {
+      "id": "writing-for-agents",
+      "label": "Writing For Agents",
+      "module": "skills",
+      "source": "skills/productivity/writing-for-agents/SKILL.md",
+      "platforms": [
+        "claude",
+        "codex"
+      ],
+      "scopes": [
+        "machine",
+        "project"
+      ],
+      "requires": [],
+      "uses": [],
+      "routes": [],
+      "prerequisites": [],
+      "resources": [
+        "skills/productivity/writing-for-agents/SKILL-MECHANICS.md"
+      ],
+      "provenanceRef": "writing-for-agents"
+    }
+  ]
+}
