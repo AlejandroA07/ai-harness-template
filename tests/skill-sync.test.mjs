@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { constants } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -236,25 +235,19 @@ test('machine setup rejects an unreconcilable skill entry before machine writes'
 });
 
 async function snapshotTree(directory) {
-  const entries = {};
-  async function walk(current, relative) {
-    let stat;
-    try { stat = await fs.lstat(current); } catch (error) {
-      if (error.code === 'ENOENT') return;
-      throw error;
-    }
-    if (stat.isSymbolicLink()) entries[relative] = { link: await fs.readlink(current) };
-    else if (stat.isDirectory()) {
-      entries[relative] = { directory: true };
-      for (const child of (await fs.readdir(current)).sort()) await walk(path.join(current, child), `${relative}/${child}`);
-    } else {
-      const handle = await fs.open(current, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-      try {
-        const opened = await handle.stat();
-        if (!opened.isFile()) throw new Error(`Snapshot entry changed type while opening: ${current}`);
-        entries[relative] = { content: await handle.readFile('utf8') };
-      } finally {
-        await handle.close();
+  const entries = { '': { directory: true } };
+  async function walk(directoryPath, relative) {
+    const children = await fs.readdir(directoryPath, { withFileTypes: true });
+    children.sort((left, right) => left.name.localeCompare(right.name));
+    for (const child of children) {
+      const childPath = path.join(directoryPath, child.name);
+      const childRelative = `${relative}/${child.name}`;
+      if (child.isSymbolicLink()) entries[childRelative] = { link: await fs.readlink(childPath) };
+      else if (child.isDirectory()) {
+        entries[childRelative] = { directory: true };
+        await walk(childPath, childRelative);
+      } else {
+        entries[childRelative] = { content: await fs.readFile(childPath, 'utf8') };
       }
     }
   }
