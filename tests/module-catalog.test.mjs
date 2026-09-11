@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { constants } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -180,12 +181,31 @@ async function fixtureRepository() {
 async function snapshot(directory) {
   const result = {};
   async function walk(current, relative) {
-    const stat = await fs.lstat(current);
-    if (stat.isSymbolicLink()) result[relative] = { link: await fs.readlink(current) };
-    else if (stat.isDirectory()) {
-      result[relative] = { directory: true, mode: stat.mode, mtime: stat.mtimeMs };
-      for (const name of (await fs.readdir(current)).sort()) await walk(path.join(current, name), `${relative}/${name}`);
-    } else result[relative] = { bytes: (await fs.readFile(current)).toString('base64'), mode: stat.mode, mtime: stat.mtimeMs };
+    const children = await fs.readdir(current, { withFileTypes: true });
+    children.sort((left, right) => left.name.localeCompare(right.name));
+    for (const child of children) {
+      const childPath = path.join(current, child.name);
+      const childRelative = `${relative}/${child.name}`;
+      if (child.isSymbolicLink()) {
+        result[childRelative] = { link: await fs.readlink(childPath) };
+      } else if (child.isDirectory()) {
+        await walk(childPath, childRelative);
+      } else {
+        const handle = await fs.open(childPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+        try {
+          const stat = await handle.stat();
+          result[childRelative] = {
+            bytes: (await handle.readFile()).toString('base64'),
+            mode: stat.mode,
+            mtime: stat.mtimeMs,
+          };
+        } finally {
+          await handle.close();
+        }
+      }
+    }
+    const stat = await fs.stat(current);
+    result[relative] = { directory: true, mode: stat.mode, mtime: stat.mtimeMs };
   }
   await walk(directory, '');
   return result;
