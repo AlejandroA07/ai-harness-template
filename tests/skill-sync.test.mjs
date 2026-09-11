@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { constants } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -246,7 +247,16 @@ async function snapshotTree(directory) {
     else if (stat.isDirectory()) {
       entries[relative] = { directory: true };
       for (const child of (await fs.readdir(current)).sort()) await walk(path.join(current, child), `${relative}/${child}`);
-    } else entries[relative] = { content: await fs.readFile(current, 'utf8') };
+    } else {
+      const handle = await fs.open(current, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+      try {
+        const opened = await handle.stat();
+        if (!opened.isFile()) throw new Error(`Snapshot entry changed type while opening: ${current}`);
+        entries[relative] = { content: await handle.readFile('utf8') };
+      } finally {
+        await handle.close();
+      }
+    }
   }
   await walk(directory, '');
   return entries;
