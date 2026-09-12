@@ -3,6 +3,7 @@ await import('./skill-sync.test.mjs');
 await import('./project-skills.test.mjs');
 await import('./module-catalog.test.mjs');
 await import('./selection-installation.test.mjs');
+await import('./global-installation.test.mjs');
 await import('./filesystem-snapshot.test.mjs');
 await import('./guard-git.test.mjs');
 await import('./attribution.test.mjs');

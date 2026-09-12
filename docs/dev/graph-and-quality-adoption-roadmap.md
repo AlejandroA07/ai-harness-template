@@ -2,8 +2,8 @@
 
 - **Kind:** living progress tracker
 - **Last updated:** 2026-09-12
-- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M0 safety corrections, M1 catalog/planning and M2 selective machine-skill lifecycle are complete; M3–M8 remain pending. Westcoast Cars remains selected with its baseline pending.
-- **Next action:** implement M3 global-only selected-platform setup on the [M2 lifecycle core](modularity-m2-installation.md); M4 project setup and M5 workflows can also proceed after M2. Retain the [M0 evidence and lifecycle limits](modularity-m0-safety.md). Westcoast Cars evaluation can proceed independently.
+- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M0 safety corrections, M1 catalog/planning, M2 selective machine-skill lifecycle and M3 selected global configuration are complete; M4–M8 remain pending. Westcoast Cars remains selected with its baseline pending.
+- **Next action:** implement M4 project-only setup or M5 workflows on the shared lifecycle foundation. Retain the [M3 ownership, recovery and activation limits](modularity-m3-global-configuration.md) and [M0 evidence and lifecycle limits](modularity-m0-safety.md). Westcoast Cars evaluation can proceed independently.
 
 This file is the durable checklist for the graph-engineering, Graphify, architecture-viewer, CRAP, and hardening work. Update it after every completed step so progress does not depend on remembering a conversation.
 
@@ -42,6 +42,7 @@ Modularity comes first for permanent integration because it establishes ownershi
 - [x] Classify all 22 capabilities and declare required capability dependencies, platforms, scopes, and source ownership (M1). Executable installation ownership remains M2–M4 work.
 - [x] Implement selective machine-skill installation and matching audit behavior while preserving unrelated user skills (M2).
 - [x] Verify the first useful installation selection and preserve the existing full-harness profile (M2).
+- [x] Add global-only platform selection, exact settings ownership and tested legacy conflict/recovery behavior (M3).
 - [ ] Integrate Graphify with all capabilities and documented invocation/configuration choices.
 - [ ] Generate the logical architecture overview and evaluate its connection to Graphify.
 
@@ -52,7 +53,7 @@ Modularity comes first for permanent integration because it establishes ownershi
 | M0 — Safety corrections and isolated fixtures | Complete | [Manifest/path, exact-hook, preflight and baseline-equivalence evidence](modularity-m0-safety.md); local commit containing this update |
 | M1 — Catalog and pure selection planner | Complete | [All 22 classifications, dependency planning and read-only fixture evidence](modularity-m1-catalog.md); local commit containing this update |
 | M2 — Single-capability install/update/remove/audit | Complete | [Store/receipt ownership, preservation, lifecycle and recovery fixtures](modularity-m2-installation.md); local commit containing this update |
-| M3 — Global-only platform selection | Pending | Independent-platform and legacy global-migration evidence |
+| M3 — Global-only platform selection | Complete | [Independent platforms, exact settings/hook ownership, legacy conflicts and interrupted-operation recovery](modularity-m3-global-configuration.md); 123 tests, 121 passed and two Windows-only skips; local verification gate passed |
 | M4 — Project-only configuration and gates | Pending | Self-contained runtime, preserved verifier/settings and adapter drift checks |
 | M5 — Workflow composition and discovery | Pending | Dependency closure, conditional prerequisites and unchanged invocation behavior |
 | M6 — Provenance and tool integrations | Pending | Graphify full-capability integration and Archify trial with owned setup |

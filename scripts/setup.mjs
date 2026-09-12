@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { loadCatalog } from './catalog-loader.mjs';
 import { planSelection } from './module-catalog.mjs';
 import { planInstallation, applyInstallation } from './selection-installation.mjs';
+import { planGlobalInstallation, applyGlobalInstallation } from './global-installation.mjs';
 
 const usage = `Usage:
   node scripts/setup.mjs list [--json]
@@ -11,9 +12,10 @@ const usage = `Usage:
 
   node scripts/setup.mjs <apply|remove> --select <skill> --platform <claude|codex> --scope machine --target <absolute-home-path> [--apply] [--json]
   node scripts/setup.mjs audit --platform <claude|codex> --scope machine --target <absolute-home-path> [--json]
+  node scripts/setup.mjs <plan|apply|audit|remove> --module global-configuration --platform <claude|codex> --scope machine --target <absolute-home-path> [--apply] [--json]
 
 Apply and remove preview by default; --apply performs the operation.
-Add --target to plan for read-only installation preflight. M2 supports machine Skills.
+Add --target to plan for read-only installation preflight. Machine Skills and Global configuration are supported.
 Existing full-profile machine setup, bootstrap and audit commands are unchanged.`;
 
 function parseArgs(args) {
@@ -47,7 +49,10 @@ function parseArgs(args) {
   }
   if (operation !== 'list' && (!result.platform || !result.scope)) throw new Error('Requires explicit --platform and --scope');
   if (['apply', 'audit', 'remove'].includes(operation) && !result.target) throw new Error('Lifecycle requires explicit --target');
-  if ((result.target || operation !== 'plan') && result.modules.length) throw new Error('Lifecycle requires explicit --select IDs');
+  const global = result.modules.length === 1 && result.modules[0] === 'global-configuration';
+  if (global && (result.ids.length || !result.target)) throw new Error('Global configuration requires --target and cannot be mixed with skills');
+  if ((result.target || operation !== 'plan') && result.modules.length && !global) throw new Error('Lifecycle supports explicit --select IDs or --module global-configuration');
+  result.global = global;
   return result;
 }
 
@@ -82,18 +87,23 @@ try {
           console.log(`${module.label} (${module.id}; ${module.visibility})`);
           const members = catalog.capabilities.filter((entry) => entry.module === module.id);
           for (const entry of members) console.log(`  ${entry.id}: ${entry.description} [${entry.activation}; ${entry.platforms.join('/')}; ${entry.scopes.join('/')}]`);
-          if (!members.length) console.log('  Source ownership recorded; no selectable M1 capability definitions.');
+          if (!members.length) console.log(module.id === 'global-configuration'
+            ? '  Lifecycle: --module global-configuration with an explicit machine target and one platform.'
+            : '  Source ownership recorded; no selectable capability definitions.');
         }
       }
     } else if (options.target) {
-      const plan = await planInstallation(root, { operation: options.operation === 'plan' ? 'apply' : options.operation,
+      const planner = options.global ? planGlobalInstallation : planInstallation;
+      const applyPlan = options.global ? applyGlobalInstallation : applyInstallation;
+      const plan = await planner(root, { operation: options.operation === 'plan' ? 'apply' : options.operation,
         ids: options.ids, platform: options.platform, scope: options.scope, target: options.target });
-      const result = options.apply ? await applyInstallation(plan) : plan;
+      const result = options.apply ? await applyPlan(plan) : plan;
       if (options.json) console.log(JSON.stringify(result, null, 2));
       else {
         console.log(`${options.operation}: ${result.platform} / machine / coexistence (${options.apply ? 'applied' : 'read-only'})`);
         for (const change of result.changes) console.log(`${change.action}: ${change.id}`);
         for (const conflict of result.conflicts) console.log(`Conflict: ${conflict}`);
+        if (options.global) console.log(result.activation);
         if (!result.changes.length && !result.receiptChanged && result.applicable) console.log(result.installed
           ? 'No changes required; installed state is consistent.' : 'No selected installation is recorded.');
         if (!options.apply && ['apply', 'remove'].includes(options.operation)) console.log('Use --apply to perform this operation.');

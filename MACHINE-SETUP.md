@@ -2,6 +2,12 @@
 
 The setup is Windows-first on this machine and portable to macOS/Linux. It never installs missing tools silently and never changes configuration in dry-run mode.
 
+This page describes the full managed profile. To select only one platform's
+global guidance and settings, follow the [global lifecycle guide](docs/dev/modularity-m3-global-configuration.md).
+It uses an explicit target and preserves unrelated configuration. Do not run
+the full-profile audit to judge a selective installation; use the matching
+`setup.mjs audit --module global-configuration` command.
+
 ## 1. Required tools
 
 - Node.js 18 or newer (Node 22 recommended)

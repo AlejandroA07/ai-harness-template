@@ -1,29 +1,14 @@
 import fs from 'node:fs/promises';
-import { constants } from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { loadCatalog } from './catalog-loader.mjs';
 import { planSelection } from './module-catalog.mjs';
 import { assertSafeDirectory, parseSkill, renderSkillDocuments, isPathWithin } from './skill-lib.mjs';
 
-const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
-const encode = (value) => JSON.stringify(value, null, 2) + '\n';
+import { encode, stat, readRegular, payloadHash, treeFiles, acquireTargetLock, releaseTargetLock } from './installation-core.mjs';
+
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const fail = (message) => { throw new Error(message); };
 const receipts = new WeakMap();
-async function stat(file) {
-  try { return await fs.lstat(file); } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
-}
-async function readRegular(file) {
-  const info = await stat(file);
-  if (!info?.isFile() || info.isSymbolicLink() || info.nlink !== 1) fail('Expected an unlinked regular file');
-  const handle = await fs.open(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-  try {
-    const opened = await handle.stat();
-    if (!opened.isFile() || opened.nlink !== 1 || opened.ino !== info.ino || opened.dev !== info.dev) fail('File changed while opening');
-    return await handle.readFile();
-  } finally { await handle.close(); }
-}
 async function linkState(file) {
   const info = await stat(file);
   if (!info) return null;
@@ -37,24 +22,6 @@ function fields(value, keys) {
 function ids(value, known) {
   if (!Array.isArray(value) || value.some((id) => !known.has(id))
     || !same(value, [...new Set(value)].sort())) fail('Invalid receipt selection');
-}
-function payloadHash(files) {
-  return digest(encode(Object.keys(files).sort().map((name) => [name, digest(files[name])])));
-}
-async function treeFiles(directory, prefix = '') {
-  await assertSafeDirectory(directory, directory);
-  const files = {};
-  const entries = await fs.readdir(directory, { withFileTypes: true });
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    const relative = prefix + entry.name;
-    const file = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      const nested = await treeFiles(file, relative + '/');
-      if (!Object.keys(nested).length) fail('Unexpected empty payload directory');
-      Object.assign(files, nested);
-    } else files[relative] = await readRegular(file);
-  }
-  return files;
 }
 function selection(catalog, requested, platform) {
   if (!requested.length) return { requested: [], capabilities: [] };
@@ -247,7 +214,7 @@ export async function applyInstallation(candidate, { checkpoint = async () => {}
   if (!plan.changes.length && !plan.receiptChanged) return { ...plan, applied: true, noOp: true };
   await fs.mkdir(plan.target, { recursive: false }).catch((error) => { if (error.code !== 'EEXIST') throw error; });
   await assertSafeDirectory(plan.target, plan.target);
-  await fs.mkdir(locations.lock, { mode: 0o700 }).catch(() => fail('Target is locked; no changes applied'));
+  await acquireTargetLock(plan.target);
   let staging;
   const completed = [];
   let publishedReceipt = false;
@@ -363,7 +330,7 @@ export async function applyInstallation(candidate, { checkpoint = async () => {}
         await safeLayout(plan.target, locations);
         await fs.rm(staging, { recursive: true, force: true });
       }
-      await fs.rmdir(locations.lock);
+      await releaseTargetLock(locations.lock);
     }
   }
 }
