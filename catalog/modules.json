@@ -13,7 +13,9 @@
         "machine"
       ],
       "sources": [
-        "global"
+        "global",
+        "scripts/global-installation.mjs",
+        "scripts/global-settings.mjs"
       ],
       "description": "Machine-wide guidance and platform settings."
     },
@@ -104,6 +106,8 @@
         "scripts/module-catalog.mjs",
         "scripts/catalog-loader.mjs",
         "scripts/setup.mjs",
+        "scripts/installation-core.mjs",
+        "scripts/selection-installation.mjs",
         "scripts/machine-setup.mjs",
         "scripts/config-merge.mjs",
         "scripts/skill-lib.mjs",
