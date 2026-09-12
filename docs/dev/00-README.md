@@ -6,6 +6,7 @@ Current state: skill reconciliation handles filesystem aliases when classifying 
 |---|---|---|
 | `decisions.md` | Implementation decisions that should remain stable across changes. | living log |
 | `harness-modularity-plan.md` | Agreed five-module direction: global configuration, project configuration, separate skills and workflows, and tool integrations; selective setup and architecture catalog plan. | implementation plan |
+| `modularity-m2-installation.md` | Selective machine-skill commands, store and receipt ownership, update/removal, recovery and acceptance evidence. | implementation contract |
 | `harness-modularity-review.md` | Whole-repository ownership map, proposed classification of 22 capabilities, migration blockers R1–R10, and evidence supporting the implementation sequence. | source review |
 | `graph-and-quality-adoption-roadmap.md` | Living eight-step checklist for learning, evaluations, project-local quality gates, and later harness decisions. | living roadmap |
 | `2026-09-10-graphify-architecture-quality-follow-up.md` | Current conclusions, Graphify pilot evidence, Archify/Roslyn comparison, activation/token map, and decided-versus-open checklist. | dated report |

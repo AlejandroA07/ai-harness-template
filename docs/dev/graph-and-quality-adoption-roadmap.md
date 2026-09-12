@@ -1,9 +1,9 @@
 # Graph and quality tooling adoption roadmap
 
 - **Kind:** living progress tracker
-- **Last updated:** 2026-09-11
-- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M0 safety corrections and M1 catalog/planning are complete; M2–M8 remain pending. Westcoast Cars remains selected with its baseline pending.
-- **Next action:** implement M2 single-capability installation/update/removal and audit using the [M1 selection contract](modularity-m1-catalog.md). Retain the [M0 evidence and lifecycle limits](modularity-m0-safety.md). Westcoast Cars evaluation can proceed independently.
+- **Last updated:** 2026-09-12
+- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M0 safety corrections, M1 catalog/planning and M2 selective machine-skill lifecycle are complete; M3–M8 remain pending. Westcoast Cars remains selected with its baseline pending.
+- **Next action:** implement M3 global-only selected-platform setup on the [M2 lifecycle core](modularity-m2-installation.md); M4 project setup and M5 workflows can also proceed after M2. Retain the [M0 evidence and lifecycle limits](modularity-m0-safety.md). Westcoast Cars evaluation can proceed independently.
 
 This file is the durable checklist for the graph-engineering, Graphify, architecture-viewer, CRAP, and hardening work. Update it after every completed step so progress does not depend on remembering a conversation.
 
@@ -40,8 +40,8 @@ Modularity comes first for permanent integration because it establishes ownershi
 - [x] Review all tracked path families and classify the existing 22 capabilities; record R1–R10 and shared internal ownership.
 - [x] Produce a self-contained implementation contract, dependency-ordered slices, recovery rules, test matrix, and fresh-task handoff.
 - [x] Classify all 22 capabilities and declare required capability dependencies, platforms, scopes, and source ownership (M1). Executable installation ownership remains M2–M4 work.
-- [ ] Implement selective installation and matching audit behavior while preserving unrelated user skills.
-- [ ] Verify the first useful installation selection and preserve the full-harness profile.
+- [x] Implement selective machine-skill installation and matching audit behavior while preserving unrelated user skills (M2).
+- [x] Verify the first useful installation selection and preserve the existing full-harness profile (M2).
 - [ ] Integrate Graphify with all capabilities and documented invocation/configuration choices.
 - [ ] Generate the logical architecture overview and evaluate its connection to Graphify.
 
@@ -51,7 +51,7 @@ Modularity comes first for permanent integration because it establishes ownershi
 |---|---|---|
 | M0 — Safety corrections and isolated fixtures | Complete | [Manifest/path, exact-hook, preflight and baseline-equivalence evidence](modularity-m0-safety.md); local commit containing this update |
 | M1 — Catalog and pure selection planner | Complete | [All 22 classifications, dependency planning and read-only fixture evidence](modularity-m1-catalog.md); local commit containing this update |
-| M2 — Single-capability install/update/remove/audit | Pending | Receipt and ownership lifecycle tests; verified commit |
+| M2 — Single-capability install/update/remove/audit | Complete | [Store/receipt ownership, preservation, lifecycle and recovery fixtures](modularity-m2-installation.md); local commit containing this update |
 | M3 — Global-only platform selection | Pending | Independent-platform and legacy global-migration evidence |
 | M4 — Project-only configuration and gates | Pending | Self-contained runtime, preserved verifier/settings and adapter drift checks |
 | M5 — Workflow composition and discovery | Pending | Dependency closure, conditional prerequisites and unchanged invocation behavior |

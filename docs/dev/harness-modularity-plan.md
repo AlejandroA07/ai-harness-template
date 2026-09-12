@@ -1,10 +1,10 @@
 # Plan: make the harness understandable and selectively adoptable
 
-- **Status:** five-module direction agreed; M0 safety corrections and M1 catalog/planning implemented and verified
+- **Status:** five-module direction agreed; M0 safety corrections, M1 catalog/planning and M2 selective skill lifecycle implemented and verified
 - **Scope:** repository organization, selective installation, and a readable architecture map
 - **Graphify decision:** adopt with all capabilities in Tool integrations, available across projects and invoked by the user. Watchers, Git hooks, semantic document processing, and MCP are supported configuration choices; availability does not automatically activate them everywhere.
 - **Review baseline:** `a31e26aa1a9d6fdec2f61ca33c50ba32187b307c`; see the [whole-repository review](harness-modularity-review.md) for the ownership map, 22-capability classification, and findings R1–R10.
-- **Current delivery:** M0 safety corrections and isolated fixtures complete; see [M0 evidence and limits](modularity-m0-safety.md). M1 catalog and read-only planning are complete; see [M1 contract and evidence](modularity-m1-catalog.md). M2 selective installation is next. The detailed contract and slices below supersede the earlier high-level sequence wherever more specific.
+- **Current delivery:** M0 safety corrections and isolated fixtures complete; see [M0 evidence and limits](modularity-m0-safety.md). M1 catalog and read-only planning are complete; see [M1 contract and evidence](modularity-m1-catalog.md). M2 selective machine-skill installation is complete; see [M2 lifecycle and evidence](modularity-m2-installation.md). M3 global setup, M4 project setup and M5 workflows are next. The detailed contract and slices below supersede the earlier high-level sequence wherever more specific.
 
 ## Recommended order
 
@@ -62,7 +62,7 @@ Harness
 └── Shared installation and audit machinery
 ```
 
-This is a proposed logical view. These modules are not independently installable today.
+This is the logical view. M2 makes machine-scoped Skills independently installable; the remaining module lifecycles follow in later slices.
 
 ## Implementation sequence
 

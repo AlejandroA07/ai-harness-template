@@ -17,7 +17,7 @@ Repeat `--select` to choose several IDs; combine explicit IDs and `--module` if 
 
 `list` includes the five public modules and two internal owners. M1 selection covers the 13 Skills and nine Workflows from the review. Global configuration, Project configuration and Tool integrations retain source references and supported dimensions, but do not yet have selectable capability definitions; selecting them reports that limitation. Their executable lifecycle definitions remain M3, M4 and M6 work. Selecting both Skills and Workflows previews all 22 capabilities; it does not activate the legacy full managed profile's inventory rules.
 
-The new setup command rejects `apply`, `audit` and `remove` until the corresponding lifecycle operations exist. Existing machine setup, bootstrap, synchronization, generation and audit commands continue to serve their established profiles.
+At the M1 boundary, the new setup command rejected `apply`, `audit` and `remove`. [M2 now supplies those operations for selected machine skills](modularity-m2-installation.md). Existing machine setup, bootstrap, synchronization, generation and audit commands continue to serve their established profiles.
 
 ## Catalog contract
 
