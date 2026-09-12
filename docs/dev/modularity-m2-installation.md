@@ -83,3 +83,13 @@ All test mutations use explicit temporary targets. No installed developer profil
 | Regression evidence | Pass for the tested local boundary | Lifecycle and denied-path fixtures registered in the gate; Windows execution remains pending |
 
 M3, M4 and M5 can build on this lifecycle boundary. They must add their own settings/project/workflow contracts rather than widening the M2 payload renderer to accept arbitrary vendor executables or receipts as write authority.
+
+## Follow-up: CodeQL file-read race in test snapshots
+
+PR 22 alert #8 identified a path-based read after `lstat` in the M2 test snapshot helper. A deterministic regression replaced the checked file before the read and demonstrated that the old helper accepted replacement bytes. The shared `tests/helpers/filesystem-snapshot.mjs` now opens once, rejects unsafe or changed file identity before reading, and obtains content and metadata through that same handle. Both M1 and M2 fixtures use this helper. Regression tests cover a regular-file or symlink replacement before opening and a path replacement after opening.
+
+For future fixture snapshots, reuse this helper. For other filesystem code, a successful path check is not authority for a later path-based read: validate the opened handle, use descriptor-based operations where available, and test replacement at the relevant boundary. Directory traversal and multi-file updates require their own constraints; this helper does not promise an atomic directory snapshot.
+
+The local verification gate does not execute CodeQL. It runs behavioral tests, Gitleaks, Zizmor and syntax/whitespace checks; the separate GitHub CodeQL workflow runs JavaScript/TypeScript `security-extended` analysis. Report these results separately and check CodeQL before merging. Do not suppress the race rule or exclude tests to hide this pattern. Local regression coverage prevents this specific mistake from silently returning; it cannot replace static analysis or guarantee that no new security alerts will occur.
+
+Follow-up security review: input/file handling and denied-path regression evidence pass for the controlled fixture boundary. Authentication, browser/network and upload handling are not applicable. No runtime installer, package, CI permission or secret handling changed. CodeQL alert closure still requires GitHub to analyze the updated commit.

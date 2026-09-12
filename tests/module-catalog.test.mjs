@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { constants } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { loadCatalog } from '../scripts/catalog-loader.mjs';
 import { planSelection, validateCatalog } from '../scripts/module-catalog.mjs';
 import { discoverSkills, readInvocationPolicy } from '../scripts/skill-lib.mjs';
+import { snapshot } from './helpers/filesystem-snapshot.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const catalog = await loadCatalog(root);
@@ -177,38 +177,6 @@ async function fixtureRepository() {
     await fs.cp(path.join(root, directory), path.join(repository, directory), { recursive: true });
   }
   return { temporary, repository };
-}
-async function snapshot(directory) {
-  const result = {};
-  async function walk(current, relative) {
-    const children = await fs.readdir(current, { withFileTypes: true });
-    children.sort((left, right) => left.name.localeCompare(right.name));
-    for (const child of children) {
-      const childPath = path.join(current, child.name);
-      const childRelative = `${relative}/${child.name}`;
-      if (child.isSymbolicLink()) {
-        result[childRelative] = { link: await fs.readlink(childPath) };
-      } else if (child.isDirectory()) {
-        await walk(childPath, childRelative);
-      } else {
-        const handle = await fs.open(childPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
-        try {
-          const stat = await handle.stat();
-          result[childRelative] = {
-            bytes: (await handle.readFile()).toString('base64'),
-            mode: stat.mode,
-            mtime: stat.mtimeMs,
-          };
-        } finally {
-          await handle.close();
-        }
-      }
-    }
-    const stat = await fs.stat(current);
-    result[relative] = { directory: true, mode: stat.mode, mtime: stat.mtimeMs };
-  }
-  await walk(directory, '');
-  return result;
 }
 
 test('list, plan and rejected CLI operations write nothing or invoke external tools', async () => {

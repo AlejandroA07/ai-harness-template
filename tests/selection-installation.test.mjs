@@ -6,6 +6,7 @@ import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { planInstallation, applyInstallation } from '../scripts/selection-installation.mjs';
 import { renderSkill, parseSkill } from '../scripts/skill-lib.mjs';
+import { snapshot } from './helpers/filesystem-snapshot.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const linkType = process.platform === 'win32' ? 'junction' : 'dir';
@@ -27,19 +28,6 @@ async function fixture(body) {
     const receipt = async (platform) => JSON.parse(await fs.readFile(receiptFile(platform), 'utf8'));
     await body({ temporary, repository, target, options, plan, apply, discovery, receiptFile, receipt });
   } finally { await fs.rm(temporary, { recursive: true, force: true }); }
-}
-async function snapshot(directory) {
-  const result = {};
-  async function walk(current, relative) {
-    const stat = await fs.lstat(current);
-    if (stat.isSymbolicLink()) result[relative] = { link: await fs.readlink(current) };
-    else if (stat.isDirectory()) {
-      result[relative] = { directory: true, mode: stat.mode, mtime: stat.mtimeMs };
-      for (const entry of (await fs.readdir(current)).sort()) await walk(path.join(current, entry), relative + '/' + entry);
-    } else result[relative] = { bytes: (await fs.readFile(current)).toString('base64'), mode: stat.mode, mtime: stat.mtimeMs };
-  }
-  await walk(directory, '');
-  return result;
 }
 
 test('selective lifecycle on each platform preserves unrelated state, repeats without writes and survives regeneration', async () => {

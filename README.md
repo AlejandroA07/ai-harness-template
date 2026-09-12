@@ -8,7 +8,7 @@ A reusable, cross-platform workflow for Claude Code and Codex. It keeps durable 
 - New or existing project: follow [BOOTSTRAP.md](BOOTSTRAP.md), beginning with `node scripts/bootstrap.mjs <project-path>`.
 - Token cost: review [TOKEN-COSTS.md](TOKEN-COSTS.md) and update it with `node scripts/token-costs.mjs --write`.
 - Audit installed state: run `node scripts/audit.mjs`, or add `--project <path>` to check whether one project conforms to the template.
-- Verify repository correctness: run `node scripts/verify.mjs` to execute the template's tests and security gates. Exit code `0` is the definition of done.
+- Verify repository correctness: run `node scripts/verify.mjs` to execute the template's tests and security gates. Exit code `0` is the definition of done. CodeQL runs separately in GitHub; check its result before merging.
 
 All mutating setup commands are dry-run by default and require `--apply`.
 
