@@ -162,8 +162,8 @@ async function copyResources(source, destination) {
   }
 }
 
-export async function renderSkill(skill, destination, platform, userOnly) {
-  await copyResources(skill.directory, destination);
+export function renderSkillDocuments(skill, platform, userOnly) {
+  const documents = {};
   const frontmatter = [
     '---',
     `name: ${skill.name}`,
@@ -174,11 +174,9 @@ export async function renderSkill(skill, destination, platform, userOnly) {
     frontmatter.push(`argument-hint: ${yamlValue(skill.argumentHint)}`);
   }
   frontmatter.push('---', '');
-  await fs.writeFile(path.join(destination, 'SKILL.md'), `${frontmatter.join('\n')}\n${skill.body}`);
+  documents['SKILL.md'] = `${frontmatter.join('\n')}\n${skill.body}`;
 
   if (platform === 'codex') {
-    const agentsDirectory = path.join(destination, 'agents');
-    await fs.mkdir(agentsDirectory, { recursive: true });
     const openaiYaml = [
       'interface:',
       `  display_name: ${yamlValue(titleCase(skill.name))}`,
@@ -188,7 +186,17 @@ export async function renderSkill(skill, destination, platform, userOnly) {
       `  allow_implicit_invocation: ${userOnly ? 'false' : 'true'}`,
       '',
     ].join('\n');
-    await fs.writeFile(path.join(agentsDirectory, 'openai.yaml'), openaiYaml);
+    documents['agents/openai.yaml'] = openaiYaml;
+  }
+  return documents;
+}
+
+export async function renderSkill(skill, destination, platform, userOnly) {
+  await copyResources(skill.directory, destination);
+  for (const [relative, content] of Object.entries(renderSkillDocuments(skill, platform, userOnly))) {
+    const file = path.join(destination, relative);
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, content);
   }
 }
 

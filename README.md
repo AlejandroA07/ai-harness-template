@@ -14,10 +14,13 @@ All mutating setup commands are dry-run by default and require `--apply`.
 
 Preview selective adoption with `node scripts/setup.mjs list` and
 `node scripts/setup.mjs plan --select implement --platform codex --scope machine`.
-These new commands are read-only: they resolve required capabilities and show
-conditional uses without inspecting or changing an installation. See the
-[catalog and planning guide](docs/dev/modularity-m1-catalog.md) for module selection,
-JSON output, and the remaining installation work.
+Target-free plans resolve capabilities and conditional uses without inspecting an
+installation. For selected machine skills, use `setup.mjs apply`, `remove` and
+`audit` with an explicit `--target`, `--platform` and `--scope machine`. Apply and
+remove preview until `--apply` is supplied. See the
+[selective installation guide](docs/dev/modularity-m2-installation.md) for commands,
+ownership and recovery, and the [catalog guide](docs/dev/modularity-m1-catalog.md)
+for selection planning.
 
 ## Active structure
 
