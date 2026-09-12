@@ -179,3 +179,26 @@ Windows-specific existing tests skip on this host, and M3 has not been applied t
 a real profile or exercised through live platform sessions. The repository gate
 is `node scripts/verify.mjs`; CodeQL runs separately in GitHub and must be checked
 before merge. No rule suppression or test exclusion is part of this change.
+
+### CodeQL #10 follow-up
+
+The PR scan found exponential backtracking in the TOML assignment regex: a
+repeated group could partition the same bare-key characters many ways when no
+assignment separator followed. The original functional fixtures did not test
+that failure shape, and the local gate does not run CodeQL.
+
+Assignment separation now scans once for an unquoted `=`, stopping before a
+comment, and delegates key validation to the existing key parser. The nested
+assignment regex has been removed. A child-process regression test bounds the
+runtime for long malformed keys, including 100,000 hyphens, while also accepting
+a long valid key. It timed out at three seconds before the fix and completed in
+about 32 ms locally after it. Additional fixtures preserve quoted equals signs,
+escaped quotes and comments. The child timeout prevents a future regression
+from hanging the whole test runner; it is not a production input timeout.
+On 2026-09-13 the full `node scripts/verify.mjs` gate exited 0 with 125 tests:
+123 passed and two Windows-only skips. PR CodeQL must rerun to confirm closure.
+
+Prefer explicit scanners for quoted/structured configuration boundaries and
+include malformed near-matches in parser tests. This closes the demonstrated
+case; it does not replace the separate PR CodeQL analysis or imply that every
+future security finding is preventable by ordinary functional tests.

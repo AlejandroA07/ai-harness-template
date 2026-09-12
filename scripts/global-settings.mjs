@@ -102,6 +102,19 @@ function statements(text) {
   if (start < text.length) result.push({ start, end: text.length, raw: text.slice(start) });
   return result;
 }
+function splitAssignment(raw) {
+  let quote = '';
+  for (let index = 0; index < raw.length; index++) {
+    const char = raw[index];
+    if (quote) {
+      if (quote === '"' && char === '\\') { index++; continue; }
+      if (char === quote) quote = '';
+    } else if (char === '"' || char === "'") quote = char;
+    else if (char === '#' || char === '\n' || char === '\r') break;
+    else if (char === '=') return { key: raw.slice(0, index), value: raw.slice(index + 1) };
+  }
+  throw new Error('Unsupported TOML assignment');
+}
 export function inspectFeatures(text) {
   const values = { hooks: null, memories: null };
   const assignments = {};
@@ -123,18 +136,17 @@ export function inspectFeatures(text) {
       }
       continue;
     }
-    const assignment = statement.raw.match(/^\s*((?:(?:"(?:[^"\\]|\\.)*"|'[^']*'|[A-Za-z0-9_-]+)\s*\.?\s*)+)=(.*)$/s);
-    if (!assignment) throw new Error('Unsupported TOML assignment');
-    const keys = [...table, ...dottedKey(assignment[1])];
+    const assignment = splitAssignment(statement.raw);
+    const keys = [...table, ...dottedKey(assignment.key)];
     if (keys[0] !== 'features') continue;
     if (!table.length) throw new Error('Use an explicit [features] table before migration');
     if (keys.length === 1 || keys[1] === 'codex_hooks') throw new Error('Inline features or deprecated hook aliases require migration');
     if (!['hooks', 'memories'].includes(keys[1])) continue;
     const key = keys[1];
     if (keys.length !== 2 || assignments[key]) throw new Error('Duplicate or nested feature setting');
-    const value = assignment[2].match(/^(\s*)(true|false)(\s*(?:#[^\r\n]*)?\r?\n?)$/);
+    const value = assignment.value.match(/^(\s*)(true|false)(\s*(?:#[^\r\n]*)?\r?\n?)$/);
     if (!value) throw new Error('Owned feature settings must be booleans');
-    const prefix = statement.raw.slice(0, statement.raw.length - assignment[2].length) + value[1];
+    const prefix = statement.raw.slice(0, statement.raw.length - assignment.value.length) + value[1];
     assignments[key] = { ...statement, prefix, suffix: value[3] };
     values[key] = value[2] === 'true';
   }

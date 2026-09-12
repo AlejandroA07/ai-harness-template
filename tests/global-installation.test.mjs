@@ -261,6 +261,26 @@ test('feature editor preserves comments/quoted keys/multiline values and rejects
   assert.equal(editFeatures(editFeatures('', { hooks: true, memories: false }), { hooks: null, memories: null }, true), '');
 });
 
+test('TOML assignment parsing rejects long invalid keys without backtracking', () => {
+  const script = `import assert from 'node:assert/strict';
+    import { inspectFeatures } from ${JSON.stringify(pathToFileURL(path.join(root, 'scripts/global-settings.mjs')).href)};
+    for (const key of ['-'.repeat(100_000), 'a '.repeat(50_000), 'a.'.repeat(50_000)]) {
+      assert.throws(() => inspectFeatures(key), /TOML/);
+    }
+    assert.deepEqual(inspectFeatures('-'.repeat(100_000) + ' = true').values, { hooks: null, memories: null });`;
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8', timeout: 3000 });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test('TOML assignment boundaries respect quoted keys and reject comment-only separators', () => {
+  const source = '"key=with=equals" = "value"\n\'literal=key\' = true\n"escaped\\\"=key" = false\n[features]\n"hooks" = false # equals = comment\nmemories = true\n';
+  const edited = editFeatures(source, { hooks: true, memories: false });
+  assert.equal(editFeatures(edited, { hooks: false, memories: true }), source);
+  assert.throws(() => inspectFeatures('invalid # comment = true'), /TOML assignment/);
+  assert.throws(() => inspectFeatures('invalid key = true'), /TOML key/);
+});
+
 test('global plans reject stale inputs and ignore edits to public plan fields', async () => fixture(async (f) => {
   const plan = await f.plan();
   plan.target = f.repository;
