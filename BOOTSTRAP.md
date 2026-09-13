@@ -1,5 +1,9 @@
 # Bootstrap a project
 
+For selective project configuration with owned update, audit and removal, use
+the [M4 project lifecycle](docs/dev/modularity-m4-project-configuration.md).
+The bootstrap command below retains its existing full-profile behavior.
+
 Bootstrap installs the portable mechanical baseline. The agent still has to understand the project and tailor the parts that cannot be inferred safely.
 
 ## 1. Inspect the plan
