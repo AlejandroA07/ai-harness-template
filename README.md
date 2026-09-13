@@ -28,6 +28,11 @@ The [global lifecycle guide](docs/dev/modularity-m3-global-configuration.md)
 covers apply, update, audit, removal, existing configuration and hook trust.
 This selection installs no skills and requires no Claude CLI for Codex setup.
 
+For one repository, use
+`node scripts/setup.mjs plan --module project-configuration --platform codex --scope project --target <absolute-project-path>`.
+The [project lifecycle guide](docs/dev/modularity-m4-project-configuration.md)
+covers preserved project verification, local adapters, optional CI and removal.
+
 ## Active structure
 
 | Path | Purpose |

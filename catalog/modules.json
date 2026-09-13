@@ -34,7 +34,14 @@
         "project",
         "scripts/bootstrap.mjs",
         "scripts/project-configuration.mjs",
-        "scripts/project-verification.mjs"
+        "scripts/project-verification.mjs",
+        "scripts/project-installation.mjs",
+        "scripts/project-settings.mjs",
+        "scripts/project-state.mjs",
+        "scripts/project-adapters.mjs",
+        "scripts/project-receipt.mjs",
+        "scripts/project-provenance.mjs",
+        "scripts/project-check.mjs"
       ],
       "description": "Repository guidance, verification and optional CI."
     },

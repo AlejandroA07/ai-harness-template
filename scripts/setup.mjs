@@ -4,6 +4,7 @@ import { loadCatalog } from './catalog-loader.mjs';
 import { planSelection } from './module-catalog.mjs';
 import { planInstallation, applyInstallation } from './selection-installation.mjs';
 import { planGlobalInstallation, applyGlobalInstallation } from './global-installation.mjs';
+import { planProjectInstallation, applyProjectInstallation } from './project-installation.mjs';
 
 const usage = `Usage:
   node scripts/setup.mjs list [--json]
@@ -13,9 +14,11 @@ const usage = `Usage:
   node scripts/setup.mjs <apply|remove> --select <skill> --platform <claude|codex> --scope machine --target <absolute-home-path> [--apply] [--json]
   node scripts/setup.mjs audit --platform <claude|codex> --scope machine --target <absolute-home-path> [--json]
   node scripts/setup.mjs <plan|apply|audit|remove> --module global-configuration --platform <claude|codex> --scope machine --target <absolute-home-path> [--apply] [--json]
+  node scripts/setup.mjs <plan|apply|audit|remove> --module project-configuration --platform <claude|codex> --scope project --target <absolute-project-path> [--apply] [--json]
+    Plan/apply options: --verification <existing|generated> --ci <none|github> --tracker <local|github> --domain-layout <single|multi>
 
 Apply and remove preview by default; --apply performs the operation.
-Add --target to plan for read-only installation preflight. Machine Skills and Global configuration are supported.
+Add --target to plan for read-only installation preflight. Machine Skills, Global configuration and Project configuration are supported.
 Existing full-profile machine setup, bootstrap and audit commands are unchanged.`;
 
 function parseArgs(args) {
@@ -36,7 +39,7 @@ function parseArgs(args) {
       result.json = true;
       continue;
     }
-    if (operation === 'list' || !['--select', '--module', '--platform', '--scope', '--target'].includes(option)) throw new Error(`Unsupported option: ${option}`);
+    if (operation === 'list' || !['--select', '--module', '--platform', '--scope', '--target', '--verification', '--ci', '--tracker', '--domain-layout'].includes(option)) throw new Error(`Unsupported option: ${option}`);
     const value = options[++index];
     if (!value || value.startsWith('--')) throw new Error(`Missing value for ${option}`);
     if (option === '--select') result.ids.push(value);
@@ -44,15 +47,18 @@ function parseArgs(args) {
     else {
       if (seen.has(option)) throw new Error(`Duplicate ${option}`);
       seen.add(option);
-      result[option.slice(2)] = value;
+      result[option === '--domain-layout' ? 'domainLayout' : option.slice(2)] = value;
     }
   }
   if (operation !== 'list' && (!result.platform || !result.scope)) throw new Error('Requires explicit --platform and --scope');
   if (['apply', 'audit', 'remove'].includes(operation) && !result.target) throw new Error('Lifecycle requires explicit --target');
   const global = result.modules.length === 1 && result.modules[0] === 'global-configuration';
-  if (global && (result.ids.length || !result.target)) throw new Error('Global configuration requires --target and cannot be mixed with skills');
-  if ((result.target || operation !== 'plan') && result.modules.length && !global) throw new Error('Lifecycle supports explicit --select IDs or --module global-configuration');
+  const project = result.modules.length === 1 && result.modules[0] === 'project-configuration';
+  if ((global || project) && (result.ids.length || !result.target)) throw new Error('Configuration modules require --target and cannot be mixed with skills');
+  if ((result.target || operation !== 'plan') && result.modules.length && !global && !project) throw new Error('Lifecycle supports one configuration module or explicit skill IDs');
+  if (!project && ['verification', 'ci', 'tracker', 'domainLayout'].some((key) => result[key] !== undefined)) throw new Error('Project configuration options require --module project-configuration');
   result.global = global;
+  result.project = project;
   return result;
 }
 
@@ -87,23 +93,25 @@ try {
           console.log(`${module.label} (${module.id}; ${module.visibility})`);
           const members = catalog.capabilities.filter((entry) => entry.module === module.id);
           for (const entry of members) console.log(`  ${entry.id}: ${entry.description} [${entry.activation}; ${entry.platforms.join('/')}; ${entry.scopes.join('/')}]`);
-          if (!members.length) console.log(module.id === 'global-configuration'
-            ? '  Lifecycle: --module global-configuration with an explicit machine target and one platform.'
+          if (!members.length) console.log(['global-configuration', 'project-configuration'].includes(module.id)
+            ? `  Lifecycle: --module ${module.id} with an explicit target, matching scope and one platform.`
             : '  Source ownership recorded; no selectable capability definitions.');
         }
       }
     } else if (options.target) {
-      const planner = options.global ? planGlobalInstallation : planInstallation;
-      const applyPlan = options.global ? applyGlobalInstallation : applyInstallation;
+      const planner = options.project ? planProjectInstallation : options.global ? planGlobalInstallation : planInstallation;
+      const applyPlan = options.project ? applyProjectInstallation : options.global ? applyGlobalInstallation : applyInstallation;
       const plan = await planner(root, { operation: options.operation === 'plan' ? 'apply' : options.operation,
-        ids: options.ids, platform: options.platform, scope: options.scope, target: options.target });
+        ids: options.ids, platform: options.platform, scope: options.scope, target: options.target,
+        ...(options.project ? { verification: options.verification, ci: options.ci, tracker: options.tracker, domainLayout: options.domainLayout } : {}) });
       const result = options.apply ? await applyPlan(plan) : plan;
       if (options.json) console.log(JSON.stringify(result, null, 2));
       else {
-        console.log(`${options.operation}: ${result.platform} / machine / coexistence (${options.apply ? 'applied' : 'read-only'})`);
+        console.log(`${options.operation}: ${result.platform} / ${result.scope ?? 'machine'} / coexistence (${options.apply ? 'applied' : 'read-only'})`);
         for (const change of result.changes) console.log(`${change.action}: ${change.id}`);
         for (const conflict of result.conflicts) console.log(`Conflict: ${conflict}`);
-        if (options.global) console.log(result.activation);
+        if (options.global || options.project) console.log(result.activation);
+        for (const note of result.notes ?? []) console.log(note);
         if (!result.changes.length && !result.receiptChanged && result.applicable) console.log(result.installed
           ? 'No changes required; installed state is consistent.' : 'No selected installation is recorded.');
         if (!options.apply && ['apply', 'remove'].includes(options.operation)) console.log('Use --apply to perform this operation.');
