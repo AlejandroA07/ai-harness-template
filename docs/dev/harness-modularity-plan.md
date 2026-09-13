@@ -4,7 +4,16 @@
 - **Scope:** repository organization, selective installation, and a readable architecture map
 - **Graphify decision:** adopt with all capabilities in Tool integrations, available across projects and invoked by the user. Watchers, Git hooks, semantic document processing, and MCP are supported configuration choices; availability does not automatically activate them everywhere.
 - **Review baseline:** `a31e26aa1a9d6fdec2f61ca33c50ba32187b307c`; see the [whole-repository review](harness-modularity-review.md) for the ownership map, 22-capability classification, and findings R1–R10.
-- **Current delivery:** M0 safety corrections and isolated fixtures complete; see [M0 evidence and limits](modularity-m0-safety.md). M1 catalog and read-only planning are complete; see [M1 contract and evidence](modularity-m1-catalog.md). M2 selective machine-skill installation is complete; see [M2 lifecycle and evidence](modularity-m2-installation.md). M3 selected global configuration is complete; see [M3 ownership, recovery and activation limits](modularity-m3-global-configuration.md). M4 selected project configuration is complete; see [M4 lifecycle, verification and limits](modularity-m4-project-configuration.md). M5 workflows are next. The detailed contract and slices below supersede the earlier high-level sequence wherever more specific.
+- **Current delivery:** M0 safety corrections and isolated fixtures complete; see [M0 evidence and limits](modularity-m0-safety.md). M1 catalog and read-only planning are complete; see [M1 contract and evidence](modularity-m1-catalog.md). M2 selective machine-skill installation is complete; see [M2 lifecycle and evidence](modularity-m2-installation.md). M3 selected global configuration is complete; see [M3 ownership, recovery and activation limits](modularity-m3-global-configuration.md). M4 selected project configuration is complete; see [M4 lifecycle, verification and limits](modularity-m4-project-configuration.md). The M0–M3 review found outstanding M2/M3 lifecycle defects; complete the [foundation repair plan](modularity-foundation-follow-up-plan.md) before M5 workflows. The detailed contract and slices below supersede the earlier high-level sequence wherever more specific.
+
+## Review gate before M5
+
+The [2026-09-13 foundation review](modularity-foundation-review.md) confirms the
+bounded M0/M1 scope but reopens M2/M3 ownership, historical-removal and activation
+acceptance. Implementation and a passing local gate do not establish that these
+new cases pass. Resolve R1–R4 in the follow-up plan before M5; retain its R5
+platform/remote verification requirements before release or real installation.
+The five-module direction and later M6–M8 work remain unchanged.
 
 ## Recommended order
 
