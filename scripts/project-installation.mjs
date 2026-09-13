@@ -1,3 +1,4 @@
+import { projectPayload, readProjectPayload, storeProjectPayload } from './project-provenance.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { isDeepStrictEqual as equal } from 'node:util';
@@ -8,7 +9,7 @@ import { projectSettings } from './project-settings.mjs';
 import { projectIgnore, projectFeatures } from './project-state.mjs';
 import { projectAdapters, projectTree } from './project-adapters.mjs';
 import { receiptPath, runtimeNames, componentNames, filePlatform, allowedProjectFile, validateProjectReceipt } from './project-receipt.mjs';
-import { buildVerificationSteps } from './project-verification.mjs';
+import { buildVerificationSteps, selectDotnetTarget } from './project-verification.mjs';
 import { detectDomainSignals, inspectExistingDomainConfiguration, inspectExistingDomainContract, inspectExistingTrackerConfiguration, renderDomainInstructions, renderTrackerInstructions } from './project-configuration.mjs';
 
 const plans = new WeakMap();
@@ -59,7 +60,8 @@ export async function planProjectInstallation(repository, options) {
   const rawReceipt = await read(receiptPath);
   let previous = null;
   try { if (rawReceipt) previous = validateProjectReceipt(JSON.parse(rawReceipt)); }
-  catch { throw new Error('Malformed project installation receipt'); }
+  catch { throw new Error('Malformed or unsupported project installation receipt; older receipts require reviewed migration'); }
+  const previousFiles = previous ? await readProjectPayload(target, previous) : {};
   const conflicts = [];
   const notes = [];
   if (await stat(path.join(target, '.ai-harness-install.lock'))) conflicts.push('Target is locked; inspect the active or interrupted operation');
@@ -72,12 +74,12 @@ export async function planProjectInstallation(repository, options) {
   if (operation === 'apply' && !selected) active.push(platform);
   if (operation === 'remove' && selected) active.splice(active.indexOf(platform), 1);
   active.sort();
-  const files = await inventory(target);
-  const packageBytes = await read('package.json');
+  const files = operation === 'apply' ? await inventory(target) : [];
+  const packageBytes = operation === 'apply' ? await read('package.json') : null;
   const packageJson = packageBytes ? parseSettings(packageBytes) : {};
-  const domain = await inspectExistingDomainConfiguration(target);
-  const domainContract = await inspectExistingDomainContract(target);
-  await read('CONTEXT.md'); await read('CONTEXT-MAP.md');
+  if (operation === 'apply') for (const file of ['CONTEXT.md', 'CONTEXT-MAP.md', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md']) await read(file);
+  const domain = operation === 'apply' ? await inspectExistingDomainConfiguration(target) : {};
+  const domainContract = operation === 'apply' ? await inspectExistingDomainContract(target) : {};
   const existingVerifier = await read('scripts/verify.mjs');
   const config = { verification: options.verification ?? previous?.options.verification ?? (existingVerifier ? 'existing' : 'generated'),
     ci: options.ci ?? previous?.options.ci ?? 'none', tracker: options.tracker ?? previous?.options.tracker ?? 'local',
@@ -98,7 +100,7 @@ export async function planProjectInstallation(repository, options) {
   const sourceFile = async (relative) => { const bytes = await optional(root, relative); if (bytes === null) throw new Error('Missing project source'); source[relative] = bytes; return bytes; };
   const desired = {};
   const preserve = new Set(['AGENTS.md', 'CLAUDE.md', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', '.gitleaks.toml']);
-  if (active.length) {
+  if (active.length && operation === 'apply') {
     for (const name of runtimeNames) desired[`.harness/project-runtime/${name}`] = await sourceFile(`scripts/${name}`);
     for (const name of componentNames) desired[`.harness/hooks/${name}`] = await sourceFile(`components/${name}`);
     desired['.harness/runtime/windows-cli.mjs'] = await sourceFile('scripts/windows-cli.mjs');
@@ -115,7 +117,9 @@ export async function planProjectInstallation(repository, options) {
     } else {
       if (existingVerifier !== null && !previous?.owned['scripts/verify.mjs']) conflicts.push('Existing project verifier is unowned; use --verification existing');
       if (files.some((file) => ['pnpm-lock.yaml', 'yarn.lock', 'bun.lock', 'bun.lockb'].includes(file))) conflicts.push('Generated verification supports npm; preserve a project verifier for other package managers');
-      const steps = buildVerificationSteps({ hasDotnet, hasNode: packageBytes !== null, isGithub: config.ci === 'github', packageJson, relativeFiles: files });
+      let dotnetTarget;
+      if (hasDotnet) { try { dotnetTarget = selectDotnetTarget(files); } catch (error) { conflicts.push(error.message); } }
+      const steps = buildVerificationSteps({ dotnetTarget, hasDotnet, hasNode: packageBytes !== null, isGithub: config.ci === 'github', packageJson, relativeFiles: files });
       if (packageBytes === null && !hasDotnet) conflicts.push('Unknown stack requires an existing scripts/verify.mjs');
       const template = (await sourceFile('project/scripts/verify.mjs.template')).toString('utf8');
       desired['scripts/verify.mjs'] = Buffer.from(template.replace('__VERIFY_STEPS__', JSON.stringify(steps, null, 2)));
@@ -128,9 +132,12 @@ export async function planProjectInstallation(repository, options) {
       }
     }
   }
-  const adapters = await projectAdapters(target, active);
+  if (active.length && operation !== 'apply') for (const [file, bytes] of Object.entries(previousFiles)) {
+    if (!filePlatform(file) || active.includes(filePlatform(file))) desired[file] = bytes;
+  }
+  const adapters = operation === 'remove' ? { files: {}, source: {} } : await projectAdapters(target, active);
   if (Object.keys(adapters.files).some((file) => !allowedProjectFile(file))) throw new Error('Unsupported project adapter resource path');
-  Object.assign(desired, adapters.files);
+  if (operation === 'apply') Object.assign(desired, adapters.files);
   // Adapter directories are owned as complete inventories; additional user files
   // block regeneration/removal rather than being silently discarded.
   const allAdapterFiles = new Set([...Object.keys(previous?.owned ?? {}), ...Object.keys(adapters.files)].filter((file) => file.startsWith('.claude/skills/') || file.startsWith('.agents/skills/')));
@@ -145,7 +152,7 @@ export async function planProjectInstallation(repository, options) {
       }
     }
   }
-  const next = { version: 1, module: 'project-configuration', scope: 'project', profile: 'coexistence', platforms: active, options: config, owned: {}, settings: {}, ignore: null, codexFeatures: null };
+  const next = { version: 2, module: 'project-configuration', scope: 'project', profile: 'coexistence', platforms: active, options: config, owned: {}, settings: {}, ignore: null, codexFeatures: null };
   const after = {};
   for (const file of new Set([...Object.keys(previous?.owned ?? {}), ...Object.keys(desired)])) {
     const before = await read(file);
@@ -158,11 +165,11 @@ export async function planProjectInstallation(repository, options) {
     if (wanted !== null) next.owned[file] = digest(wanted);
   }
   for (const name of new Set([...(previous?.platforms ?? []), ...active])) {
-    const expected = parseSettings(await sourceFile(`project/.${name}/` + (name === 'claude' ? 'settings.json' : 'hooks.json'))).hooks.PreToolUse[0];
+    const expected = operation === 'apply' ? parseSettings(await sourceFile(`project/.${name}/` + (name === 'claude' ? 'settings.json' : 'hooks.json'))).hooks.PreToolUse[0] : previous.settings[name].hook;
     const file = settingsFile(name);
     const bytes = await read(file);
     try {
-      const merged = projectSettings(bytes, expected, previous?.settings[name], !active.includes(name));
+      const merged = projectSettings(name, bytes, expected, previous?.settings[name], !active.includes(name));
       if (active.includes(name)) next.settings[name] = merged.state;
       after[file] = merged.after;
     } catch (error) { conflicts.push(error.message); }
@@ -186,6 +193,9 @@ export async function planProjectInstallation(repository, options) {
     const oldAdapters = Object.keys(previous?.owned ?? {}).filter((file) => filePlatform(file) && file !== 'CLAUDE.md');
     if (oldAdapters.some((file) => !adapters.files[file])) conflicts.push('Project adapter source inventory changed');
   }
+  const payloadFiles = active.length ? projectPayload(next, desired) : null;
+  if (payloadFiles) next.payload = payloadHash(payloadFiles);
+  if (operation !== 'audit' && (active.length || previous)) notes.push('Ownership payloads under .harness/project-payloads are retained, including after removal or rollback');
   after[receiptPath] = active.length ? Buffer.from(encode(next)) : null;
   const operations = operation === 'audit' || (operation === 'remove' && !selected) ? [] : Object.entries(after)
     .filter(([file, bytes]) => !sameBytes(observed[file] ?? null, bytes))
@@ -199,7 +209,7 @@ export async function planProjectInstallation(repository, options) {
   const fingerprint = encode({ plan, observed: Object.fromEntries(Object.entries(observed).map(([file, bytes]) => [file, bytes === null ? null : digest(bytes)])),
     source: payloadHash(source), adapters: payloadHash(adapters.source), parents, files });
   plans.set(plan, { root, options: { ...options, target, operation }, operations, observed, fingerprint, parents, next,
-    adapterSource: payloadHash(adapters.source), source, adapterDirectories: [...new Set([...allAdapterFiles].map((file) => file.split('/').slice(0, 3).join('/')))] });
+    previous, payloadFiles, adapterSource: operation === 'remove' ? null : payloadHash(adapters.source), source, adapterDirectories: [...new Set([...allAdapterFiles].map((file) => file.split('/').slice(0, 3).join('/')))] });
   return plan;
 }
 
@@ -223,6 +233,7 @@ export async function applyProjectInstallation(candidate, { checkpoint = async (
     if (!equal(prepared.parents, await parentIdentities(fresh.target, Object.keys(prepared.observed)))) throw new Error('Project parents changed');
     for (const operation of prepared.operations) await fs.mkdir(path.dirname(operation.file), { recursive: true, mode: 0o700 });
     staging = await fs.mkdtemp(path.join(fresh.target, '.harness/.project-stage-'));
+    if (prepared.payloadFiles) await storeProjectPayload(fresh.target, staging, prepared.next, prepared.payloadFiles);
     const parents = await parentIdentities(fresh.target, Object.keys(prepared.observed));
     const observed = { ...prepared.observed };
     const journal = { version: 1, changes: prepared.operations.map(({ id, before, after }) => ({ id, before: before === null ? null : digest(before), after: after === null ? null : digest(after) })) };
@@ -231,7 +242,9 @@ export async function applyProjectInstallation(candidate, { checkpoint = async (
       await checkpoint(phase, id);
       if (!equal(parents, await parentIdentities(fresh.target, Object.keys(observed)))) throw new Error('Project parents changed during publication');
       for (const [file, bytes] of Object.entries(observed)) if (!sameBytes(await optional(fresh.target, file), bytes)) throw new Error('Project file changed during publication');
-      if (payloadHash((await projectAdapters(fresh.target, fresh.platforms)).source) !== prepared.adapterSource) throw new Error('Project skill source changed during publication');
+      if (prepared.previous) await readProjectPayload(fresh.target, prepared.previous);
+      if (prepared.payloadFiles) await readProjectPayload(fresh.target, prepared.next);
+      if (prepared.adapterSource !== null && payloadHash((await projectAdapters(fresh.target, fresh.platforms)).source) !== prepared.adapterSource) throw new Error('Project skill source changed during publication');
       for (const [file, bytes] of Object.entries(prepared.source)) if (!sameBytes(await optional(prepared.root, file), bytes)) throw new Error('Harness source changed during publication');
       for (const directory of prepared.adapterDirectories) {
         const actual = await projectTree(fresh.target, path.join(fresh.target, directory));

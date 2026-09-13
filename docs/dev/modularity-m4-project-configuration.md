@@ -34,6 +34,9 @@ Plan/apply options are explicit, and omitted values reuse the receipt on updates
 | `--domain-layout single` or `multi` | Reuse an existing recognized layout. Without one, simple projects default to single; structural multi-project signals require an explicit choice. |
 
 Changing verifier ownership mode requires removal and a fresh installation.
+Generated .NET verification passes the discovered solution or project path to
+restore, build, format and test, including for nested projects. Multiple solutions,
+or multiple projects without a solution, require an existing project verifier.
 Existing/custom verifiers may depend on arbitrary tools; their CI remains
 project-managed rather than guessing those dependencies. The generated CI path
 supports the standard npm/.NET gate: Node 22, Python for Zizmor, Gitleaks, Zizmor,
@@ -74,7 +77,26 @@ options, file hashes and scoped prior settings. One project receipt owns shared
 runtime/guidance once. Removing one platform preserves the other platform and
 shared files; the last removal retires unchanged owned shared files. This receipt
 contains relative project paths, so a checkout can move or be cloned with its
-runtime. Commit the receipt and generated runtime/adapters with project changes.
+runtime. Commit the receipt, ownership payloads and generated runtime/adapters with
+project changes.
+
+Receipt version 2 points to a content-addressed snapshot under
+`.harness/project-payloads/<hash>/`. The snapshot contains installer-produced owned
+files and a manifest of scoped ownership/prior states. Planning and the installed
+gate require the receipt to match this independently checked evidence. Editing a
+receipt alone cannot claim a preserved file or rewrite prior settings ownership.
+Missing or edited evidence blocks mutation. Version 1 receipts require reviewed
+migration: use the original installation's reviewed removal procedure, verify that
+user content is preserved, then install version 2. Do not manually change a receipt
+version or reconstruct ownership from existing file hashes.
+
+Removal uses stored installed bytes and hook definitions; it does not regenerate
+the remaining platform from current templates or unfinished local skill sources.
+Ownership payloads remain after updates, removal and rollback. They contain scoped
+prior values and installed content, not copies of arbitrary user configuration.
+Review and retain them with recovery evidence before any manual cleanup. These
+hashes detect inconsistency; they are not signatures or protection against an actor
+who can replace both receipt and payload with the same filesystem authority.
 
 Keep canonical project skills in named directories under `.harness/skills/`, with
 optional `invocation-policy.json` using `userOnly`. Apply renders their documents
@@ -142,6 +164,10 @@ and reinstall; exact settings ownership; optional CI dependencies; domain/tracke
 conflicts; unsafe paths and malformed receipts; stale plans; injected rollback;
 concurrent source edits; preserved competing edits; abrupt termination; project
 verifier failure propagation; and actual guard/attribution denial.
+Review regressions also cover forged ownership, missing/edited payload evidence,
+legacy receipt rejection, nonblocking FIFO denial, retained-platform preservation
+despite changed sources, explicit nested .NET paths and matcher-independent Claude
+scalar ownership.
 
 Security-checklist verdicts:
 
@@ -159,7 +185,7 @@ All installation experiments use temporary targets. The repository gate is
 `node scripts/verify.mjs`; GitHub CodeQL must also pass before merging. This slice
 does not add rule suppressions or exclude tests from analysis.
 
-On 2026-09-13, `node scripts/verify.mjs` exited 0: 140 tests, 138 passed and two
-Windows-only skips, followed by whitespace, Gitleaks, Zizmor and syntax checks.
-No real project or machine profile was changed. Live Windows execution and PR
-CodeQL are not established by this local result.
+On 2026-09-13, `node scripts/verify.mjs` exited 0 after the review fixes: 146
+tests, 144 passed and two Windows-only skips, followed by whitespace, Gitleaks,
+Zizmor and syntax checks. No real project or machine profile was changed.
+Live Windows execution and PR CodeQL are not established by this local result.

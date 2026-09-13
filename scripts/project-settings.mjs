@@ -3,7 +3,8 @@ import { object, parseSettings, getSetting, setSetting, hookGroups, hookCount, r
 import { encode } from './installation-core.mjs';
 
 const scalars = { autoMemoryEnabled: false, includeCoAuthoredBy: false };
-export function projectSettings(bytes, expected, prior, remove = false) {
+export function projectSettings(platform, bytes, expected, prior, remove = false) {
+  if (!['codex', 'claude'].includes(platform)) throw new Error('Invalid project platform');
   const settings = parseSettings(bytes);
   const next = structuredClone(settings);
   const groups = hookGroups(settings);
@@ -20,7 +21,7 @@ export function projectSettings(bytes, expected, prior, remove = false) {
   }
   const state = prior ? structuredClone(prior) : { existed: bytes !== null, arrayExisted: getSetting(settings, ['hooks', 'PreToolUse']).present,
     createdHookContainer: !Object.hasOwn(settings, 'hooks'), owned: hookCount(groups, expected) === 0, hook: expected, scalars: {} };
-  const definitions = expected.matcher.includes('PowerShell') ? scalars : {};
+  const definitions = platform === 'claude' ? scalars : {};
   if (prior && Object.keys(prior.scalars).sort().join(',') !== Object.keys(definitions).sort().join(',')) throw new Error('Invalid project scalar ownership');
   for (const [key, value] of Object.entries(definitions)) {
     const actual = getSetting(settings, [key]);

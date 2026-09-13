@@ -40,6 +40,7 @@
         "scripts/project-state.mjs",
         "scripts/project-adapters.mjs",
         "scripts/project-receipt.mjs",
+        "scripts/project-provenance.mjs",
         "scripts/project-check.mjs"
       ],
       "description": "Repository guidance, verification and optional CI."

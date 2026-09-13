@@ -1,3 +1,4 @@
+import { readProjectPayload } from './project-provenance.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +18,7 @@ export async function checkProject(target) {
   try { await fs.access(path.join(target, '.ai-harness-install.lock')); throw new Error('Project installation is locked or interrupted'); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
   const receipt = validateProjectReceipt(JSON.parse(await read(receiptPath)));
+  await readProjectPayload(target, receipt);
   for (const [file, hash] of Object.entries(receipt.owned)) if (digest(await read(file)) !== hash) throw new Error(`Owned project file drift: ${file}`);
   const rendered = await projectAdapters(target, receipt.platforms);
   const adapterOwned = Object.keys(receipt.owned).filter((file) => receipt.platforms.some((platform) => file.startsWith(adapterRoot(platform) + '/'))).sort();
@@ -28,7 +30,7 @@ export async function checkProject(target) {
   }
   for (const platform of receipt.platforms) {
     const file = platform === 'codex' ? '.codex/hooks.json' : '.claude/settings.json';
-    projectSettings(await read(file), receipt.settings[platform].hook, receipt.settings[platform]);
+    projectSettings(platform, await read(file), receipt.settings[platform].hook, receipt.settings[platform]);
   }
   projectIgnore(await read('.gitignore'), receipt.ignore);
   if (receipt.platforms.includes('codex')) projectFeatures(await read('.codex/config.toml'), receipt.codexFeatures);

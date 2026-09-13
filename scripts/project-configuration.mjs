@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { constants } from 'node:fs';
 import path from 'node:path';
 
 const normalized = (value) => value.replaceAll('\\', '/');
@@ -6,7 +7,7 @@ const normalized = (value) => value.replaceAll('\\', '/');
 async function readValidatedFile(file, label) {
   let handle;
   try {
-    handle = await fs.open(file, 'r');
+    handle = await fs.open(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
     const opened = await handle.stat({ bigint: true });
     const current = await fs.lstat(file, { bigint: true });
     if (current.isSymbolicLink()) return { state: 'conflict', reason: `${label} must not be a symbolic link.` };
@@ -21,6 +22,7 @@ async function readValidatedFile(file, label) {
         ? { state: 'conflict', reason: `${label} changed while it was being inspected.` }
         : { state: 'missing' };
     }
+    if (['ELOOP', 'ENXIO'].includes(error.code)) return { state: 'conflict', reason: `${label} must be a safe regular file.` };
     throw error;
   } finally {
     await handle?.close();

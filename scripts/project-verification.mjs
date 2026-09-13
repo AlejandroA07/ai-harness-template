@@ -5,14 +5,15 @@ function selectPackageManager(relativeFiles) {
   return { command: 'npm', install: relativeFiles.includes('package-lock.json') ? ['ci'] : ['install'], audit: ['audit', '--audit-level', 'high'] };
 }
 
-export function buildVerificationSteps({ hasDotnet, hasNode, isGithub, packageJson = {}, relativeFiles = [] }) {
+export function buildVerificationSteps({ hasDotnet, hasNode, isGithub, dotnetTarget, packageJson = {}, relativeFiles = [] }) {
   const steps = [];
   if (hasDotnet) {
+    const target = dotnetTarget ? [dotnetTarget] : [];
     const locked = relativeFiles.some((file) => file.endsWith('packages.lock.json'));
-    steps.push({ name: 'Restore .NET', command: 'dotnet', args: locked ? ['restore', '--locked-mode'] : ['restore'] });
-    steps.push({ name: 'Build .NET', command: 'dotnet', args: ['build', '--configuration', 'Release', '--no-restore'] });
-    steps.push({ name: 'Format .NET', command: 'dotnet', args: ['format', '--verify-no-changes', '--no-restore'] });
-    steps.push({ name: 'Test .NET', command: 'dotnet', args: ['test', '--configuration', 'Release', '--no-build'] });
+    steps.push({ name: 'Restore .NET', command: 'dotnet', args: locked ? ['restore', ...target, '--locked-mode'] : ['restore', ...target] });
+    steps.push({ name: 'Build .NET', command: 'dotnet', args: ['build', ...target, '--configuration', 'Release', '--no-restore'] });
+    steps.push({ name: 'Format .NET', command: 'dotnet', args: ['format', ...target, '--verify-no-changes', '--no-restore'] });
+    steps.push({ name: 'Test .NET', command: 'dotnet', args: ['test', ...target, '--configuration', 'Release', '--no-build'] });
   }
   if (hasNode) {
     const manager = selectPackageManager(relativeFiles);
@@ -26,4 +27,11 @@ export function buildVerificationSteps({ hasDotnet, hasNode, isGithub, packageJs
   steps.push({ name: 'Gitleaks full-history scan', command: 'gitleaks', args: ['git', '--redact', '-v'] });
   if (isGithub) steps.push({ name: 'GitHub Actions security', command: 'zizmor', args: ['.github/workflows'] });
   return steps;
+}
+
+export function selectDotnetTarget(files) {
+  const solutions = files.filter((file) => /\.(?:sln|slnx)$/i.test(file));
+  const candidates = solutions.length ? solutions : files.filter((file) => /\.csproj$/i.test(file));
+  if (candidates.length !== 1) throw new Error('Generated .NET verification requires one unambiguous solution or project');
+  return './' + candidates[0];
 }

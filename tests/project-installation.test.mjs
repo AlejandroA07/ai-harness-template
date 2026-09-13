@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { planProjectInstallation, applyProjectInstallation } from '../scripts/project-installation.mjs';
 import { snapshot } from './helpers/filesystem-snapshot.mjs';
+import { digest } from '../scripts/installation-core.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 async function fixture(body) {
@@ -28,6 +29,99 @@ async function fixture(body) {
 }
 const skill = (name = 'sample') => `---\nname: ${name}\ndescription: A project fixture skill\n---\n\nUse the project fixture.\n`;
 const run = (target, script) => spawnSync(process.execPath, [script], { cwd: target, encoding: 'utf8' });
+
+test('review regression: forged file and setting ownership never authorizes mutation', async () => {
+  for (const kind of ['file', 'hook', 'scalar', 'features', 'ignore']) await fixture(async (f) => {
+    await f.put('AGENTS.md', 'User-owned guidance\n');
+    await f.apply('claude'); await f.apply('codex');
+    const receipt = JSON.parse(await f.read('.harness/project-installation.json'));
+    if (kind === 'file') receipt.owned['AGENTS.md'] = digest(await f.read('AGENTS.md'));
+    if (kind === 'hook') receipt.settings.claude.owned = false;
+    if (kind === 'scalar') receipt.settings.claude.scalars.autoMemoryEnabled = { present: true, value: true };
+    if (kind === 'features') receipt.codexFeatures.values.memories = true;
+    if (kind === 'ignore') receipt.ignore.owned = false;
+    await f.put('.harness/project-installation.json', JSON.stringify(receipt));
+    const before = await snapshot(f.target);
+    await assert.rejects(f.apply('codex', 'remove'), undefined, kind);
+    assert.deepEqual(await snapshot(f.target), before);
+    await assert.rejects(f.apply('claude'), undefined, kind);
+    assert.deepEqual(await snapshot(f.target), before);
+    assert.notEqual(run(f.target, 'scripts/verify-harness.mjs').status, 0);
+  });
+});
+
+test('review regression: domain and tracker FIFOs fail without blocking', { skip: process.platform === 'win32' }, async () => {
+  for (const file of ['CONTEXT.md', 'CONTEXT-MAP.md', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md']) await fixture(async (f) => {
+    await fs.mkdir(path.dirname(path.join(f.target, file)), { recursive: true });
+    assert.equal(spawnSync('mkfifo', [path.join(f.target, file)]).status, 0);
+    const result = spawnSync(process.execPath, [path.join(f.source, 'scripts/setup.mjs'), 'plan', '--module', 'project-configuration',
+      '--platform', 'codex', '--scope', 'project', '--target', f.target], { encoding: 'utf8', timeout: 2000 });
+    assert.ifError(result.error);
+    assert.notEqual(result.status, 0);
+    await assert.rejects(fs.access(path.join(f.target, '.ai-harness-install.lock')));
+  });
+});
+
+test('project payload evidence is required and legacy receipts fail without writes', async () => {
+  for (const kind of ['missing', 'edited', 'legacy']) await fixture(async (f) => {
+    await f.apply();
+    const receipt = JSON.parse(await f.read('.harness/project-installation.json'));
+    const manifest = `.harness/project-payloads/${receipt.payload}/manifest.json`;
+    if (kind === 'missing') await fs.unlink(path.join(f.target, manifest));
+    if (kind === 'edited') await f.put(manifest, '{}');
+    if (kind === 'legacy') {
+      receipt.version = 1; delete receipt.payload;
+      await f.put('.harness/project-installation.json', JSON.stringify(receipt));
+    }
+    const before = await snapshot(f.target);
+    await assert.rejects(f.apply('codex', 'remove'));
+    await assert.rejects(f.apply());
+    assert.deepEqual(await snapshot(f.target), before);
+    assert.notEqual(run(f.target, 'scripts/verify-harness.mjs').status, 0);
+  });
+});
+
+test('review regression: removal preserves retained platform bytes despite changed sources', async () => fixture(async (f) => {
+  await f.put('.harness/skills/sample/SKILL.md', skill());
+  await f.apply('codex'); await f.apply('claude');
+  const before = {};
+  for (const file of ['AGENTS.md', '.claude/settings.json', '.claude/skills/sample/SKILL.md', '.harness/hooks/guard-policy.mjs']) before[file] = await f.read(file);
+  await fs.appendFile(path.join(f.source, 'project/AGENTS.selected.md'), '\nUpstream revision\n');
+  await fs.appendFile(path.join(f.source, 'components/guard-policy.mjs'), '\n// Upstream revision\n');
+  await f.put('.harness/skills/sample/SKILL.md', skill() + '\nLocal draft revision\n');
+  const plan = await f.plan('codex', 'remove');
+  assert.ok(!plan.changes.some((change) => Object.hasOwn(before, change.id)));
+  await applyProjectInstallation(plan);
+  for (const [file, bytes] of Object.entries(before)) assert.equal(await f.read(file), bytes);
+  await fs.rm(path.join(f.source, 'project'), { recursive: true });
+  await f.put('.harness/skills/sample/SKILL.md', 'Invalid draft');
+  await f.apply('claude', 'remove');
+  assert.equal(await f.read('.harness/skills/sample/SKILL.md'), 'Invalid draft');
+}));
+
+test('review regression: nested .NET entry points are explicit and ambiguous layouts fail planning', async () => fixture(async (f) => {
+  await fs.unlink(path.join(f.target, 'scripts/verify.mjs'));
+  await f.put('src/app/App.csproj', '<Project />');
+  await f.apply();
+  const generated = await f.read('scripts/verify.mjs');
+  for (const verb of ['restore', 'build', 'format', 'test']) assert.ok(generated.includes(`"${verb}",\n      "./src/app/App.csproj"`), verb);
+  await f.apply('codex', 'remove');
+  await f.put('src/other/Other.csproj', '<Project />');
+  const plan = await f.plan('codex', 'apply', { domainLayout: 'single' });
+  assert.equal(plan.applicable, false);
+  assert.ok(plan.conflicts.some((message) => message.includes('.NET')));
+}));
+
+test('review regression: Claude scalar ownership is independent of matcher text', async () => fixture(async (f) => {
+  const file = path.join(f.source, 'project/.claude/settings.json');
+  const template = JSON.parse(await fs.readFile(file, 'utf8'));
+  template.hooks.PreToolUse[0].matcher = 'Bash|Read';
+  await fs.writeFile(file, JSON.stringify(template));
+  await f.apply('claude');
+  const settings = JSON.parse(await f.read('.claude/settings.json'));
+  assert.equal(settings.autoMemoryEnabled, false);
+  assert.equal(settings.includeCoAuthoredBy, false);
+}));
 
 test('selected project lifecycle preserves an existing verifier, unrelated platform and Git configuration', async () => {
   for (const platform of ['codex', 'claude']) await fixture(async (f) => {
