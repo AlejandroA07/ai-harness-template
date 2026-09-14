@@ -11,7 +11,7 @@ const usage = `Usage:
   node scripts/setup.mjs plan --select <id> [--select <id> ...] --platform <claude|codex|both> --scope <machine|project> [--json]
   node scripts/setup.mjs plan --module <skills|workflows> --platform <claude|codex|both> --scope <machine|project> [--json]
 
-  node scripts/setup.mjs <apply|remove> --select <skill> --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--apply] [--json]
+  node scripts/setup.mjs <apply|remove> --select <capability> --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--apply] [--json]
   node scripts/setup.mjs audit --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--json]
   node scripts/setup.mjs <plan|apply|audit|remove> --module global-configuration --platform <claude|codex> --scope machine --target <absolute-home-path> [--apply] [--json]
   node scripts/setup.mjs <plan|apply|audit|remove> --module project-configuration --platform <claude|codex> --scope project --target <absolute-project-path> [--apply] [--json]
@@ -108,6 +108,12 @@ try {
       if (options.json) console.log(JSON.stringify(result, null, 2));
       else {
         console.log(`${options.operation}: ${result.platform} / ${result.scope ?? 'machine'} / coexistence (${options.apply ? 'applied' : 'read-only'})`);
+        for (const capability of result.capabilities ?? []) {
+          console.log(`${capability.module === 'workflows' ? 'Workflow' : 'Capability'}: ${capability.id} (${capability.currentStatus} -> ${capability.plannedStatus})`);
+          for (const prerequisite of capability.prerequisites) console.log(`  At invocation [${prerequisite.status}]: ${prerequisite.description}`);
+          for (const use of capability.conditionalUses) console.log(`  Conditional [${use.currentStatus} -> ${use.plannedStatus}]: ${use.id} — ${use.when}`);
+          for (const route of capability.routes) console.log(`  Route [${route.currentStatus} -> ${route.plannedStatus}]: ${route.id}`);
+        }
         for (const change of result.changes) console.log(`${change.action}: ${change.id}`);
         if (result.evidence) console.log(`${result.evidence.action}: ${result.evidence.path}`);
         for (const conflict of result.conflicts) console.log(`Conflict: ${conflict}`);
