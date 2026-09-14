@@ -217,3 +217,18 @@ Prefer explicit scanners for quoted/structured configuration boundaries and
 include malformed near-matches in parser tests. This closes the demonstrated
 case; it does not replace the separate PR CodeQL analysis or imply that every
 future security finding is preventable by ordinary functional tests.
+
+### Windows legacy-hook preflight correction
+
+The first supplied Windows lifecycle run reported 78 passes, one failure and three
+skips. The failure was the `legacy-hook` preservation fixture: its native checkout
+path contained backslashes followed by a forward-slash component path, while the
+detector recognized only a fully forward-slash command. This was a behavioral CI
+failure, not a CodeQL alert.
+
+Legacy detection now checks exact forward-slash, backslash and mixed spellings of
+the known checkout command. It does not normalize arbitrary shell commands or
+claim removal ownership. Regression fixtures exercise both platforms on every host,
+verify rejection without writes, and preserve customized commands through apply
+and removal. The backslash case failed locally before the correction and passes
+after it. Windows CI must rerun on the corrected revision before claiming success.

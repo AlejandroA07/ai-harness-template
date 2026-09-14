@@ -440,3 +440,26 @@ test('replayed global receipt cannot restore a previous installation’s setting
   for (const operation of ['audit', 'apply', 'remove']) await assert.rejects(f.plan('claude', operation), /Current ownership/);
   assert.deepEqual(await snapshot(f.target), before);
 }));
+
+
+test('legacy hook preflight recognizes Windows and mixed path separators without changing user hooks', async () => {
+  for (const platform of ['codex', 'claude']) for (const style of ['forward', 'backward', 'mixed']) await fixture(async (f) => {
+    const forward = f.repository.replaceAll('\\', '/');
+    const backward = forward.replaceAll('/', '\\');
+    const program = style === 'forward' ? forward + '/components/guard-git.mjs'
+      : style === 'backward' ? backward + '\\components\\guard-git.mjs' : backward + '/components/guard-git.mjs';
+    await f.put(platform, 'settings', { hooks: { PreToolUse: [{ matcher: 'Bash|Read', hooks: [{ type: 'command', command: `node "${program}"` }] }] } });
+    const before = await snapshot(f.target);
+    const plan = await f.plan(platform);
+    assert.equal(plan.applicable, false, `${platform}/${style}`);
+    assert.match(plan.conflicts.join(' '), /legacy checkout hook/);
+    await assert.rejects(f.apply(platform));
+    assert.deepEqual(await snapshot(f.target), before);
+    const custom = { matcher: 'Bash|Read', hooks: [{ type: 'command', command: `node "${program}" --custom-policy` }] };
+    await f.put(platform, 'settings', { hooks: { PreToolUse: [custom] } });
+    await f.apply(platform);
+    assert.ok((await f.json(platform, 'settings')).hooks.PreToolUse.some((group) => JSON.stringify(group) === JSON.stringify(custom)));
+    await f.apply(platform, 'remove');
+    assert.deepEqual((await f.json(platform, 'settings')).hooks.PreToolUse, [custom]);
+  });
+});

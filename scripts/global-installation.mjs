@@ -165,7 +165,12 @@ export async function planGlobalInstallation(repository, options) {
   if (previous && hookCount(groups, oldHook) !== 1) conflicts.push('hooks: owned or required hook is missing, duplicated or edited');
   // A known checkout hook is migration evidence, not permission to remove it.
   if (!previous && operation === 'apply') {
-    const legacyCommands = [root, path.resolve(repository)].map((directory) => `node "${directory.replaceAll('\\', '/')}/components/guard-git.mjs"`);
+    const legacyCommands = [root, path.resolve(repository)].flatMap((directory) => {
+      const forward = directory.replaceAll('\\', '/');
+      const backward = forward.replaceAll('/', '\\');
+      return [forward + '/components/guard-git.mjs', backward + '\\components\\guard-git.mjs', backward + '/components/guard-git.mjs']
+        .map((program) => `node "${program}"`);
+    });
     if (groups.some((group) => group.hooks.some((entry) => legacyCommands.includes(entry.command)))) conflicts.push('hooks: legacy checkout hook requires a reviewed migration');
   }
   const features = platform === 'codex' ? inspectFeatures(input.config?.toString('utf8') ?? '') : null;
