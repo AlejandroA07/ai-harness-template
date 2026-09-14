@@ -28,17 +28,30 @@ For each target, the installer owns these locations:
 ```text
 <target>/.ai-harness/installations/<platform>/
   receipt.json
+  skills-current.json
+  evidence/<metadata-hash>.json
   payloads/<skill-id>/<content-hash>/
 <target>/.ai-harness-install.lock/
 ```
 
-Discovery links live at `<target>/.agents/skills/<id>` for Codex or `<target>/.claude/skills/<id>` for Claude. They point to complete, versioned payload directories in the target's installation store. Windows uses directory junctions. Regeneration, deletion of `.generated`, or moving the source checkout does not break installed skills. Installation management still requires a valid harness checkout.
+Discovery links live at `<target>/.agents/skills/<id>` for Codex or `<target>/.claude/skills/<id>` for Claude. They point to complete, versioned payload directories in the target's installation store. Windows uses directory junctions. Regeneration, deletion of `.generated`, or moving the source checkout does not break installed skills. Installation management still requires the installer program. Audit/removal use
+verified installed history and do not require current catalog/source validity;
+apply still validates current sources and supported selections.
 
-The version 1 receipt binds the canonical target, platform, machine scope and coexistence profile. It records explicitly selected IDs and entries containing stable capability IDs, SHA-256 payload revisions and the explicit selections consuming each payload. Hashes include relative filenames and file bytes. Paths are derived from validated IDs and hashes; receipts cannot supply arbitrary paths. Runtime documents use the same renderer as the legacy generator, preserving platform-specific invocation metadata. Only resources declared by the catalog are copied, with the established README/platform-metadata exclusions.
+The version 2 receipt binds the canonical target, platform, machine scope and coexistence profile. It records explicitly selected IDs and entries containing stable capability IDs, SHA-256 payload revisions and the explicit selections consuming each payload. Hashes include relative filenames and file bytes. Paths are derived from validated IDs and hashes; receipts cannot supply arbitrary paths. Runtime documents use the same renderer as the legacy generator, preserving platform-specific invocation metadata. Only resources declared by the catalog are copied, with the established README/platform-metadata exclusions.
 
 Adding another selection preserves installed revisions outside the requested dependency closures. Updating a shared dependency updates its one discovery entry for all recorded consumers. Removing a selection releases its ownership share; a required payload remains discoverable until its final consumer is removed. Removal uses the receipt's historical consumer graph, so a changed dependency declaration does not silently strand or remove another selection. Removing an ID that is not explicitly selected is a no-op.
 
 ## Ownership and preservation
+
+Scoped ownership metadata is also stored independently in `evidence/<hash>.json`
+under the platform installation store. The receipt must match this evidence before
+audit, update, removal and publication. Consumer-list or selection edits cannot
+claim historical ownership using payload hashes alone. Evidence is retained after
+removal and rollback. A separate `skills-current.json` binds the current receipt;
+retained older evidence cannot authorize receipt replay. Both files publish and
+roll back together. Version 1 requires the [receipt assessment and reviewed
+recovery procedure](receipt-migration.md); do not manufacture evidence from it.
 
 Receipt files are untrusted: reject unsupported schemas, unknown IDs, unsafe hashes, target/profile mismatches, duplicate selections, invalid consumers and linked/hardlinked receipt files. A receipt alone is insufficient to overwrite or remove a discovery entry. The exact link must point to its derived store revision, and the stored file tree must match the recorded content hash. Unowned directories, legacy links, case-variant collisions, missing links and edited or unsafe payloads are conflicts. No automatic adoption is attempted.
 
@@ -54,7 +67,10 @@ Complete payloads, the next receipt and a recovery journal are staged under a pr
 
 Caught failures report completed discovery operations and restore previous links and receipt content when the current state still matches the operation's writes. Published immutable payloads and empty created parent directories may remain. If a concurrent change makes rollback ambiguous, preserve that change, the staging directory, old links and the target lock, and report that recovery is required.
 
-Abrupt termination also leaves the lock and staging journal. Locks are never expired or removed automatically. Recovery requires confirming that no installer is running, then inspecting `.stage-*/transaction.json`, the current receipt, the discovery links and any `<id>.old` staged links. The journal records previous and intended receipts plus the planned link changes. Restore only verified operation-owned links/receipt state, or reconcile a fully published receipt, before removing the reviewed staging directory and lock and rerunning audit. Preserve any ambiguous content for review. There is no automatic journal replay or payload garbage collector in M2.
+Abrupt termination also leaves the lock and staging journal. Locks are never expired or removed automatically. Recovery requires confirming that no installer is running, then inspecting `.stage-*/transaction.json`, the current receipt, the discovery links and any `<id>.old` staged links. The journal records previous and intended receipts plus the planned link changes.
+The nested `receipt-publication/` journal orders `ownership` then `receipt`; its
+`0.old`/`0.new` files are the current-revision record, and `1.old`/`1.new` the receipt.
+Reconcile these two files together before releasing the lock. Restore only verified operation-owned links/receipt state, or reconcile a fully published receipt, before removing the reviewed staging directory and lock and rerunning audit. Preserve any ambiguous content for review. There is no automatic journal replay or payload garbage collector in M2.
 
 ## Acceptance evidence
 

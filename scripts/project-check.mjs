@@ -1,3 +1,4 @@
+import { verifyOwnershipHead } from './installation-evidence.mjs';
 import { readProjectPayload } from './project-provenance.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -19,6 +20,7 @@ export async function checkProject(target) {
   catch (error) { if (error.code !== 'ENOENT') throw error; }
   const receipt = validateProjectReceipt(JSON.parse(await read(receiptPath)));
   await readProjectPayload(target, receipt);
+  await verifyOwnershipHead(target, path.join(target, '.harness/project-current.json'), receipt.payload);
   for (const [file, hash] of Object.entries(receipt.owned)) if (digest(await read(file)) !== hash) throw new Error(`Owned project file drift: ${file}`);
   const rendered = await projectAdapters(target, receipt.platforms);
   const adapterOwned = Object.keys(receipt.owned).filter((file) => receipt.platforms.some((platform) => file.startsWith(adapterRoot(platform) + '/'))).sort();

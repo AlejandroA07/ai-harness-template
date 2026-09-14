@@ -1,3 +1,4 @@
+import { verifyOwnershipHead, ownershipHeadBytes } from './installation-evidence.mjs';
 import { projectPayload, readProjectPayload, storeProjectPayload } from './project-provenance.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -62,6 +63,7 @@ export async function planProjectInstallation(repository, options) {
   try { if (rawReceipt) previous = validateProjectReceipt(JSON.parse(rawReceipt)); }
   catch { throw new Error('Malformed or unsupported project installation receipt; older receipts require reviewed migration'); }
   const previousFiles = previous ? await readProjectPayload(target, previous) : {};
+  observed['.harness/project-current.json'] = await verifyOwnershipHead(target, path.join(target, '.harness/project-current.json'), previous?.payload ?? null);
   const conflicts = [];
   const notes = [];
   if (await stat(path.join(target, '.ai-harness-install.lock'))) conflicts.push('Target is locked; inspect the active or interrupted operation');
@@ -152,7 +154,7 @@ export async function planProjectInstallation(repository, options) {
       }
     }
   }
-  const next = { version: 2, module: 'project-configuration', scope: 'project', profile: 'coexistence', platforms: active, options: config, owned: {}, settings: {}, ignore: null, codexFeatures: null };
+  const next = { version: 3, module: 'project-configuration', scope: 'project', profile: 'coexistence', platforms: active, options: config, owned: {}, settings: {}, ignore: null, codexFeatures: null };
   const after = {};
   for (const file of new Set([...Object.keys(previous?.owned ?? {}), ...Object.keys(desired)])) {
     const before = await read(file);
@@ -196,6 +198,7 @@ export async function planProjectInstallation(repository, options) {
   const payloadFiles = active.length ? projectPayload(next, desired) : null;
   if (payloadFiles) next.payload = payloadHash(payloadFiles);
   if (operation !== 'audit' && (active.length || previous)) notes.push('Ownership payloads under .harness/project-payloads are retained, including after removal or rollback');
+  after['.harness/project-current.json'] = active.length ? ownershipHeadBytes(next.payload) : null;
   after[receiptPath] = active.length ? Buffer.from(encode(next)) : null;
   const operations = operation === 'audit' || (operation === 'remove' && !selected) ? [] : Object.entries(after)
     .filter(([file, bytes]) => !sameBytes(observed[file] ?? null, bytes))

@@ -30,6 +30,25 @@ async function fixture(body) {
 const skill = (name = 'sample') => `---\nname: ${name}\ndescription: A project fixture skill\n---\n\nUse the project fixture.\n`;
 const run = (target, script) => spawnSync(process.execPath, [script], { cwd: target, encoding: 'utf8' });
 
+test('disabled project hooks block apply and audit while owned removal preserves user settings', async () => fixture(async (f) => {
+  await f.put('.claude/settings.json', JSON.stringify({ disableAllHooks: true, other: 'keep' }));
+  const before = await snapshot(f.target);
+  assert.equal((await f.plan('claude')).applicable, false);
+  await assert.rejects(f.apply('claude'));
+  assert.deepEqual(await snapshot(f.target), before);
+  await f.put('.claude/settings.json', JSON.stringify({ other: 'keep' }));
+  await f.apply('claude');
+  const settings = JSON.parse(await f.read('.claude/settings.json'));
+  settings.disableAllHooks = true;
+  await f.put('.claude/settings.json', JSON.stringify(settings));
+  const disabled = await snapshot(f.target);
+  assert.equal((await f.plan('claude', 'audit')).applicable, false);
+  assert.notEqual(run(f.target, 'scripts/verify-harness.mjs').status, 0);
+  assert.deepEqual(await snapshot(f.target), disabled);
+  await f.apply('claude', 'remove');
+  assert.deepEqual(JSON.parse(await f.read('.claude/settings.json')), { other: 'keep', disableAllHooks: true });
+}));
+
 test('review regression: forged file and setting ownership never authorizes mutation', async () => {
   for (const kind of ['file', 'hook', 'scalar', 'features', 'ignore']) await fixture(async (f) => {
     await f.put('AGENTS.md', 'User-owned guidance\n');
@@ -383,4 +402,16 @@ test('installed project guard and attribution runtime retain denied behavior wit
   await f.put('message.txt', ['Co-Authored', '-By: ', 'Claude'].join(''));
   const attribution = spawnSync(process.execPath, ['.harness/hooks/check-attribution.mjs', 'message.txt'], { cwd: f.target, encoding: 'utf8' });
   assert.equal(attribution.status, 1, attribution.stderr);
+}));
+
+
+test('replayed project receipt cannot remove runtime used by a later platform', async () => fixture(async (f) => {
+  await f.apply('codex');
+  const historical = await f.read('.harness/project-installation.json');
+  await f.apply('claude');
+  await f.put('.harness/project-installation.json', historical);
+  const before = await snapshot(f.target);
+  for (const operation of ['audit', 'apply', 'remove']) await assert.rejects(f.plan('codex', operation), /Current ownership/);
+  assert.notEqual(run(f.target, 'scripts/verify-harness.mjs').status, 0);
+  assert.deepEqual(await snapshot(f.target), before);
 }));

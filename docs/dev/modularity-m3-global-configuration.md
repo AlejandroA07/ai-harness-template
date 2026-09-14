@@ -25,6 +25,10 @@ performs updates; an unchanged installation is a no-op. Audit reports receipt
 and owned-content consistency, not whether a running platform executed a hook.
 Audit with no receipt reports an absent installation, not successful activation.
 
+An explicit local `disableAllHooks: true` blocks apply/audit readiness and is
+reported without changing that preference. Owned removal remains available.
+Configuration readiness does not prove live platform execution or trust.
+
 Only `--scope machine` and one explicit platform are accepted. Selecting both
 platforms requires two operations; global and skill selections cannot be mixed
 in one transaction. No skills, custom agents, MCP configuration, project files,
@@ -52,6 +56,16 @@ other platform. The guard runs from this store after the checkout moves. The
 guidance's maintenance/bootstrap pointer still refers to the source checkout;
 rerun apply from its new location to update that pointer. Lifecycle operations
 continue to require a harness checkout.
+
+Version 2 receipts bind all prior values, consumer-independent ownership flags
+and added-denial metadata to retained `evidence/<hash>.json` records in the
+platform installation store. Audit, apply, remove and publication require matching
+evidence. The separate `global-current.json` binds the active revision so an older
+valid receipt cannot be replayed. It publishes and rolls back with the receipt.
+Old version 1 receipts require [assessment and reviewed recovery](receipt-migration.md).
+Audit/removal use the installed runtime and policy, without reading current global
+templates or the full catalog. These records detect receipt-only edits, not an
+actor rewriting every same-user artifact.
 
 Settings ownership is narrower than file ownership. The receipt records prior
 boolean/enum states, newly added deny entries, exact hook ownership and whether
@@ -134,7 +148,8 @@ For an interrupted operation:
 1. Confirm the original process has stopped. Preserve the lock and staging while
    reviewing recovery; do not rerun a forceful install.
 2. Use the journal's ordered `changes` entries to map index `N` to the fixed file
-   role (`guidance`, `settings`, `config`, `receipt`). `N.old` contains a moved
+   role (`guidance`, `settings`, `config`, `ownership`, `receipt`). `ownership` is
+   `global-current.json`; reconcile it with the receipt as one state. `N.old` contains a moved
    original, `N.new` an unpublished output. Compare file hashes with the journal
    before choosing restoration or completion. Preserve any competing user file.
 3. Restore a coherent set of settings, guidance and receipt from the reviewed
@@ -202,3 +217,18 @@ Prefer explicit scanners for quoted/structured configuration boundaries and
 include malformed near-matches in parser tests. This closes the demonstrated
 case; it does not replace the separate PR CodeQL analysis or imply that every
 future security finding is preventable by ordinary functional tests.
+
+### Windows legacy-hook preflight correction
+
+The first supplied Windows lifecycle run reported 78 passes, one failure and three
+skips. The failure was the `legacy-hook` preservation fixture: its native checkout
+path contained backslashes followed by a forward-slash component path, while the
+detector recognized only a fully forward-slash command. This was a behavioral CI
+failure, not a CodeQL alert.
+
+Legacy detection now checks exact forward-slash, backslash and mixed spellings of
+the known checkout command. It does not normalize arbitrary shell commands or
+claim removal ownership. Regression fixtures exercise both platforms on every host,
+verify rejection without writes, and preserve customized commands through apply
+and removal. The backslash case failed locally before the correction and passes
+after it. Windows CI must rerun on the corrected revision before claiming success.

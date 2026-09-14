@@ -391,3 +391,75 @@ test('global lifecycle supports an absent target and rejects source-overlapping 
   await f.apply('codex', 'remove');
   await assert.rejects(planGlobalInstallation(f.repository, { ...f.options(), target: path.join(f.repository, 'nested') }), /outside the source/);
 }));
+
+
+test('global ownership rejects semantic edits to every restoration field', async () => {
+  for (const field of ['scalars', 'addedDenials', 'hookOwned', 'createdContainers', 'settingsExisted', 'hookArrayExisted', 'denyArrayExisted', 'configExisted', 'createdFeatureTable', 'features']) await fixture(async (f) => {
+    const platform = field === 'features' ? 'codex' : 'claude';
+    await f.apply(platform);
+    const receipt = await f.json(platform, 'receipt');
+    if (field === 'scalars') receipt.scalars.autoMemoryEnabled = { present: true, value: true };
+    else if (field === 'addedDenials') receipt.addedDenials = [];
+    else if (field === 'createdContainers') receipt.createdContainers = [];
+    else if (field === 'features') receipt.features.memories = true;
+    else receipt[field] = !receipt[field];
+    await f.put(platform, 'receipt', receipt);
+    const before = await snapshot(f.target);
+    await assert.rejects(f.plan(platform, 'audit'));
+    await assert.rejects(f.apply(platform, 'remove'));
+    assert.deepEqual(await snapshot(f.target), before);
+  });
+});
+
+test('global disabled hooks block readiness but allow owned removal', async () => fixture(async (f) => {
+  await f.put('claude', 'settings', { disableAllHooks: true });
+  const plan = await f.plan('claude');
+  assert.equal(plan.applicable, false);
+  assert.match(plan.conflicts.join(' '), /disabled/i);
+  await f.put('claude', 'settings', {});
+  await f.apply('claude');
+  const settings = await f.json('claude', 'settings');
+  settings.disableAllHooks = true;
+  await f.put('claude', 'settings', settings);
+  assert.equal((await f.plan('claude', 'audit')).applicable, false);
+  await fs.rm(path.join(f.repository, 'global'), { recursive: true });
+  await f.apply('claude', 'remove');
+  assert.equal((await f.json('claude', 'settings')).disableAllHooks, true);
+}));
+
+
+test('replayed global receipt cannot restore a previous installation’s settings', async () => fixture(async (f) => {
+  await f.put('claude', 'settings', { autoMemoryEnabled: true });
+  await f.apply('claude');
+  const historical = await fs.readFile(f.file('claude', 'receipt'));
+  await f.apply('claude', 'remove');
+  await f.put('claude', 'settings', { autoMemoryEnabled: false });
+  await f.apply('claude');
+  await fs.writeFile(f.file('claude', 'receipt'), historical);
+  const before = await snapshot(f.target);
+  for (const operation of ['audit', 'apply', 'remove']) await assert.rejects(f.plan('claude', operation), /Current ownership/);
+  assert.deepEqual(await snapshot(f.target), before);
+}));
+
+
+test('legacy hook preflight recognizes Windows and mixed path separators without changing user hooks', async () => {
+  for (const platform of ['codex', 'claude']) for (const style of ['forward', 'backward', 'mixed']) await fixture(async (f) => {
+    const forward = f.repository.replaceAll('\\', '/');
+    const backward = forward.replaceAll('/', '\\');
+    const program = style === 'forward' ? forward + '/components/guard-git.mjs'
+      : style === 'backward' ? backward + '\\components\\guard-git.mjs' : backward + '/components/guard-git.mjs';
+    await f.put(platform, 'settings', { hooks: { PreToolUse: [{ matcher: 'Bash|Read', hooks: [{ type: 'command', command: `node "${program}"` }] }] } });
+    const before = await snapshot(f.target);
+    const plan = await f.plan(platform);
+    assert.equal(plan.applicable, false, `${platform}/${style}`);
+    assert.match(plan.conflicts.join(' '), /legacy checkout hook/);
+    await assert.rejects(f.apply(platform));
+    assert.deepEqual(await snapshot(f.target), before);
+    const custom = { matcher: 'Bash|Read', hooks: [{ type: 'command', command: `node "${program}" --custom-policy` }] };
+    await f.put(platform, 'settings', { hooks: { PreToolUse: [custom] } });
+    await f.apply(platform);
+    assert.ok((await f.json(platform, 'settings')).hooks.PreToolUse.some((group) => JSON.stringify(group) === JSON.stringify(custom)));
+    await f.apply(platform, 'remove');
+    assert.deepEqual((await f.json(platform, 'settings')).hooks.PreToolUse, [custom]);
+  });
+});
