@@ -87,10 +87,10 @@ test('project-scoped skills coexist with project configuration on both platforms
     const preview = await f.plan(['research'], { platform, scope: 'project' });
     assert.equal(preview.applicable, true, preview.conflicts.join('; '));
     assert.equal(preview.scope, 'project');
-    assert.equal(path.relative(preview.target, preview.receiptPath), `.harness/installations/${platform}/receipt.json`);
+    assert.equal(path.relative(preview.target, preview.receiptPath), path.join('.harness', 'installations', platform, 'receipt.json'));
     await applyInstallation(preview);
     const installed = await fs.realpath(f.discovery('research', platform));
-    assert.ok(installed.startsWith(path.join(await fs.realpath(f.target), `.harness/installations/${platform}/payloads`)));
+    assert.ok(installed.startsWith(path.join(await fs.realpath(f.target), '.harness', 'installations', platform, 'payloads')));
     assert.deepEqual((await f.receipt(platform, 'project')).selected, ['research']);
     assert.equal(await fs.readFile(path.join(f.discovery('local-sample', platform), 'SKILL.md'), 'utf8'), localBefore);
     assert.equal((await planProjectInstallation(f.repository, { ...projectConfiguration, operation: 'audit' })).applicable, true);
