@@ -15,8 +15,10 @@ All mutating setup commands are dry-run by default and require `--apply`.
 Preview selective adoption with `node scripts/setup.mjs list` and
 `node scripts/setup.mjs plan --select implement --platform codex --scope machine`.
 Target-free plans resolve capabilities and conditional uses without inspecting an
-installation. For selected machine skills, use `setup.mjs apply`, `remove` and
-`audit` with an explicit `--target`, `--platform` and `--scope machine`. Apply and
+installation. For selected machine or project skills, use `setup.mjs apply`,
+`remove` and `audit` with an explicit `--target`, `--platform` and matching
+`--scope`. Project skill payloads and receipts stay under the selected
+repository's `.harness/` directory and do not change machine state. Apply and
 remove preview until `--apply` is supplied. See the
 [selective installation guide](docs/dev/modularity-m2-installation.md) for commands,
 ownership and recovery, and the [catalog guide](docs/dev/modularity-m1-catalog.md)
@@ -32,6 +34,8 @@ For one repository, use
 `node scripts/setup.mjs plan --module project-configuration --platform codex --scope project --target <absolute-project-path>`.
 The [project lifecycle guide](docs/dev/modularity-m4-project-configuration.md)
 covers preserved project verification, local adapters, optional CI and removal.
+The [M5 guide](docs/dev/modularity-m5-workflows.md) explains canonical
+project-skill ownership and its coexistence boundary with project-local adapters.
 
 ## Active structure
 

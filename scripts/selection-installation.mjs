@@ -24,14 +24,14 @@ function ids(value, known) {
   if (!Array.isArray(value) || value.some((id) => !known.has(id))
     || !same(value, [...new Set(value)].sort())) fail('Invalid receipt selection');
 }
-function selection(catalog, requested, platform) {
+function selection(catalog, requested, platform, scope) {
   if (!requested.length) return { requested: [], capabilities: [] };
-  const plan = planSelection(catalog, { ids: requested, modules: [], platforms: [platform], scope: 'machine' });
-  if (plan.capabilities.some((entry) => entry.module !== 'skills')) fail('M2 installs machine-scoped Skills only; workflows remain M5');
+  const plan = planSelection(catalog, { ids: requested, modules: [], platforms: [platform], scope });
+  if (plan.capabilities.some((entry) => entry.module !== 'skills')) fail('Selected Skills lifecycle does not install workflows');
   return plan;
 }
-function layout(target, platform) {
-  const store = path.join(target, '.ai-harness', 'installations', platform);
+function layout(target, platform, scope) {
+  const store = path.join(target, scope === 'project' ? '.harness' : '.ai-harness', 'installations', platform);
   return { store, payloads: path.join(store, 'payloads'), receipt: path.join(store, 'receipt.json'), ownership: path.join(store, 'skills-current.json'),
     discovery: path.join(target, platform === 'codex' ? '.agents' : '.claude', 'skills'),
     lock: path.join(target, '.ai-harness-install.lock') };
@@ -42,7 +42,7 @@ async function safeLayout(target, locations) {
   await assertSafeDirectory(target, locations.discovery);
 }
 function payloadPath(locations, entry) { return path.join(locations.payloads, entry.id, entry.hash); }
-async function loadReceipt(locations, target, platform) {
+async function loadReceipt(locations, target, platform, scope) {
   if (!await stat(locations.receipt)) {
     await verifyOwnershipHead(target, locations.ownership, null);
     return { receipt: null, bytes: null };
@@ -54,7 +54,7 @@ async function loadReceipt(locations, target, platform) {
   await verifyOwnershipHead(target, locations.ownership, receipt.evidence);
   fields(receipt, ['version', 'evidence', 'target', 'platform', 'scope', 'profile', 'selected', 'entries']);
   if (receipt.version !== 2 || receipt.target !== target || receipt.platform !== platform
-    || receipt.scope !== 'machine' || receipt.profile !== 'coexistence') fail('Receipt target/profile mismatch');
+    || receipt.scope !== scope || receipt.profile !== 'coexistence') fail('Receipt target/profile mismatch');
   if (!Array.isArray(receipt.entries) || receipt.entries.some((entry) => !entry || typeof entry.id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(entry.id))) fail('Unsafe historical skill ID');
   const known = new Set(receipt.entries.map((entry) => entry.id));
   ids(receipt.selected, known);
@@ -112,8 +112,8 @@ async function parentIdentity(target, locations) {
 export async function planInstallation(root, options) {
   const { operation = 'apply', platform, scope, ids: requested = [], target: suppliedTarget } = options;
   if (!['apply', 'remove', 'audit'].includes(operation) || !['claude', 'codex'].includes(platform)
-    || scope !== 'machine' || typeof suppliedTarget !== 'string' || !path.isAbsolute(suppliedTarget)) {
-    fail('Lifecycle requires an absolute --target, one --platform and --scope machine');
+    || !['machine', 'project'].includes(scope) || typeof suppliedTarget !== 'string' || !path.isAbsolute(suppliedTarget)) {
+    fail('Lifecycle requires an absolute --target, one --platform and --scope machine or project');
   }
   if (operation !== 'audit' && !requested.length) fail('Select at least one skill');
   if (operation === 'audit' && requested.length) fail('Audit inspects the whole platform receipt; omit --select');
@@ -126,14 +126,14 @@ export async function planInstallation(root, options) {
   });
   if (await isPathWithin(target, root)) fail('Installation target must be outside the source checkout');
   const catalog = operation === 'apply' ? await loadCatalog(root) : null;
-  if (operation === 'apply' && requested.length) selection(catalog, requested, platform);
+  if (operation === 'apply' && requested.length) selection(catalog, requested, platform, scope);
   if (requested.some((id) => typeof id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(id))) fail('Unsafe skill selection');
-  const locations = layout(target, platform);
+  const locations = layout(target, platform, scope);
   for (const ownedRoot of [locations.store, locations.discovery, locations.lock]) {
     if (await isPathWithin(root, ownedRoot)) fail('Installation paths overlap the source checkout');
   }
   await safeLayout(target, locations);
-  const old = await loadReceipt(locations, target, platform);
+  const old = await loadReceipt(locations, target, platform, scope);
   const previous = old.receipt?.entries ?? [];
   const conflicts = [];
   if (await stat(locations.lock)) conflicts.push('Target is locked; inspect the interrupted/running operation before retrying');
@@ -163,7 +163,7 @@ export async function planInstallation(root, options) {
       if (consumers.length) desired.set(entry.id, { ...entry, consumers });
     }
     for (const consumer of [...requested].sort()) {
-      for (const capability of selection(catalog, [consumer], platform).capabilities) {
+      for (const capability of selection(catalog, [consumer], platform, scope).capabilities) {
         const rendered = await renderPayload(root, capability, platform);
         const existing = desired.get(capability.id);
         const consumers = [...new Set([...(existing?.consumers ?? []), consumer])].sort();
@@ -177,7 +177,7 @@ export async function planInstallation(root, options) {
     }
   }
   const entries = [...desired.values()].sort((a, b) => a.id.localeCompare(b.id));
-  const nextReceipt = sealReceipt({ version: 2, target, platform, scope: 'machine', profile: 'coexistence', selected: nextSelected,
+  const nextReceipt = sealReceipt({ version: 2, target, platform, scope, profile: 'coexistence', selected: nextSelected,
     entries: entries.map(({ id, hash, consumers }) => ({ id, hash, consumers })) });
   const changes = [];
   for (const id of [...new Set([...previous.map((entry) => entry.id), ...desired.keys()])].sort()) {
@@ -204,7 +204,7 @@ export async function planInstallation(root, options) {
     installed: old.receipt !== null && previous.length > 0,
     selected: [...nextSelected], entries: structuredClone(nextReceipt.entries), changes: operation === 'audit' ? [] : changes,
     receiptChanged, receiptPath: locations.receipt, evidence, conflicts, applicable: conflicts.length === 0, tools: [],
-    activation: 'Discovery only; no hooks, settings, processes or network activation',
+    activation: `${scope === 'project' ? 'Project' : 'Machine'} discovery only; no hooks, settings, processes or network activation`,
     retainedPayloads: 'Immutable payload revisions are retained on update/removal; no recursive garbage collection' };
   receipts.set(plan, { root, options: { ...options, ids: [...requested], target }, locations, old, nextReceipt, entries,
     fingerprint: encode({ old, states, ownedHashes, plan, parents: await parentIdentity(target, locations) }) });
@@ -259,7 +259,7 @@ export async function applyInstallation(candidate, { checkpoint = async () => {}
     await checkpoint('staged');
     await verifyReceiptEvidence(plan.target, locations.store, prepared.nextReceipt);
     await safeLayout(plan.target, locations);
-    const receiptNow = await loadReceipt(locations, plan.target, plan.platform);
+    const receiptNow = await loadReceipt(locations, plan.target, plan.platform, plan.scope);
     if (!same(receiptNow, prepared.old)) fail('Receipt changed before publication');
     for (const entry of prepared.old.receipt?.entries ?? []) {
       const payload = payloadPath(locations, entry);
@@ -303,7 +303,7 @@ export async function applyInstallation(candidate, { checkpoint = async () => {}
       if (!same(await linkState(path.join(locations.discovery, entry.id)), { link: expected })
         || payloadHash(await treeFiles(expected)) !== entry.hash) fail('Installed state changed before receipt publication');
     }
-    if (!same(await loadReceipt(locations, plan.target, plan.platform), prepared.old)) fail('Receipt changed while publishing');
+    if (!same(await loadReceipt(locations, plan.target, plan.platform, plan.scope), prepared.old)) fail('Receipt changed while publishing');
     const publication = path.join(staging, 'receipt-publication');
     await fs.mkdir(publication, { mode: 0o700 });
     const ownershipBefore = prepared.old.receipt ? ownershipHeadBytes(prepared.old.receipt.evidence) : null;

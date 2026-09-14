@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { planInstallation, applyInstallation } from '../scripts/selection-installation.mjs';
+import { planProjectInstallation, applyProjectInstallation } from '../scripts/project-installation.mjs';
 import { renderSkill, parseSkill } from '../scripts/skill-lib.mjs';
 import { snapshot } from './helpers/filesystem-snapshot.mjs';
 
@@ -24,8 +25,9 @@ async function fixture(body) {
     const plan = (ids, extra) => planInstallation(repository, options(ids, extra));
     const apply = async (ids, extra, hooks) => applyInstallation(await plan(ids, extra), hooks);
     const discovery = (id, platform = 'codex') => path.join(target, platform === 'codex' ? '.agents' : '.claude', 'skills', id);
-    const receiptFile = (platform = 'codex') => path.join(target, '.ai-harness/installations', platform, 'receipt.json');
-    const receipt = async (platform) => JSON.parse(await fs.readFile(receiptFile(platform), 'utf8'));
+    const receiptFile = (platform = 'codex', scope = 'machine') => path.join(target,
+      scope === 'project' ? '.harness' : '.ai-harness', 'installations', platform, 'receipt.json');
+    const receipt = async (platform, scope) => JSON.parse(await fs.readFile(receiptFile(platform, scope), 'utf8'));
     await body({ temporary, repository, target, options, plan, apply, discovery, receiptFile, receipt });
   } finally { await fs.rm(temporary, { recursive: true, force: true }); }
 }
@@ -67,6 +69,60 @@ test('selective lifecycle on each platform preserves unrelated state, repeats wi
     assert.equal((await f.apply(['research'], { platform, operation: 'remove' })).noOp, true);
   });
 });
+
+test('project-scoped skills coexist with project configuration and never write machine state', async () => fixture(async (f) => {
+  const machine = path.join(f.temporary, 'machine');
+  await fs.mkdir(machine);
+  await fs.mkdir(path.join(f.target, 'scripts'), { recursive: true });
+  await fs.writeFile(path.join(f.target, 'scripts/verify.mjs'), "console.log('Project verifier ran');\n");
+  await fs.mkdir(path.join(f.target, '.harness/skills/team/local-sample'), { recursive: true });
+  await fs.writeFile(path.join(f.target, '.harness/skills/team/local-sample/SKILL.md'),
+    '---\nname: local-sample\ndescription: Project-owned sample\n---\n\nKeep this local skill.\n');
+  const projectConfiguration = { operation: 'apply', platform: 'codex', scope: 'project', target: f.target };
+  await applyProjectInstallation(await planProjectInstallation(f.repository, projectConfiguration));
+  const machineBefore = await snapshot(machine);
+  const localBefore = await fs.readFile(path.join(f.discovery('local-sample'), 'SKILL.md'), 'utf8');
+
+  const preview = await f.plan(['research'], { scope: 'project' });
+  assert.equal(preview.applicable, true, preview.conflicts.join('; '));
+  assert.equal(preview.scope, 'project');
+  assert.equal(path.relative(preview.target, preview.receiptPath), '.harness/installations/codex/receipt.json');
+  await applyInstallation(preview);
+  const installed = await fs.realpath(f.discovery('research'));
+  assert.ok(installed.startsWith(path.join(await fs.realpath(f.target), '.harness/installations/codex/payloads')));
+  assert.deepEqual((await f.receipt('codex', 'project')).selected, ['research']);
+  assert.equal(await fs.readFile(path.join(f.discovery('local-sample'), 'SKILL.md'), 'utf8'), localBefore);
+  assert.equal((await planProjectInstallation(f.repository, { ...projectConfiguration, operation: 'audit' })).applicable, true);
+  assert.equal((await applyProjectInstallation(await planProjectInstallation(f.repository, projectConfiguration))).noOp, true);
+
+  await fs.appendFile(path.join(f.repository, 'skills/engineering/research/SKILL.md'), '\nProject-scope update.\n');
+  assert.equal((await f.apply(['research'], { scope: 'project' })).noOp, false);
+  assert.match(await fs.readFile(path.join(f.discovery('research'), 'SKILL.md'), 'utf8'), /Project-scope update/);
+  assert.equal((await f.plan([], { scope: 'project', operation: 'audit' })).applicable, true);
+
+  await applyProjectInstallation(await planProjectInstallation(f.repository, { ...projectConfiguration, operation: 'remove' }));
+  await assert.rejects(fs.readFile(path.join(f.discovery('local-sample'), 'SKILL.md')), { code: 'ENOENT' });
+  assert.match(await fs.readFile(path.join(f.discovery('research'), 'SKILL.md'), 'utf8'), /Project-scope update/);
+  await f.apply(['research'], { scope: 'project', operation: 'remove' });
+  await assert.rejects(fs.lstat(f.discovery('research')), { code: 'ENOENT' });
+  assert.deepEqual(await snapshot(machine), machineBefore);
+}));
+
+test('project-scoped selection preserves an M4 adapter with the same capability name', async () => fixture(async (f) => {
+  await fs.mkdir(path.join(f.target, 'scripts'), { recursive: true });
+  await fs.writeFile(path.join(f.target, 'scripts/verify.mjs'), "console.log('Project verifier ran');\n");
+  await fs.mkdir(path.join(f.target, '.harness/skills/team/research'), { recursive: true });
+  await fs.writeFile(path.join(f.target, '.harness/skills/team/research/SKILL.md'),
+    '---\nname: research\ndescription: Borrowed project implementation\n---\n\nKeep this project adapter.\n');
+  await applyProjectInstallation(await planProjectInstallation(f.repository,
+    { operation: 'apply', platform: 'codex', scope: 'project', target: f.target }));
+  const before = await snapshot(f.target);
+  const plan = await f.plan(['research'], { scope: 'project' });
+  assert.equal(plan.applicable, false);
+  assert.match(plan.conflicts.join(' '), /unowned discovery collision/);
+  await assert.rejects(applyInstallation(plan));
+  assert.deepEqual(await snapshot(f.target), before);
+}));
 
 test('update publishes a new revision and preserves the other platform and selection', async () => fixture(async (f) => {
   await f.apply(['research', 'tdd']);
@@ -250,7 +306,7 @@ test('CLI defaults to a read-only preview, uses explicit scope/target and needs 
     assert.deepEqual(await snapshot(f.target), before);
   }
   for (const args of [['apply', '--select', 'implement', ...common], ['apply', '--select', 'research', '--apply'],
-    ['apply', '--module', 'skills', ...common], ['apply', '--select', 'research', ...common, '--scope', 'project'],
+    ['apply', '--module', 'skills', ...common],
     ['audit', '--select', 'research', ...common], ['audit', ...common, '--apply']]) {
     assert.notEqual(run(...args).status, 0);
   }
@@ -260,6 +316,13 @@ test('CLI defaults to a read-only preview, uses explicit scope/target and needs 
   assert.equal(JSON.parse(applied.stdout).applied, true);
   assert.equal(run('audit', ...common).status, 0);
   assert.equal(run('remove', '--select', 'research', ...common, '--apply').status, 0);
+  const projectTarget = path.join(f.temporary, 'project');
+  await fs.mkdir(projectTarget);
+  const project = ['--platform', 'codex', '--scope', 'project', '--target', projectTarget, '--json'];
+  assert.equal(run('apply', '--select', 'research', ...project).status, 0);
+  assert.equal(run('apply', '--select', 'research', ...project, '--apply').status, 0);
+  assert.equal(run('audit', ...project).status, 0);
+  assert.equal(run('remove', '--select', 'research', ...project, '--apply').status, 0);
 }));
 
 test('fresh missing targets, user-only metadata, resources and resource-only updates work without source runtime links', async () => fixture(async (f) => {

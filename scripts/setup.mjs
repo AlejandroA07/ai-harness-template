@@ -11,14 +11,14 @@ const usage = `Usage:
   node scripts/setup.mjs plan --select <id> [--select <id> ...] --platform <claude|codex|both> --scope <machine|project> [--json]
   node scripts/setup.mjs plan --module <skills|workflows> --platform <claude|codex|both> --scope <machine|project> [--json]
 
-  node scripts/setup.mjs <apply|remove> --select <skill> --platform <claude|codex> --scope machine --target <absolute-home-path> [--apply] [--json]
-  node scripts/setup.mjs audit --platform <claude|codex> --scope machine --target <absolute-home-path> [--json]
+  node scripts/setup.mjs <apply|remove> --select <skill> --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--apply] [--json]
+  node scripts/setup.mjs audit --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--json]
   node scripts/setup.mjs <plan|apply|audit|remove> --module global-configuration --platform <claude|codex> --scope machine --target <absolute-home-path> [--apply] [--json]
   node scripts/setup.mjs <plan|apply|audit|remove> --module project-configuration --platform <claude|codex> --scope project --target <absolute-project-path> [--apply] [--json]
     Plan/apply options: --verification <existing|generated> --ci <none|github> --tracker <local|github> --domain-layout <single|multi>
 
 Apply and remove preview by default; --apply performs the operation.
-Add --target to plan for read-only installation preflight. Machine Skills, Global configuration and Project configuration are supported.
+Add --target to plan for read-only installation preflight. Machine/project Skills, Global configuration and Project configuration are supported.
 Existing full-profile machine setup, bootstrap and audit commands are unchanged.`;
 
 function parseArgs(args) {
