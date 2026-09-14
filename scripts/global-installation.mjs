@@ -1,3 +1,4 @@
+import { sealReceipt, verifyReceiptEvidence, storeReceiptEvidence, planReceiptEvidence, verifyOwnershipHead, ownershipHeadBytes } from './installation-evidence.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { isDeepStrictEqual as equal } from 'node:util';
@@ -55,9 +56,9 @@ async function sourceBundle(root) {
   return { files, hash: payloadHash(files), denials };
 }
 function validateReceipt(receipt, { target, platform }) {
-  shape(receipt, ['version', 'target', 'platform', 'module', 'profile', 'runtime', 'guidanceHash', 'scalars', 'addedDenials', 'hookOwned',
+  shape(receipt, ['version', 'evidence', 'target', 'platform', 'module', 'profile', 'runtime', 'guidanceHash', 'scalars', 'addedDenials', 'hookOwned',
     'createdContainers', 'settingsExisted', 'hookArrayExisted', 'denyArrayExisted', 'configExisted', 'features', 'createdFeatureTable']);
-  if (receipt.version !== 1 || receipt.target !== target || receipt.platform !== platform || receipt.module !== 'global-configuration'
+  if (receipt.version !== 2 || receipt.target !== target || receipt.platform !== platform || receipt.module !== 'global-configuration'
     || receipt.profile !== 'coexistence' || !hashPattern.test(receipt.runtime) || !hashPattern.test(receipt.guidanceHash)) fail('Global receipt identity mismatch');
   for (const key of ['hookOwned', 'settingsExisted', 'hookArrayExisted', 'denyArrayExisted', 'configExisted', 'createdFeatureTable']) {
     if (typeof receipt[key] !== 'boolean') fail('Invalid global receipt flag');
@@ -112,22 +113,25 @@ export async function planGlobalInstallation(repository, options) {
     guidance: path.join(platformRoot, platform === 'codex' ? 'AGENTS.md' : 'CLAUDE.md'),
     settings: path.join(platformRoot, platform === 'codex' ? 'hooks.json' : 'settings.json'), config: path.join(platformRoot, 'config.toml') };
   locations.receipt = path.join(locations.store, 'global.json');
+  locations.ownership = path.join(locations.store, 'global-current.json');
   locations.lock = path.join(target, '.ai-harness-install.lock');
   for (const owned of [locations.store, locations.runtimes, platformRoot]) {
     if (await isPathWithin(root, owned)) fail('Global installation overlaps the source checkout');
   }
   await safePaths(target, locations);
-  const bundle = await sourceBundle(root);
+  const bundle = operation === 'apply' ? await sourceBundle(root) : { files: {}, hash: null, denials: [] };
   const input = { guidance: await optionalFile(locations.guidance), settings: await optionalFile(locations.settings),
     receipt: await optionalFile(locations.receipt), config: platform === 'codex' ? await optionalFile(locations.config) : null };
   let previous = null;
   if (input.receipt !== null) {
     try { previous = JSON.parse(input.receipt.toString('utf8')); } catch { fail('Malformed global installation receipt'); }
+    await verifyReceiptEvidence(target, locations.store, previous);
     validateReceipt(previous, { target, platform, denials: bundle.denials });
   }
+  input.ownership = await verifyOwnershipHead(target, locations.ownership, previous?.evidence ?? null);
   const conflicts = [];
   if (await stat(locations.lock)) conflicts.push('Target is locked; inspect the running or interrupted operation');
-  const runtime = path.join(locations.runtimes, bundle.hash);
+  const runtime = bundle.hash ? path.join(locations.runtimes, bundle.hash) : null;
   const previousRuntime = previous ? path.join(locations.runtimes, previous.runtime) : null;
   let ownedFiles = null;
   let previousPolicy = null;
@@ -155,7 +159,8 @@ export async function planGlobalInstallation(repository, options) {
   const settings = parseSettings(input.settings);
   const modified = structuredClone(settings);
   const groups = hookGroups(settings);
-  const expected = hook(platform, runtime);
+  if (settings.disableAllHooks === true && operation !== 'remove') conflicts.push('hooks: all hooks are disabled; reconcile the local setting before activation');
+  const expected = hook(platform, runtime ?? previousRuntime ?? locations.runtimes, operation === 'apply' ? process.execPath : previousPolicy?.executable ?? process.execPath);
   const oldHook = previous ? hook(platform, previousRuntime, previousPolicy?.executable ?? process.execPath) : null;
   if (previous && hookCount(groups, oldHook) !== 1) conflicts.push('hooks: owned or required hook is missing, duplicated or edited');
   // A known checkout hook is migration evidence, not permission to remove it.
@@ -164,8 +169,8 @@ export async function planGlobalInstallation(repository, options) {
     if (groups.some((group) => group.hooks.some((entry) => legacyCommands.includes(entry.command)))) conflicts.push('hooks: legacy checkout hook requires a reviewed migration');
   }
   const features = platform === 'codex' ? inspectFeatures(input.config?.toString('utf8') ?? '') : null;
-  const receipt = previous ? structuredClone(previous) : { version: 1, target, platform, module: 'global-configuration', profile: 'coexistence',
-    runtime: bundle.hash, guidanceHash: digest(bundle.files[`guidance/${platform}.md`]), scalars: {}, addedDenials: [],
+  const receipt = previous ? structuredClone(previous) : { version: 2, target, platform, module: 'global-configuration', profile: 'coexistence',
+    runtime: bundle.hash, guidanceHash: operation === 'apply' ? digest(bundle.files[`guidance/${platform}.md`]) : null, scalars: {}, addedDenials: [],
     hookOwned: hookCount(groups, expected) === 0, createdContainers: containerNames.filter((name) => !Object.hasOwn(settings, name)),
     settingsExisted: input.settings !== null, hookArrayExisted: getSetting(settings, ['hooks', 'PreToolUse']).present,
     denyArrayExisted: platform === 'claude' && getSetting(settings, ['permissions', 'deny']).present,
@@ -216,22 +221,24 @@ export async function planGlobalInstallation(repository, options) {
     config = operation === 'remove' && !previous.configExisted && !updated.trim() ? null : Buffer.from(updated);
   }
   const outputSettings = equal(settings, modified) ? input.settings : (operation === 'remove' && !previous.settingsExisted && !Object.keys(modified).length ? null : Buffer.from(encode(modified)));
+  const sealedReceipt = sealReceipt(receipt);
   const after = operation === 'audit' || (operation === 'remove' && !previous) ? input : {
     guidance: operation === 'apply' ? bundle.files[`guidance/${platform}.md`] : null,
-    settings: outputSettings, config, receipt: operation === 'apply' ? Buffer.from(encode(receipt)) : null };
-  const operations = ['guidance', 'settings', ...(platform === 'codex' ? ['config'] : []), 'receipt']
+    settings: outputSettings, config, ownership: operation === 'apply' ? ownershipHeadBytes(sealedReceipt.evidence) : null, receipt: operation === 'apply' ? Buffer.from(encode(sealedReceipt)) : null };
+  const operations = ['guidance', 'settings', ...(platform === 'codex' ? ['config'] : []), 'ownership', 'receipt']
     .filter((id) => !bytesEqual(input[id], after[id])).map((id) => ({ id, file: locations[id], before: input[id], after: after[id], receipt: id === 'receipt' }));
+  const evidence = operation === 'apply' ? await planReceiptEvidence(target, locations.store, sealedReceipt) : null;
   const plan = { version: 1, stage: 'target-preflight', operation, target, platform, scope, module: 'global-configuration', profile: 'coexistence',
     installed: previous !== null, selected: ['global-configuration'], dependencies: ['shared-policy-runtime'],
     changes: operations.map(({ id, file, before, after }) => ({ id, path: file, action: after === null ? 'remove' : before === null ? 'create' : 'update' })),
-    receiptChanged: operations.some((entry) => entry.receipt), applicable: conflicts.length === 0, conflicts,
-    activation: operation === 'remove' ? 'Removal restores prior owned settings; shared runtime is retained.'
+    receiptChanged: operations.some((entry) => entry.receipt), evidence, applicable: conflicts.length === 0, conflicts,
+    activation: settings.disableAllHooks === true && operation !== 'remove' ? 'Guard activation is blocked: local settings disable all hooks.' : operation === 'remove' ? 'Removal restores prior owned settings; shared runtime is retained.'
       : operation === 'audit' && !previous ? 'No global installation receipt is present.'
         : platform === 'codex' ? 'Configuration enables hooks and disables memories; review/trust through /hooks remains interactive.' : 'Configuration enables the PreToolUse guard and disables automatic memory.',
     tools: [process.execPath, 'git (when checking push commands)'], runtime: operation === 'apply' ? runtime : previousRuntime,
     retainedRuntime: 'Shared immutable runtime revisions are retained on removal.' };
   const parentState = await parents(target, locations);
-  plans.set(plan, { root: path.resolve(repository), options: { operation, target, platform, scope }, locations, bundle, previous, receipt, operations, input,
+  plans.set(plan, { root: path.resolve(repository), options: { operation, target, platform, scope }, locations, bundle, previous, receipt: sealedReceipt, operations, input,
     fingerprint: encode({ plan, input: Object.fromEntries(Object.entries(input).map(([key, bytes]) => [key, bytes === null ? null : digest(bytes)])),
       source: bundle.hash, owned: ownedFiles ? payloadHash(ownedFiles) : null, parents: parentState }) });
   return plan;
@@ -277,6 +284,7 @@ export async function applyGlobalInstallation(candidate, { checkpoint = async ()
         await fs.rename(payload, destination);
       } else if (payloadHash(await treeFiles(destination)) !== prepared.bundle.hash) fail('Runtime changed before publication');
     }
+    if (plan.operation === 'apply') await storeReceiptEvidence(plan.target, prepared.locations.store, staging, prepared.receipt);
     const journal = { version: 1, previousReceipt: prepared.previous, nextReceipt: plan.operation === 'remove' ? null : prepared.receipt,
       changes: prepared.operations.map(({ id, before, after }) => ({ id, before: before === null ? null : digest(before), after: after === null ? null : digest(after) })) };
     await fs.mkdir(path.dirname(prepared.locations.guidance), { recursive: true, mode: 0o700 });
@@ -285,6 +293,8 @@ export async function applyGlobalInstallation(candidate, { checkpoint = async ()
     await publishFiles({ target: plan.target, staging, operations: prepared.operations, journal, checkpoint: async (phase, id) => {
       if (id) observed[id] = prepared.operations.find((operation) => operation.id === id).after;
       await checkpoint(phase, id);
+      if (prepared.previous) await verifyReceiptEvidence(plan.target, prepared.locations.store, prepared.previous);
+      if (plan.operation === 'apply') await verifyReceiptEvidence(plan.target, prepared.locations.store, prepared.receipt);
       await safePaths(plan.target, prepared.locations);
       const currentParents = await parents(plan.target, prepared.locations);
       for (const [directory, identity] of Object.entries(parentState)) {

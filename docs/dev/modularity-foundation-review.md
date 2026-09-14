@@ -1,6 +1,8 @@
 # M0–M3 foundation review, 2026-09-13
 
-**Decision:** retain the five-module architecture and M0–M8 sequence, but repair
+**Historical findings:** these findings motivated the [implemented repair record](modularity-foundation-follow-up-plan.md#implementation-record). The reproductions below describe the review baseline.
+
+**Decision at review:** retain the five-module architecture and M0–M8 sequence, but repair
 M2/M3 before starting M5. Passing the current gate does not cover the semantic
 ownership cases reproduced below. This review changes documentation only.
 

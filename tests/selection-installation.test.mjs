@@ -217,7 +217,7 @@ test('publication failures restore previous discoveries and receipt; the target 
       assert.equal(competing.applicable, false);
       await assert.rejects(applyInstallation(competing), /locked/);
       throw new Error('Injected publication failure');
-    } }), /Injected publication failure.*rolled back/);
+    } }), /(?:Injected publication failure|Publication failed).*rolled back/);
     assert.equal(await fs.readFile(f.receiptFile(), 'utf8'), previousReceipt);
     assert.equal(await fs.realpath(f.discovery('research')), previousLink);
     await assert.rejects(fs.lstat(f.discovery('tdd')), { code: 'ENOENT' });
@@ -360,4 +360,53 @@ test('a discovery replaced at the rename boundary is restored instead of deleted
   assert.equal(injected, true);
   assert.equal(await fs.readFile(path.join(f.discovery('research'), 'notes.md'), 'utf8'), 'Racing user content');
   assert.equal(await fs.readFile(f.receiptFile(), 'utf8'), previous);
+}));
+
+
+test('historical ownership rejects semantic consumer edits', async () => fixture(async (f) => {
+  const file = path.join(f.repository, 'catalog/modules.json');
+  const catalog = JSON.parse(await fs.readFile(file));
+  for (const id of ['research', 'grilling']) catalog.capabilities.find((entry) => entry.id === id).requires = ['security-checklist'];
+  await fs.writeFile(file, JSON.stringify(catalog));
+  await f.apply(['research', 'grilling']);
+  const receipt = await f.receipt();
+  receipt.entries.find((entry) => entry.id === 'security-checklist').consumers = ['research'];
+  await fs.writeFile(f.receiptFile(), JSON.stringify(receipt));
+  const before = await snapshot(f.target);
+  await assert.rejects(f.plan([], { operation: 'audit' }));
+  await assert.rejects(f.apply(['research'], { operation: 'remove' }));
+  assert.deepEqual(await snapshot(f.target), before);
+}));
+
+test('historical skill removal and CLI audit survive retired catalog and invalid drafts', async () => fixture(async (f) => {
+  await f.apply(['research']);
+  const catalogFile = path.join(f.repository, 'catalog/modules.json');
+  const catalog = JSON.parse(await fs.readFile(catalogFile));
+  catalog.capabilities.find((entry) => entry.id === 'research').scopes = ['project'];
+  await fs.writeFile(catalogFile, JSON.stringify(catalog));
+  assert.equal((await f.plan(['research'], { operation: 'remove' })).applicable, true);
+  await fs.writeFile(path.join(f.repository, 'catalog/modules.json'), 'Invalid draft');
+  assert.equal((await f.plan([], { operation: 'audit' })).applicable, true);
+  const cli = spawnSync(process.execPath, [path.join(f.repository, 'scripts/setup.mjs'), 'audit', '--target', f.target, '--scope', 'machine', '--platform', 'codex'], { encoding: 'utf8' });
+  assert.equal(cli.status, 0, cli.stderr);
+  await f.apply(['research'], { operation: 'remove' });
+  await assert.rejects(fs.lstat(f.discovery('research')), { code: 'ENOENT' });
+}));
+
+
+test('replaying a historical skill receipt cannot retire a current shared dependency', async () => fixture(async (f) => {
+  const file = path.join(f.repository, 'catalog/modules.json');
+  const catalog = JSON.parse(await fs.readFile(file));
+  for (const id of ['research', 'grilling']) catalog.capabilities.find((entry) => entry.id === id).requires = ['security-checklist'];
+  await fs.writeFile(file, JSON.stringify(catalog));
+  await f.apply(['research']);
+  const historical = await fs.readFile(f.receiptFile());
+  await f.apply(['grilling']);
+  await fs.writeFile(f.receiptFile(), historical);
+  const before = await snapshot(f.target);
+  await assert.rejects(f.plan([], { operation: 'audit' }), /Current ownership/);
+  await assert.rejects(f.apply(['research']), /Current ownership/);
+  await assert.rejects(f.apply(['research'], { operation: 'remove' }), /Current ownership/);
+  assert.deepEqual(await snapshot(f.target), before);
+  assert.ok(await fs.readFile(path.join(f.discovery('security-checklist'), 'SKILL.md')));
 }));

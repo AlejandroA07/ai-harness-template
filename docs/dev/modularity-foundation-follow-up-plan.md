@@ -1,6 +1,6 @@
 # Foundation repairs before M5
 
-- **Status:** proposed implementation work; review complete, fixes not started.
+- **Status:** R1–R4 implemented; local verification recorded below. R5 Windows CI is configured; actual remote and live-platform evidence remains pending.
 - **Baseline:** `7599479622a4d7235f2dcc0a3b44df2c8000ad1b`.
 - **Evidence:** [M0–M3 review](modularity-foundation-review.md).
 - **Scope:** repair the delivered lifecycle contracts; preserve five public
@@ -101,3 +101,38 @@ broader integration acquisition in M6 and the architecture view in M7. Payload
 cleanup/retention tooling can follow once recovery is stable; do not add automatic
 garbage collection during these ownership repairs. No folder reorganization or
 general installer framework is needed to address the confirmed defects.
+
+
+## Implementation record
+
+- R1: M2/M3 version 2 metadata evidence and M4 version 3 payload evidence are validated for audit/apply/remove and
+  publication. Independent current-revision records publish and roll back with
+  receipts; replaying valid older receipts is rejected on all three lifecycles.
+  Semantic receipt mutations and altered/missing evidence have
+  registered regression coverage. Read-only `assess-receipt-migration.mjs` and
+  [reviewed recovery guidance](receipt-migration.md) cover old schemas, refusal of
+  uncertain ownership, private backups and a known-baseline recovery rehearsal.
+- R2: machine audit/removal no longer loads the current catalog or global source
+  templates; historical IDs and consumers retain strict stored-evidence checks.
+  The setup CLI dispatches target operations without unconditional catalog loading.
+- R3: local disabled-hook settings block M3 apply/audit readiness and remain
+  preserved; removal stays available. Reports distinguish this blocker from trust.
+- R4: the main plan assigns canonical project Skills to M5a, followed by workflow
+  composition at both scopes in M5b, with explicit M4 coexistence acceptance.
+- R5: a Windows Node 22 CI job runs portable process and lifecycle suites. Its
+  actual result and the exact revision's CodeQL result require a future remote run;
+  no live platform activation or Windows execution is claimed from this host.
+
+Security checklist: access/identity, input/output, filesystem boundaries and
+regression evidence pass for the tested explicit local target. Network/browser
+controls are not applicable. No dependencies were added; CI reuses pinned actions
+with read-only permissions. Same-authority replacement of all evidence remains
+outside the integrity guarantee, and old ambiguous state is never auto-adopted.
+
+Local verification: `node scripts/verify.mjs` exited 0 with 157 tests, 155 passed
+and two Windows-only skips, followed by whitespace, Gitleaks, Zizmor and syntax
+checks. All lifecycle and recovery experiments used isolated temporary targets.
+
+Final bounded standards and specification reviews found no remaining actionable
+findings. Seven replay/rollback cases were independently rerun and passed across
+M2, M3 and M4. Final verification was completed on 2026-09-14.

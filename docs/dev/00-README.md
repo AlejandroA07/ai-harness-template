@@ -8,6 +8,7 @@ Current state: skill reconciliation handles filesystem aliases when classifying 
 | `harness-modularity-plan.md` | Agreed five-module direction: global configuration, project configuration, separate skills and workflows, and tool integrations; selective setup and architecture catalog plan. | implementation plan |
 | `modularity-m2-installation.md` | Selective machine-skill commands, store and receipt ownership, update/removal, recovery and acceptance evidence. | implementation contract |
 | `modularity-foundation-review.md` | M0–M3 completion review, reproduced ownership/removal/activation defects and M4 receipt compatibility explanation. | source review |
+| `receipt-migration.md` | Read-only receipt assessment and reviewed recovery without trusting older ownership claims. | recovery procedure |
 | `modularity-foundation-follow-up-plan.md` | Prioritized foundation repairs and acceptance checks required before M5. | implementation plan |
 | `harness-modularity-review.md` | Whole-repository ownership map, proposed classification of 22 capabilities, migration blockers R1–R10, and evidence supporting the implementation sequence. | source review |
 | `graph-and-quality-adoption-roadmap.md` | Living eight-step checklist for learning, evaluations, project-local quality gates, and later harness decisions. | living roadmap |

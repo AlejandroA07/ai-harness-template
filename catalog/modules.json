@@ -114,6 +114,8 @@
         "scripts/catalog-loader.mjs",
         "scripts/setup.mjs",
         "scripts/installation-core.mjs",
+        "scripts/installation-evidence.mjs",
+        "scripts/assess-receipt-migration.mjs",
         "scripts/selection-installation.mjs",
         "scripts/machine-setup.mjs",
         "scripts/config-merge.mjs",

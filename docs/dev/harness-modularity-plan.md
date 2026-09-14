@@ -4,16 +4,26 @@
 - **Scope:** repository organization, selective installation, and a readable architecture map
 - **Graphify decision:** adopt with all capabilities in Tool integrations, available across projects and invoked by the user. Watchers, Git hooks, semantic document processing, and MCP are supported configuration choices; availability does not automatically activate them everywhere.
 - **Review baseline:** `a31e26aa1a9d6fdec2f61ca33c50ba32187b307c`; see the [whole-repository review](harness-modularity-review.md) for the ownership map, 22-capability classification, and findings R1–R10.
-- **Current delivery:** M0 safety corrections and isolated fixtures complete; see [M0 evidence and limits](modularity-m0-safety.md). M1 catalog and read-only planning are complete; see [M1 contract and evidence](modularity-m1-catalog.md). M2 selective machine-skill installation is complete; see [M2 lifecycle and evidence](modularity-m2-installation.md). M3 selected global configuration is complete; see [M3 ownership, recovery and activation limits](modularity-m3-global-configuration.md). M4 selected project configuration is complete; see [M4 lifecycle, verification and limits](modularity-m4-project-configuration.md). The M0–M3 review found outstanding M2/M3 lifecycle defects; complete the [foundation repair plan](modularity-foundation-follow-up-plan.md) before M5 workflows. The detailed contract and slices below supersede the earlier high-level sequence wherever more specific.
+- **Current delivery:** M0 safety corrections and isolated fixtures complete; see [M0 evidence and limits](modularity-m0-safety.md). M1 catalog and read-only planning are complete; see [M1 contract and evidence](modularity-m1-catalog.md). M2 selective machine-skill installation is complete; see [M2 lifecycle and evidence](modularity-m2-installation.md). M3 selected global configuration is complete; see [M3 ownership, recovery and activation limits](modularity-m3-global-configuration.md). M4 selected project configuration is complete; see [M4 lifecycle, verification and limits](modularity-m4-project-configuration.md). The M0–M3 review led to [foundation repairs](modularity-foundation-follow-up-plan.md): verified ownership metadata, historical removal and truthful activation reporting. M5 follows the repaired lifecycle gate. The detailed contract and slices below supersede the earlier high-level sequence wherever more specific.
 
 ## Review gate before M5
 
-The [2026-09-13 foundation review](modularity-foundation-review.md) confirms the
-bounded M0/M1 scope but reopens M2/M3 ownership, historical-removal and activation
-acceptance. Implementation and a passing local gate do not establish that these
-new cases pass. Resolve R1–R4 in the follow-up plan before M5; retain its R5
-platform/remote verification requirements before release or real installation.
-The five-module direction and later M6–M8 work remain unchanged.
+The [2026-09-13 foundation review](modularity-foundation-review.md) reopened
+M2/M3 acceptance cases. The [repair record](modularity-foundation-follow-up-plan.md)
+tracks their implementation and verification. Receipt-only semantic edits must
+fail audit/apply/remove; historical removal must survive catalog changes; known
+local activation blockers must be reported. Receipt format changes require a
+read-only assessment and a tested reviewed recovery procedure. Windows CI and
+exact-revision remote checks remain separate release evidence.
+
+M5 is explicitly split into M5a canonical project-scoped Skills installation and
+M5b workflow composition at both supported scopes. M5a must define coexistence with
+M4 project-local adapters, borrowed files, shared consumers and receipt ownership
+before writing those discovery paths. Its acceptance includes installing one
+catalog skill into a project without machine changes, update/remove/audit, and
+preserving project-local skills and other consumers. M5b uses that lifecycle for
+workflow dependencies, retains optional routes and preserves invocation metadata.
+Neither sub-slice may present catalog-supported scope as already installed.
 
 ## Recommended order
 
@@ -172,7 +182,7 @@ Each slice must leave the repository gate green and produce a reviewable local c
 | M2 | First complete selective installation: one capability for one platform, staging/store, receipts, update/remove, and matching audit. R1–R3. | M1 | Single-skill lifecycle works in an isolated target; unrelated content preserved; repeat apply is a no-op; another selection remains usable after regeneration/removal |
 | M3 | Global-only selected-platform setup through the same lifecycle core; guards and settings migration. R1/R4/R5. | M2 | Codex-only does not require/mutate Claude; exact owned hook replacement; shared policy retained; legacy configuration conflicts and failure recovery tested |
 | M4 | Project-only setup, verification/CI options, domain/tracker contracts and project adapters with owned lifecycle. R3/R5/R7. | M2 | No machine writes; existing project verifier/settings preserved; shipped runtime self-contained; generated adapter drift checked by the selected gate; CI dependencies complete |
-| M5 | Workflow installation and conditional requirements; router lists installed/available capabilities accurately. | M2 | Implementation workflow obtains required skills; routes stay optional; one discovery entry per ID; invocation metadata unchanged; missing project contracts use the documented fallback or explain prerequisites |
+| M5 | M5a: canonical project-scoped Skills lifecycle coexisting with M4. M5b: workflows at machine/project scope with conditional requirements; router lists installed/available capabilities accurately. | M2 | Implementation workflow obtains required skills; routes stay optional; one discovery entry per ID; invocation metadata unchanged; missing project contracts use the documented fallback or explain prerequisites |
 | M6 | Generalized provenance/resource acquisition and existing integration adapters; add Graphify and then Archify using the shared module interface. R6/R8. | M3, M4, M5 | Pinned sources/resources validated; vendor scripts cannot silently take ownership of shared settings; all Graphify capabilities exposed; install/query/activation/removal tested independently; no automatic agent memory |
 | M7 | Logical architecture view and cost inventory generated from catalog/receipts; evaluate Graphify interchange. R9. | M3, M4, M5 | Global → platform → capability → source navigation; workflow/skill/tool edges visible; missing references fail validation; measured token data preserved; clearly distinguish planned, installed, and observed state |
 | M8 | Full-profile migration rehearsal, optional source-folder moves, documentation and compatibility cleanup. R1–R10. | M6, M7 | Legacy full profile migrates without loss; no stale path references or broken links; all selected profiles and repository verification pass |

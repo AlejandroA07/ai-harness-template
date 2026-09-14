@@ -84,7 +84,7 @@ try {
   if (options.help) console.log(usage);
   else {
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-    const catalog = await loadCatalog(root);
+    const catalog = options.target ? null : await loadCatalog(root);
     if (options.operation === 'list') {
       if (options.json) console.log(JSON.stringify(catalog, null, 2));
       else {
@@ -109,6 +109,7 @@ try {
       else {
         console.log(`${options.operation}: ${result.platform} / ${result.scope ?? 'machine'} / coexistence (${options.apply ? 'applied' : 'read-only'})`);
         for (const change of result.changes) console.log(`${change.action}: ${change.id}`);
+        if (result.evidence) console.log(`${result.evidence.action}: ${result.evidence.path}`);
         for (const conflict of result.conflicts) console.log(`Conflict: ${conflict}`);
         if (options.global || options.project) console.log(result.activation);
         for (const note of result.notes ?? []) console.log(note);

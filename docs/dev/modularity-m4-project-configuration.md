@@ -77,17 +77,19 @@ options, file hashes and scoped prior settings. One project receipt owns shared
 runtime/guidance once. Removing one platform preserves the other platform and
 shared files; the last removal retires unchanged owned shared files. This receipt
 contains relative project paths, so a checkout can move or be cloned with its
-runtime. Commit the receipt, ownership payloads and generated runtime/adapters with
+runtime. Commit the receipt, current-revision record, ownership payloads and generated runtime/adapters with
 project changes.
 
-Receipt version 2 points to a content-addressed snapshot under
+Receipt version 3 points to a content-addressed snapshot under
 `.harness/project-payloads/<hash>/`. The snapshot contains installer-produced owned
 files and a manifest of scoped ownership/prior states. Planning and the installed
 gate require the receipt to match this independently checked evidence. Editing a
 receipt alone cannot claim a preserved file or rewrite prior settings ownership.
-Missing or edited evidence blocks mutation. Version 1 receipts require reviewed
-migration: use the original installation's reviewed removal procedure, verify that
-user content is preserved, then install version 2. Do not manually change a receipt
+The separate `.harness/project-current.json` binds the active revision, preventing
+replay of older receipts. It is published and restored with the receipt.
+Missing or edited evidence blocks mutation. Version 1–2 receipts require the [read-only assessment and reviewed recovery
+procedure](receipt-migration.md). Preserve ambiguous content; do not use the old
+remover as a shortcut. Do not manually change a receipt
 version or reconstruct ownership from existing file hashes.
 
 Removal uses stored installed bytes and hook definitions; it does not regenerate
