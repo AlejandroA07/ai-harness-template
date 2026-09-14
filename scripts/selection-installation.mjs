@@ -27,8 +27,56 @@ function ids(value, known) {
 function selection(catalog, requested, context) {
   if (!requested.length) return { requested: [], capabilities: [] };
   const plan = planSelection(catalog, { ids: requested, modules: [], platforms: [context.platform], scope: context.scope });
-  if (plan.capabilities.some((entry) => entry.module !== 'skills')) fail('Selected Skills lifecycle does not install workflows');
+  if (plan.capabilities.some((entry) => !['skills', 'workflows'].includes(entry.module))) {
+    fail('Selected capability lifecycle supports Skills and Workflows only');
+  }
   return plan;
+}
+function availability(catalog, id, context, installed) {
+  if (installed.has(id)) return 'installed';
+  const capability = catalog.capabilities.find((entry) => entry.id === id);
+  return capability?.platforms.includes(context.platform) && capability.scopes.includes(context.scope)
+    ? 'available' : 'unavailable';
+}
+async function invocationPrerequisites(context, prerequisites) {
+  const output = [];
+  for (const description of prerequisites) {
+    const paths = context.scope === 'project'
+      ? [...description.matchAll(/\b(?:docs|scripts)\/[a-zA-Z0-9._/-]*[a-zA-Z0-9]/g)].map((match) => match[0])
+      : [];
+    const missing = [];
+    for (const relative of paths) {
+      const file = path.join(context.target, relative);
+      await assertSafeDirectory(context.target, path.dirname(file));
+      const info = await stat(file);
+      if (!info) missing.push(relative);
+      else if (info.isSymbolicLink() || !info.isFile() || info.nlink !== 1) fail('Unsafe project prerequisite contract');
+    }
+    output.push({ description, status: !paths.length ? 'at-invocation' : !missing.length ? 'configured'
+      : /\b(?:otherwise|fallback)\b/i.test(description) ? 'fallback' : 'missing', paths, missing });
+  }
+  return output;
+}
+async function lifecycleCapabilities(catalog, plan, context, current, planned) {
+  const output = [];
+  for (const capability of plan.capabilities) {
+    output.push({ id: capability.id, module: capability.module, reason: capability.reason,
+      currentStatus: availability(catalog, capability.id, context, current),
+      plannedStatus: availability(catalog, capability.id, context, planned),
+      requires: capability.requires.map((relationship) => ({ ...relationship,
+        currentStatus: availability(catalog, relationship.id, context, current),
+        plannedStatus: availability(catalog, relationship.id, context, planned) })),
+      conditionalUses: capability.conditionalUses.map((relationship) => ({ id: relationship.id, when: relationship.when,
+        provenance: relationship.provenance, optional: true,
+        currentStatus: availability(catalog, relationship.id, context, current),
+        plannedStatus: availability(catalog, relationship.id, context, planned) })),
+      routes: capability.routes.map((relationship) => ({ id: relationship.id, provenance: relationship.provenance, optional: true,
+        currentStatus: availability(catalog, relationship.id, context, current),
+        plannedStatus: availability(catalog, relationship.id, context, planned) })),
+      prerequisites: await invocationPrerequisites(context, capability.prerequisites),
+      activation: structuredClone(capability.activation), workflow: structuredClone(capability.workflow) });
+  }
+  return output;
 }
 function layout(context) {
   const { target, platform, scope } = context;
@@ -118,7 +166,7 @@ export async function planInstallation(root, options) {
     || !['machine', 'project'].includes(scope) || typeof suppliedTarget !== 'string' || !path.isAbsolute(suppliedTarget)) {
     fail('Lifecycle requires an absolute --target, one --platform and --scope machine or project');
   }
-  if (operation !== 'audit' && !requested.length) fail('Select at least one skill');
+  if (operation !== 'audit' && !requested.length) fail('Select at least one capability');
   if (operation === 'audit' && requested.length) fail('Audit inspects the whole platform receipt; omit --select');
   const unresolved = path.resolve(suppliedTarget);
   await assertSafeDirectory(unresolved, unresolved);
@@ -136,8 +184,8 @@ export async function planInstallation(root, options) {
   const context = { target, platform, scope };
   context.locations = layout(context);
   const catalog = operation === 'apply' ? await loadCatalog(root) : null;
-  if (operation === 'apply' && requested.length) selection(catalog, requested, context);
-  if (requested.some((id) => typeof id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(id))) fail('Unsafe skill selection');
+  const selectedPlan = operation === 'apply' ? selection(catalog, requested, context) : null;
+  if (requested.some((id) => typeof id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(id))) fail('Unsafe capability selection');
   const { locations } = context;
   for (const ownedRoot of [locations.store, locations.discovery, locations.lock]) {
     if (await isPathWithin(root, ownedRoot)) fail('Installation paths overlap the source checkout');
@@ -187,6 +235,8 @@ export async function planInstallation(root, options) {
     }
   }
   const entries = [...desired.values()].sort((a, b) => a.id.localeCompare(b.id));
+  const capabilities = selectedPlan ? await lifecycleCapabilities(catalog, selectedPlan, context,
+    new Set(previous.map((entry) => entry.id)), new Set(entries.map((entry) => entry.id))) : [];
   const nextReceipt = sealReceipt({ version: 2, target, platform, scope, profile: 'coexistence', selected: nextSelected,
     entries: entries.map(({ id, hash, consumers }) => ({ id, hash, consumers })) });
   const changes = [];
@@ -212,7 +262,8 @@ export async function planInstallation(root, options) {
   const evidence = receiptChanged ? await planReceiptEvidence(target, locations.store, nextReceipt) : null;
   const plan = { version: 1, stage: 'target-preflight', operation, target, platform, scope, profile: 'coexistence',
     installed: old.receipt !== null && previous.length > 0,
-    selected: [...nextSelected], entries: structuredClone(nextReceipt.entries), changes: operation === 'audit' ? [] : changes,
+    selected: [...nextSelected], entries: structuredClone(nextReceipt.entries), capabilities,
+    changes: operation === 'audit' ? [] : changes,
     receiptChanged, receiptPath: locations.receipt, evidence, conflicts, applicable: conflicts.length === 0, tools: [],
     activation: `${scope === 'project' ? 'Project' : 'Machine'} discovery only; no hooks, settings, processes or network activation`,
     retainedPayloads: 'Immutable payload revisions are retained on update/removal; no recursive garbage collection' };

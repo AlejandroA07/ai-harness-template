@@ -126,6 +126,102 @@ test('project-scoped selection preserves an M4 adapter with the same capability 
   assert.deepEqual(await snapshot(f.target), before);
 }));
 
+test('workflow lifecycle installs required skills once and preserves a direct dependency consumer', async () => {
+  for (const platform of ['codex', 'claude']) for (const scope of ['machine', 'project']) await fixture(async (f) => {
+    await f.apply(['tdd'], { platform, scope });
+    const preview = await f.plan(['implement'], { platform, scope });
+    assert.equal(preview.applicable, true, preview.conflicts.join('; '));
+    assert.deepEqual(preview.capabilities.map((entry) => entry.id), ['code-review', 'tdd', 'implement']);
+    const implementation = preview.capabilities.find((entry) => entry.id === 'implement');
+    assert.equal(implementation.module, 'workflows');
+    assert.equal(implementation.currentStatus, 'available');
+    assert.equal(implementation.plannedStatus, 'installed');
+    assert.equal(implementation.workflow.stages.at(-1).id, 'verify-and-commit');
+    assert.deepEqual(implementation.conditionalUses.map((entry) => [entry.id, entry.optional, entry.currentStatus, entry.plannedStatus]),
+      [['security-checklist', true, 'available', 'available']]);
+    assert.equal(preview.capabilities.find((entry) => entry.id === 'tdd').currentStatus, 'installed');
+    assert.equal(new Set(preview.entries.map((entry) => entry.id)).size, preview.entries.length);
+    await applyInstallation(preview);
+    const receipt = await f.receipt(platform, scope);
+    assert.deepEqual(receipt.selected, ['implement', 'tdd']);
+    assert.deepEqual(receipt.entries.find((entry) => entry.id === 'tdd').consumers, ['implement', 'tdd']);
+    if (platform === 'codex') {
+      assert.match(await fs.readFile(path.join(f.discovery('implement', platform), 'agents/openai.yaml'), 'utf8'), /allow_implicit_invocation: false/);
+    } else {
+      assert.match(await fs.readFile(path.join(f.discovery('implement', platform), 'SKILL.md'), 'utf8'), /disable-model-invocation: true/);
+    }
+    await f.apply(['implement'], { platform, scope, operation: 'remove' });
+    await assert.rejects(fs.lstat(f.discovery('implement', platform)), { code: 'ENOENT' });
+    await assert.rejects(fs.lstat(f.discovery('code-review', platform)), { code: 'ENOENT' });
+    assert.match(await fs.readFile(path.join(f.discovery('tdd', platform), 'SKILL.md'), 'utf8'), /name: tdd/);
+  });
+});
+
+test('project workflow plans report missing contracts, configured contracts and documented fallbacks', async () => fixture(async (f) => {
+  const missing = await f.plan(['implement'], { scope: 'project' });
+  const verification = missing.capabilities.find((entry) => entry.id === 'implement').prerequisites
+    .find((entry) => entry.paths.includes('scripts/verify.mjs'));
+  assert.equal(verification.status, 'missing');
+  assert.deepEqual(verification.missing, ['scripts/verify.mjs']);
+  const tracker = missing.capabilities.find((entry) => entry.id === 'code-review').prerequisites
+    .find((entry) => entry.paths.includes('docs/agents/issue-tracker.md'));
+  assert.equal(tracker.status, 'fallback');
+  assert.match(tracker.description, /GitHub Issues.*\.scratch/);
+  await fs.mkdir(path.join(f.target, 'scripts'));
+  await fs.writeFile(path.join(f.target, 'scripts/verify.mjs'), 'process.exit(0);\n');
+  await fs.mkdir(path.join(f.target, 'docs/agents'), { recursive: true });
+  await fs.writeFile(path.join(f.target, 'docs/agents/issue-tracker.md'), '# Local tracker\n');
+  const configured = await f.plan(['implement'], { scope: 'project' });
+  assert.equal(configured.capabilities.find((entry) => entry.id === 'implement').prerequisites
+    .find((entry) => entry.paths.includes('scripts/verify.mjs')).status, 'configured');
+  assert.equal(configured.capabilities.find((entry) => entry.id === 'code-review').prerequisites
+    .find((entry) => entry.paths.includes('docs/agents/issue-tracker.md')).status, 'configured');
+}));
+
+test('workflow prerequisite inspection rejects linked and escaping project contracts without writes', async () => {
+  for (const kind of ['linked', 'hardlinked', 'traversal']) await fixture(async (f) => {
+    const outside = path.join(f.temporary, 'outside');
+    await fs.mkdir(outside);
+    const sentinel = path.join(outside, 'sentinel');
+    await fs.writeFile(sentinel, 'Do not inspect or change this content');
+    if (kind === 'traversal') {
+      const catalogFile = path.join(f.repository, 'catalog/modules.json');
+      const catalog = JSON.parse(await fs.readFile(catalogFile, 'utf8'));
+      catalog.capabilities.find((entry) => entry.id === 'implement').prerequisites =
+        ['Invocation requires scripts/../../outside/sentinel.'];
+      await fs.writeFile(catalogFile, JSON.stringify(catalog));
+    } else {
+      const contract = path.join(f.target, 'docs/agents/issue-tracker.md');
+      await fs.mkdir(path.dirname(contract), { recursive: true });
+      if (kind === 'linked') await fs.symlink(sentinel, contract);
+      else await fs.link(sentinel, contract);
+    }
+    const before = await snapshot(f.temporary);
+    await assert.rejects(f.plan(['implement'], { scope: 'project' }), /escapes|Unsafe project prerequisite/);
+    assert.deepEqual(await snapshot(f.temporary), before);
+    assert.equal(await fs.readFile(sentinel, 'utf8'), 'Do not inspect or change this content');
+  });
+});
+
+test('router distinguishes installed, available and unavailable routes without installing optional entries', async () => fixture(async (f) => {
+  await f.apply(['research'], { scope: 'project' });
+  const catalogFile = path.join(f.repository, 'catalog/modules.json');
+  const catalog = JSON.parse(await fs.readFile(catalogFile));
+  catalog.capabilities.find((entry) => entry.id === 'teach').scopes = ['machine'];
+  await fs.writeFile(catalogFile, JSON.stringify(catalog));
+  const preview = await f.plan(['ask-alfred'], { scope: 'project' });
+  const routes = preview.capabilities.find((entry) => entry.id === 'ask-alfred').routes;
+  assert.equal(routes.find((entry) => entry.id === 'research').currentStatus, 'installed');
+  assert.equal(routes.find((entry) => entry.id === 'tdd').currentStatus, 'available');
+  assert.equal(routes.find((entry) => entry.id === 'teach').currentStatus, 'unavailable');
+  assert.ok(routes.every((entry) => entry.optional && entry.currentStatus === entry.plannedStatus));
+  assert.deepEqual(preview.changes.map((entry) => entry.id), ['ask-alfred']);
+  await applyInstallation(preview);
+  await assert.rejects(fs.lstat(f.discovery('tdd')), { code: 'ENOENT' });
+  await assert.rejects(fs.lstat(f.discovery('teach')), { code: 'ENOENT' });
+  assert.deepEqual((await f.receipt('codex', 'project')).selected, ['ask-alfred', 'research']);
+}));
+
 test('update publishes a new revision and preserves the other platform and selection', async () => fixture(async (f) => {
   await f.apply(['research', 'tdd']);
   await f.apply(['research'], { platform: 'claude' });
@@ -328,7 +424,7 @@ test('CLI defaults to a read-only preview, uses explicit scope/target and needs 
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(await snapshot(f.target), before);
   }
-  for (const args of [['apply', '--select', 'implement', ...common], ['apply', '--select', 'research', '--apply'],
+  for (const args of [['apply', '--select', 'research', '--apply'],
     ['apply', '--module', 'skills', ...common],
     ['audit', '--select', 'research', ...common], ['audit', ...common, '--apply']]) {
     assert.notEqual(run(...args).status, 0);
@@ -339,6 +435,11 @@ test('CLI defaults to a read-only preview, uses explicit scope/target and needs 
   assert.equal(JSON.parse(applied.stdout).applied, true);
   assert.equal(run('audit', ...common).status, 0);
   assert.equal(run('remove', '--select', 'research', ...common, '--apply').status, 0);
+  const workflowPreview = run('apply', '--select', 'implement', ...common);
+  assert.equal(workflowPreview.status, 0, workflowPreview.stderr);
+  assert.equal(JSON.parse(workflowPreview.stdout).capabilities.find((entry) => entry.id === 'implement').module, 'workflows');
+  assert.equal(run('apply', '--select', 'implement', ...common, '--apply').status, 0);
+  assert.equal(run('remove', '--select', 'implement', ...common, '--apply').status, 0);
   const projectTarget = path.join(f.temporary, 'project');
   await fs.mkdir(projectTarget);
   const project = ['--platform', 'codex', '--scope', 'project', '--target', projectTarget, '--json'];

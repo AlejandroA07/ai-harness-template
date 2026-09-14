@@ -191,7 +191,7 @@
         "writing-for-agents"
       ],
       "prerequisites": [
-        "Routes describe available canonical capabilities, not observed installation state; installed-state routing is M5 work."
+        "Routing status is target-specific: installed entries can be invoked immediately, available entries require selection, and unavailable entries do not support the target."
       ],
       "resources": [
         "skills/engineering/ask-alfred/PHASE-BOUNDARIES.md"

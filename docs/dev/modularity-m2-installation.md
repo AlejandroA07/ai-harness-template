@@ -1,6 +1,6 @@
 # M2: selective machine skill lifecycle
 
-M2 adds target preflight, apply/update, removal and installed-state audit to the shared setup interface. It supports explicit Skills selections on one machine platform per command, with coexistence as the only profile. Required skill dependencies are resolved and tracked per selection. Workflow installation remains M5; global configuration, project configuration and integrations remain M3, M4 and M6 respectively.
+M2 adds target preflight, apply/update, removal and installed-state audit to the shared setup interface. It supports explicit Skills selections on one machine platform per command, with coexistence as the only profile. Required skill dependencies are resolved and tracked per selection. M5 later extended this lifecycle to workflows and project-scoped Skills; global configuration, project configuration and integrations belong to M3, M4 and M6 respectively.
 
 ## Commands
 
@@ -98,7 +98,7 @@ All test mutations use explicit temporary targets. No installed developer profil
 | Dependencies and delivery | Pass | No packages or CI permissions added; existing provenance and security gates retained |
 | Regression evidence | Pass for the tested local boundary | Lifecycle and denied-path fixtures registered in the gate; Windows execution remains pending |
 
-M3, M4 and M5 can build on this lifecycle boundary. They must add their own settings/project/workflow contracts rather than widening the M2 payload renderer to accept arbitrary vendor executables or receipts as write authority.
+M3, M4 and M5 build on this lifecycle boundary. Their settings, project and workflow contracts do not widen the M2 payload renderer to accept arbitrary vendor executables or receipts as write authority.
 
 ## Follow-up: CodeQL file-read race in test snapshots
 
