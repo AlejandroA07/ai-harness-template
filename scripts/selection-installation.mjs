@@ -24,25 +24,27 @@ function ids(value, known) {
   if (!Array.isArray(value) || value.some((id) => !known.has(id))
     || !same(value, [...new Set(value)].sort())) fail('Invalid receipt selection');
 }
-function selection(catalog, requested, platform) {
+function selection(catalog, requested, context) {
   if (!requested.length) return { requested: [], capabilities: [] };
-  const plan = planSelection(catalog, { ids: requested, modules: [], platforms: [platform], scope: 'machine' });
-  if (plan.capabilities.some((entry) => entry.module !== 'skills')) fail('M2 installs machine-scoped Skills only; workflows remain M5');
+  const plan = planSelection(catalog, { ids: requested, modules: [], platforms: [context.platform], scope: context.scope });
+  if (plan.capabilities.some((entry) => entry.module !== 'skills')) fail('Selected Skills lifecycle does not install workflows');
   return plan;
 }
-function layout(target, platform) {
-  const store = path.join(target, '.ai-harness', 'installations', platform);
+function layout(context) {
+  const { target, platform, scope } = context;
+  const store = path.join(target, scope === 'project' ? '.harness' : '.ai-harness', 'installations', platform);
   return { store, payloads: path.join(store, 'payloads'), receipt: path.join(store, 'receipt.json'), ownership: path.join(store, 'skills-current.json'),
     discovery: path.join(target, platform === 'codex' ? '.agents' : '.claude', 'skills'),
     lock: path.join(target, '.ai-harness-install.lock') };
 }
-async function safeLayout(target, locations) {
-  await assertSafeDirectory(target, target);
-  await assertSafeDirectory(target, locations.payloads);
-  await assertSafeDirectory(target, locations.discovery);
+async function safeLayout(context) {
+  await assertSafeDirectory(context.target, context.target);
+  await assertSafeDirectory(context.target, context.locations.payloads);
+  await assertSafeDirectory(context.target, context.locations.discovery);
 }
 function payloadPath(locations, entry) { return path.join(locations.payloads, entry.id, entry.hash); }
-async function loadReceipt(locations, target, platform) {
+async function loadReceipt(context) {
+  const { locations, target, platform, scope } = context;
   if (!await stat(locations.receipt)) {
     await verifyOwnershipHead(target, locations.ownership, null);
     return { receipt: null, bytes: null };
@@ -54,7 +56,7 @@ async function loadReceipt(locations, target, platform) {
   await verifyOwnershipHead(target, locations.ownership, receipt.evidence);
   fields(receipt, ['version', 'evidence', 'target', 'platform', 'scope', 'profile', 'selected', 'entries']);
   if (receipt.version !== 2 || receipt.target !== target || receipt.platform !== platform
-    || receipt.scope !== 'machine' || receipt.profile !== 'coexistence') fail('Receipt target/profile mismatch');
+    || receipt.scope !== scope || receipt.profile !== 'coexistence') fail('Receipt target/profile mismatch');
   if (!Array.isArray(receipt.entries) || receipt.entries.some((entry) => !entry || typeof entry.id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(entry.id))) fail('Unsafe historical skill ID');
   const known = new Set(receipt.entries.map((entry) => entry.id));
   ids(receipt.selected, known);
@@ -89,7 +91,8 @@ async function renderPayload(root, capability, platform) {
   }
   return { files, hash: payloadHash(files) };
 }
-async function parentIdentity(target, locations) {
+async function parentIdentity(context) {
+  const { target, locations } = context;
   const paths = new Set();
   for (const end of [locations.payloads, locations.discovery]) {
     let current = end;
@@ -112,8 +115,8 @@ async function parentIdentity(target, locations) {
 export async function planInstallation(root, options) {
   const { operation = 'apply', platform, scope, ids: requested = [], target: suppliedTarget } = options;
   if (!['apply', 'remove', 'audit'].includes(operation) || !['claude', 'codex'].includes(platform)
-    || scope !== 'machine' || typeof suppliedTarget !== 'string' || !path.isAbsolute(suppliedTarget)) {
-    fail('Lifecycle requires an absolute --target, one --platform and --scope machine');
+    || !['machine', 'project'].includes(scope) || typeof suppliedTarget !== 'string' || !path.isAbsolute(suppliedTarget)) {
+    fail('Lifecycle requires an absolute --target, one --platform and --scope machine or project');
   }
   if (operation !== 'audit' && !requested.length) fail('Select at least one skill');
   if (operation === 'audit' && requested.length) fail('Audit inspects the whole platform receipt; omit --select');
@@ -124,16 +127,23 @@ export async function planInstallation(root, options) {
     if (error.code !== 'ENOENT') throw error;
     return path.join(await fs.realpath(path.dirname(unresolved)), path.basename(unresolved));
   });
-  if (await isPathWithin(target, root)) fail('Installation target must be outside the source checkout');
+  if (await isPathWithin(target, root)
+    || (scope === 'project' && await isPathWithin(root, target))) {
+    fail(scope === 'project'
+      ? 'Project installation target must not overlap the source checkout'
+      : 'Installation target must be outside the source checkout');
+  }
+  const context = { target, platform, scope };
+  context.locations = layout(context);
   const catalog = operation === 'apply' ? await loadCatalog(root) : null;
-  if (operation === 'apply' && requested.length) selection(catalog, requested, platform);
+  if (operation === 'apply' && requested.length) selection(catalog, requested, context);
   if (requested.some((id) => typeof id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(id))) fail('Unsafe skill selection');
-  const locations = layout(target, platform);
+  const { locations } = context;
   for (const ownedRoot of [locations.store, locations.discovery, locations.lock]) {
     if (await isPathWithin(root, ownedRoot)) fail('Installation paths overlap the source checkout');
   }
-  await safeLayout(target, locations);
-  const old = await loadReceipt(locations, target, platform);
+  await safeLayout(context);
+  const old = await loadReceipt(context);
   const previous = old.receipt?.entries ?? [];
   const conflicts = [];
   if (await stat(locations.lock)) conflicts.push('Target is locked; inspect the interrupted/running operation before retrying');
@@ -163,7 +173,7 @@ export async function planInstallation(root, options) {
       if (consumers.length) desired.set(entry.id, { ...entry, consumers });
     }
     for (const consumer of [...requested].sort()) {
-      for (const capability of selection(catalog, [consumer], platform).capabilities) {
+      for (const capability of selection(catalog, [consumer], context).capabilities) {
         const rendered = await renderPayload(root, capability, platform);
         const existing = desired.get(capability.id);
         const consumers = [...new Set([...(existing?.consumers ?? []), consumer])].sort();
@@ -177,7 +187,7 @@ export async function planInstallation(root, options) {
     }
   }
   const entries = [...desired.values()].sort((a, b) => a.id.localeCompare(b.id));
-  const nextReceipt = sealReceipt({ version: 2, target, platform, scope: 'machine', profile: 'coexistence', selected: nextSelected,
+  const nextReceipt = sealReceipt({ version: 2, target, platform, scope, profile: 'coexistence', selected: nextSelected,
     entries: entries.map(({ id, hash, consumers }) => ({ id, hash, consumers })) });
   const changes = [];
   for (const id of [...new Set([...previous.map((entry) => entry.id), ...desired.keys()])].sort()) {
@@ -204,17 +214,18 @@ export async function planInstallation(root, options) {
     installed: old.receipt !== null && previous.length > 0,
     selected: [...nextSelected], entries: structuredClone(nextReceipt.entries), changes: operation === 'audit' ? [] : changes,
     receiptChanged, receiptPath: locations.receipt, evidence, conflicts, applicable: conflicts.length === 0, tools: [],
-    activation: 'Discovery only; no hooks, settings, processes or network activation',
+    activation: `${scope === 'project' ? 'Project' : 'Machine'} discovery only; no hooks, settings, processes or network activation`,
     retainedPayloads: 'Immutable payload revisions are retained on update/removal; no recursive garbage collection' };
-  receipts.set(plan, { root, options: { ...options, ids: [...requested], target }, locations, old, nextReceipt, entries,
-    fingerprint: encode({ old, states, ownedHashes, plan, parents: await parentIdentity(target, locations) }) });
+  receipts.set(plan, { root, options: { ...options, ids: [...requested], target }, context, old, nextReceipt, entries,
+    fingerprint: encode({ old, states, ownedHashes, plan, parents: await parentIdentity(context) }) });
   return plan;
 }
 
 export async function applyInstallation(candidate, { checkpoint = async () => {} } = {}) {
   const prepared = receipts.get(candidate);
   if (!prepared) fail('Apply requires a fresh in-process installation plan');
-  const { root, options, locations } = prepared;
+  const { root, options, context } = prepared;
+  const { locations } = context;
   const plan = await planInstallation(root, options);
   if (!plan.applicable) fail(`Installation conflicts: ${plan.conflicts.join('; ')}`);
   if (plan.operation === 'audit') fail('Audit is read-only');
@@ -239,7 +250,7 @@ export async function applyInstallation(candidate, { checkpoint = async () => {}
     if (earlier.parents[plan.target] === null) earlier.parents[plan.target] = current.parents[plan.target];
     if (!same(earlier, current)) fail('Installation preconditions changed under lock; plan again');
     await checkpoint('locked');
-    await safeLayout(plan.target, locations);
+    await safeLayout(context);
     await fs.mkdir(locations.store, { recursive: true, mode: 0o700 });
     staging = await fs.mkdtemp(path.join(locations.store, '.stage-'));
     await fs.writeFile(path.join(staging, 'transaction.json'), encode({ version: 1,
@@ -258,8 +269,8 @@ export async function applyInstallation(candidate, { checkpoint = async () => {}
     await storeReceiptEvidence(plan.target, locations.store, staging, prepared.nextReceipt);
     await checkpoint('staged');
     await verifyReceiptEvidence(plan.target, locations.store, prepared.nextReceipt);
-    await safeLayout(plan.target, locations);
-    const receiptNow = await loadReceipt(locations, plan.target, plan.platform);
+    await safeLayout(context);
+    const receiptNow = await loadReceipt(context);
     if (!same(receiptNow, prepared.old)) fail('Receipt changed before publication');
     for (const entry of prepared.old.receipt?.entries ?? []) {
       const payload = payloadPath(locations, entry);
@@ -282,7 +293,7 @@ export async function applyInstallation(candidate, { checkpoint = async () => {}
     }
     await fs.mkdir(locations.discovery, { recursive: true });
     for (const change of plan.changes) {
-      await safeLayout(plan.target, locations);
+      await safeLayout(context);
       if (!same(await linkState(change.discovery), change.from ? { link: change.from } : null)) fail('Discovery changed while publishing');
       if (change.from) await fs.rename(change.discovery, path.join(staging, `${change.id}.old`));
       completed.push(change);
@@ -296,14 +307,14 @@ export async function applyInstallation(candidate, { checkpoint = async () => {}
       if (change.to) await fs.symlink(change.to, change.discovery, process.platform === 'win32' ? 'junction' : 'dir');
       await checkpoint('discovery', change.id);
     }
-    await safeLayout(plan.target, locations);
+    await safeLayout(context);
     for (const entry of prepared.nextReceipt.entries) {
       const expected = payloadPath(locations, entry);
       await assertSafeDirectory(plan.target, expected);
       if (!same(await linkState(path.join(locations.discovery, entry.id)), { link: expected })
         || payloadHash(await treeFiles(expected)) !== entry.hash) fail('Installed state changed before receipt publication');
     }
-    if (!same(await loadReceipt(locations, plan.target, plan.platform), prepared.old)) fail('Receipt changed while publishing');
+    if (!same(await loadReceipt(context), prepared.old)) fail('Receipt changed while publishing');
     const publication = path.join(staging, 'receipt-publication');
     await fs.mkdir(publication, { mode: 0o700 });
     const ownershipBefore = prepared.old.receipt ? ownershipHeadBytes(prepared.old.receipt.evidence) : null;
@@ -322,7 +333,7 @@ export async function applyInstallation(candidate, { checkpoint = async () => {}
     const unresolved = error.recoveryRequired ? ['receipt publication'] : [];
     for (const change of [...completed].reverse()) {
       try {
-        await safeLayout(plan.target, locations);
+        await safeLayout(context);
         const current = await linkState(change.discovery);
         if (current && !same(current, { link: change.to })) fail('Discovery changed during rollback');
         if (current) await fs.unlink(change.discovery);
@@ -335,7 +346,7 @@ export async function applyInstallation(candidate, { checkpoint = async () => {}
   } finally {
     if (!retainStaging) {
       if (staging) {
-        await safeLayout(plan.target, locations);
+        await safeLayout(context);
         await fs.rm(staging, { recursive: true, force: true });
       }
       await releaseTargetLock(locations.lock);

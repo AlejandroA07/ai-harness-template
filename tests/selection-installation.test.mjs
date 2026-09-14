@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { planInstallation, applyInstallation } from '../scripts/selection-installation.mjs';
+import { planProjectInstallation, applyProjectInstallation } from '../scripts/project-installation.mjs';
 import { renderSkill, parseSkill } from '../scripts/skill-lib.mjs';
 import { snapshot } from './helpers/filesystem-snapshot.mjs';
 
@@ -24,8 +25,9 @@ async function fixture(body) {
     const plan = (ids, extra) => planInstallation(repository, options(ids, extra));
     const apply = async (ids, extra, hooks) => applyInstallation(await plan(ids, extra), hooks);
     const discovery = (id, platform = 'codex') => path.join(target, platform === 'codex' ? '.agents' : '.claude', 'skills', id);
-    const receiptFile = (platform = 'codex') => path.join(target, '.ai-harness/installations', platform, 'receipt.json');
-    const receipt = async (platform) => JSON.parse(await fs.readFile(receiptFile(platform), 'utf8'));
+    const receiptFile = (platform = 'codex', scope = 'machine') => path.join(target,
+      scope === 'project' ? '.harness' : '.ai-harness', 'installations', platform, 'receipt.json');
+    const receipt = async (platform, scope) => JSON.parse(await fs.readFile(receiptFile(platform, scope), 'utf8'));
     await body({ temporary, repository, target, options, plan, apply, discovery, receiptFile, receipt });
   } finally { await fs.rm(temporary, { recursive: true, force: true }); }
 }
@@ -68,6 +70,62 @@ test('selective lifecycle on each platform preserves unrelated state, repeats wi
   });
 });
 
+test('project-scoped skills coexist with project configuration on both platforms and never write machine state', async () => {
+  for (const platform of ['codex', 'claude']) await fixture(async (f) => {
+    const machine = path.join(f.temporary, 'machine');
+    await fs.mkdir(machine);
+    await fs.mkdir(path.join(f.target, 'scripts'), { recursive: true });
+    await fs.writeFile(path.join(f.target, 'scripts/verify.mjs'), "console.log('Project verifier ran');\n");
+    await fs.mkdir(path.join(f.target, '.harness/skills/team/local-sample'), { recursive: true });
+    await fs.writeFile(path.join(f.target, '.harness/skills/team/local-sample/SKILL.md'),
+      '---\nname: local-sample\ndescription: Project-owned sample\n---\n\nKeep this local skill.\n');
+    const projectConfiguration = { operation: 'apply', platform, scope: 'project', target: f.target };
+    await applyProjectInstallation(await planProjectInstallation(f.repository, projectConfiguration));
+    const machineBefore = await snapshot(machine);
+    const localBefore = await fs.readFile(path.join(f.discovery('local-sample', platform), 'SKILL.md'), 'utf8');
+
+    const preview = await f.plan(['research'], { platform, scope: 'project' });
+    assert.equal(preview.applicable, true, preview.conflicts.join('; '));
+    assert.equal(preview.scope, 'project');
+    assert.equal(path.relative(preview.target, preview.receiptPath), path.join('.harness', 'installations', platform, 'receipt.json'));
+    await applyInstallation(preview);
+    const installed = await fs.realpath(f.discovery('research', platform));
+    assert.ok(installed.startsWith(path.join(await fs.realpath(f.target), '.harness', 'installations', platform, 'payloads')));
+    assert.deepEqual((await f.receipt(platform, 'project')).selected, ['research']);
+    assert.equal(await fs.readFile(path.join(f.discovery('local-sample', platform), 'SKILL.md'), 'utf8'), localBefore);
+    assert.equal((await planProjectInstallation(f.repository, { ...projectConfiguration, operation: 'audit' })).applicable, true);
+    assert.equal((await applyProjectInstallation(await planProjectInstallation(f.repository, projectConfiguration))).noOp, true);
+
+    await fs.appendFile(path.join(f.repository, 'skills/engineering/research/SKILL.md'), '\nProject-scope update.\n');
+    assert.equal((await f.apply(['research'], { platform, scope: 'project' })).noOp, false);
+    assert.match(await fs.readFile(path.join(f.discovery('research', platform), 'SKILL.md'), 'utf8'), /Project-scope update/);
+    assert.equal((await f.plan([], { platform, scope: 'project', operation: 'audit' })).applicable, true);
+
+    await applyProjectInstallation(await planProjectInstallation(f.repository, { ...projectConfiguration, operation: 'remove' }));
+    await assert.rejects(fs.readFile(path.join(f.discovery('local-sample', platform), 'SKILL.md')), { code: 'ENOENT' });
+    assert.match(await fs.readFile(path.join(f.discovery('research', platform), 'SKILL.md'), 'utf8'), /Project-scope update/);
+    await f.apply(['research'], { platform, scope: 'project', operation: 'remove' });
+    await assert.rejects(fs.lstat(f.discovery('research', platform)), { code: 'ENOENT' });
+    assert.deepEqual(await snapshot(machine), machineBefore);
+  });
+});
+
+test('project-scoped selection preserves an M4 adapter with the same capability name', async () => fixture(async (f) => {
+  await fs.mkdir(path.join(f.target, 'scripts'), { recursive: true });
+  await fs.writeFile(path.join(f.target, 'scripts/verify.mjs'), "console.log('Project verifier ran');\n");
+  await fs.mkdir(path.join(f.target, '.harness/skills/team/research'), { recursive: true });
+  await fs.writeFile(path.join(f.target, '.harness/skills/team/research/SKILL.md'),
+    '---\nname: research\ndescription: Borrowed project implementation\n---\n\nKeep this project adapter.\n');
+  await applyProjectInstallation(await planProjectInstallation(f.repository,
+    { operation: 'apply', platform: 'codex', scope: 'project', target: f.target }));
+  const before = await snapshot(f.target);
+  const plan = await f.plan(['research'], { scope: 'project' });
+  assert.equal(plan.applicable, false);
+  assert.match(plan.conflicts.join(' '), /unowned discovery collision/);
+  await assert.rejects(applyInstallation(plan));
+  assert.deepEqual(await snapshot(f.target), before);
+}));
+
 test('update publishes a new revision and preserves the other platform and selection', async () => fixture(async (f) => {
   await f.apply(['research', 'tdd']);
   await f.apply(['research'], { platform: 'claude' });
@@ -86,21 +144,23 @@ test('update publishes a new revision and preserves the other platform and selec
   assert.equal((await f.plan([], { operation: 'audit' })).applicable, true);
 }));
 
-test('shared dependencies remain until the final consumer is removed', async () => fixture(async (f) => {
-  const file = path.join(f.repository, 'catalog/modules.json');
-  const catalog = JSON.parse(await fs.readFile(file, 'utf8'));
-  catalog.capabilities.find((entry) => entry.id === 'research').requires = ['security-checklist'];
-  catalog.capabilities.find((entry) => entry.id === 'grilling').requires = ['security-checklist'];
-  await fs.writeFile(file, JSON.stringify(catalog));
-  await f.apply(['research']);
-  await f.apply(['grilling']);
-  assert.deepEqual((await f.receipt()).entries.find((entry) => entry.id === 'security-checklist').consumers, ['grilling', 'research']);
-  await f.apply(['research'], { operation: 'remove' });
-  assert.match(await fs.readFile(path.join(f.discovery('security-checklist'), 'SKILL.md'), 'utf8'), /Security checklist/);
-  await f.apply(['grilling'], { operation: 'remove' });
-  await assert.rejects(fs.lstat(f.discovery('security-checklist')), { code: 'ENOENT' });
-  assert.deepEqual((await f.receipt()).entries, []);
-}));
+test('shared dependencies remain until the final consumer is removed at each scope', async () => {
+  for (const scope of ['machine', 'project']) await fixture(async (f) => {
+    const file = path.join(f.repository, 'catalog/modules.json');
+    const catalog = JSON.parse(await fs.readFile(file, 'utf8'));
+    catalog.capabilities.find((entry) => entry.id === 'research').requires = ['security-checklist'];
+    catalog.capabilities.find((entry) => entry.id === 'grilling').requires = ['security-checklist'];
+    await fs.writeFile(file, JSON.stringify(catalog));
+    await f.apply(['research'], { scope });
+    await f.apply(['grilling'], { scope });
+    assert.deepEqual((await f.receipt('codex', scope)).entries.find((entry) => entry.id === 'security-checklist').consumers, ['grilling', 'research']);
+    await f.apply(['research'], { scope, operation: 'remove' });
+    assert.match(await fs.readFile(path.join(f.discovery('security-checklist'), 'SKILL.md'), 'utf8'), /Security checklist/);
+    await f.apply(['grilling'], { scope, operation: 'remove' });
+    await assert.rejects(fs.lstat(f.discovery('security-checklist')), { code: 'ENOENT' });
+    assert.deepEqual((await f.receipt('codex', scope)).entries, []);
+  });
+});
 
 test('unowned copies, legacy links, case collisions and edited owned files are preserved', async () => {
   for (const kind of ['directory', 'legacy-link', 'case', 'edited', 'extra-file', 'missing-link', 'changed-link']) await fixture(async (f) => {
@@ -127,103 +187,122 @@ test('unowned copies, legacy links, case collisions and edited owned files are p
   });
 });
 
-test('malformed, forged and linked receipts cannot claim unrelated content or escape the target', async () => {
-  for (const kind of ['json', 'traversal', 'target', 'hash', 'consumers', 'extra-field', 'linked', 'hardlinked', 'forged-copy']) await fixture(async (f) => {
-    await f.apply();
-    const outside = path.join(f.temporary, 'sentinel');
-    await fs.writeFile(outside, 'Preserve outside');
-    const receipt = await f.receipt();
-    if (kind === 'traversal') receipt.entries[0].id = '../../../sentinel';
-    if (kind === 'target') receipt.target = f.temporary;
-    if (kind === 'hash') receipt.entries[0].hash = '../../sentinel';
-    if (kind === 'consumers') receipt.entries[0].consumers = [];
-    if (kind === 'extra-field') receipt.entries[0].path = outside;
-    if (kind === 'forged-copy') {
-      await fs.unlink(f.discovery('research'));
-      await fs.mkdir(f.discovery('research'));
-      await fs.writeFile(path.join(f.discovery('research'), 'SKILL.md'), 'Unowned copy');
-    }
-    await fs.writeFile(f.receiptFile(), kind === 'json' ? '{broken' : JSON.stringify(receipt));
-    if (kind === 'linked' || kind === 'hardlinked') {
-      await fs.unlink(f.receiptFile());
-      if (kind === 'linked') await fs.symlink(outside, f.receiptFile());
-      else await fs.link(outside, f.receiptFile());
-    }
-    const before = await snapshot(f.target);
-    if (kind === 'forged-copy') await assert.rejects(f.apply(['research'], { operation: 'remove' }));
-    else await assert.rejects(f.plan(['research'], { operation: 'remove' }));
-    assert.deepEqual(await snapshot(f.target), before);
-    assert.equal(await fs.readFile(outside, 'utf8'), 'Preserve outside');
-  });
+test('malformed, forged and linked receipts cannot claim unrelated content or escape either scope', async () => {
+  for (const scope of ['machine', 'project']) {
+    for (const kind of ['json', 'traversal', 'target', 'hash', 'consumers', 'extra-field', 'linked', 'hardlinked', 'forged-copy']) await fixture(async (f) => {
+      await f.apply(['research'], { scope });
+      const outside = path.join(f.temporary, 'sentinel');
+      await fs.writeFile(outside, 'Preserve outside');
+      const receipt = await f.receipt('codex', scope);
+      if (kind === 'traversal') receipt.entries[0].id = '../../../sentinel';
+      if (kind === 'target') receipt.target = f.temporary;
+      if (kind === 'hash') receipt.entries[0].hash = '../../sentinel';
+      if (kind === 'consumers') receipt.entries[0].consumers = [];
+      if (kind === 'extra-field') receipt.entries[0].path = outside;
+      if (kind === 'forged-copy') {
+        await fs.unlink(f.discovery('research'));
+        await fs.mkdir(f.discovery('research'));
+        await fs.writeFile(path.join(f.discovery('research'), 'SKILL.md'), 'Unowned copy');
+      }
+      const receiptFile = f.receiptFile('codex', scope);
+      await fs.writeFile(receiptFile, kind === 'json' ? '{broken' : JSON.stringify(receipt));
+      if (kind === 'linked' || kind === 'hardlinked') {
+        await fs.unlink(receiptFile);
+        if (kind === 'linked') await fs.symlink(outside, receiptFile);
+        else await fs.link(outside, receiptFile);
+      }
+      const before = await snapshot(f.target);
+      if (kind === 'forged-copy') await assert.rejects(f.apply(['research'], { scope, operation: 'remove' }));
+      else await assert.rejects(f.plan(['research'], { scope, operation: 'remove' }));
+      assert.deepEqual(await snapshot(f.target), before);
+      assert.equal(await fs.readFile(outside, 'utf8'), 'Preserve outside');
+    });
+  }
 });
 
-test('linked target, discovery, payload roots and resources fail without writes', async () => {
-  for (const kind of ['target', 'discovery', 'store', 'payload', 'resource']) await fixture(async (f) => {
+test('linked target, discovery, payload roots and resources fail without writes at either scope', async () => {
+  for (const scope of ['machine', 'project']) {
+    for (const kind of ['target', 'discovery', 'store', 'payload', 'resource']) await fixture(async (f) => {
+      const outside = path.join(f.temporary, 'outside');
+      await fs.mkdir(outside);
+      await fs.writeFile(path.join(outside, 'sentinel'), 'Unrelated');
+      if (kind === 'target') {
+        await fs.rmdir(f.target);
+        await fs.symlink(outside, f.target, linkType);
+      } else if (kind === 'resource' || kind === 'payload') {
+        await f.apply(['research'], { scope });
+        const payload = await fs.realpath(f.discovery('research'));
+        if (kind === 'resource') {
+          await fs.unlink(path.join(payload, 'SKILL.md'));
+          await fs.symlink(path.join(outside, 'sentinel'), path.join(payload, 'SKILL.md'));
+        } else {
+          await fs.rename(payload, path.join(f.temporary, 'old-payload'));
+          await fs.symlink(outside, payload, linkType);
+        }
+      } else {
+        const link = path.join(f.target, kind === 'store' ? (scope === 'project' ? '.harness' : '.ai-harness') : '.agents');
+        await fs.symlink(outside, link, linkType);
+      }
+      const before = await snapshot(f.temporary);
+      await assert.rejects(f.apply(['research'], { scope, operation: kind === 'resource' || kind === 'payload' ? 'remove' : 'apply' }));
+      assert.deepEqual(await snapshot(f.temporary), before);
+      assert.equal(await fs.readFile(path.join(outside, 'sentinel'), 'utf8'), 'Unrelated');
+    });
+  }
+  await fixture(async (f) => {
     const outside = path.join(f.temporary, 'outside');
     await fs.mkdir(outside);
     await fs.writeFile(path.join(outside, 'sentinel'), 'Unrelated');
-    if (kind === 'target') {
-      await fs.rmdir(f.target);
-      await fs.symlink(outside, f.target, linkType);
-    } else if (kind === 'resource' || kind === 'payload') {
-      await f.apply();
-      const payload = await fs.realpath(f.discovery('research'));
-      if (kind === 'resource') {
-        await fs.unlink(path.join(payload, 'SKILL.md'));
-        await fs.symlink(path.join(outside, 'sentinel'), path.join(payload, 'SKILL.md'));
-      } else {
-        await fs.rename(payload, path.join(f.temporary, 'old-payload'));
-        await fs.symlink(outside, payload, linkType);
-      }
-    } else {
-      const link = path.join(f.target, kind === 'store' ? '.ai-harness' : '.agents');
-      await fs.symlink(outside, link, linkType);
-    }
+    await fs.symlink(outside, path.join(f.target, '.claude'), linkType);
     const before = await snapshot(f.temporary);
-    await assert.rejects(f.apply(['research'], { operation: kind === 'resource' || kind === 'payload' ? 'remove' : 'apply' }));
+    await assert.rejects(f.apply(['research'], { platform: 'claude', scope: 'project' }));
     assert.deepEqual(await snapshot(f.temporary), before);
   });
 });
 
-test('plans reject stale state, serialized authority and honor immutable application data', async () => fixture(async (f) => {
-  const plan = await f.plan();
-  await assert.rejects(applyInstallation(JSON.parse(JSON.stringify(plan))), /in-process/);
-  plan.target = f.repository;
-  plan.changes[0].discovery = path.join(f.repository, 'sentinel');
-  plan.selected.push('implement');
-  plan.entries[0].hash = 'forged';
-  plan.entries[0].consumers.push('implement');
-  await applyInstallation(plan);
-  assert.deepEqual((await f.receipt()).selected, ['research']);
-  assert.equal((await f.plan([], { operation: 'audit' })).applicable, true);
-  await assert.rejects(fs.lstat(path.join(f.repository, 'sentinel')), { code: 'ENOENT' });
-  const next = await f.plan(['tdd']);
-  await fs.mkdir(f.discovery('tdd'));
-  await assert.rejects(applyInstallation(next), /conflicts|preconditions changed/);
-  const sourcePlan = await f.plan(['grilling']);
-  await fs.appendFile(path.join(f.repository, 'skills/productivity/grilling/SKILL.md'), '\nChanged');
-  await assert.rejects(applyInstallation(sourcePlan), /preconditions changed/);
-}));
+test('plans reject stale state and serialized authority at either scope', async () => {
+  for (const scope of ['machine', 'project']) await fixture(async (f) => {
+    const plan = await f.plan(['research'], { scope });
+    await assert.rejects(applyInstallation(JSON.parse(JSON.stringify(plan))), /in-process/);
+    plan.target = f.repository;
+    plan.changes[0].discovery = path.join(f.repository, 'sentinel');
+    plan.selected.push('implement');
+    plan.entries[0].hash = 'forged';
+    plan.entries[0].consumers.push('implement');
+    await applyInstallation(plan);
+    assert.deepEqual((await f.receipt('codex', scope)).selected, ['research']);
+    assert.equal((await f.plan([], { scope, operation: 'audit' })).applicable, true);
+    await assert.rejects(fs.lstat(path.join(f.repository, 'sentinel')), { code: 'ENOENT' });
+    const next = await f.plan(['tdd'], { scope });
+    await fs.mkdir(f.discovery('tdd'));
+    await assert.rejects(applyInstallation(next), /conflicts|preconditions changed/);
+    const sourcePlan = await f.plan(['grilling'], { scope });
+    await fs.appendFile(path.join(f.repository, 'skills/productivity/grilling/SKILL.md'), '\nChanged');
+    await assert.rejects(applyInstallation(sourcePlan), /preconditions changed/);
+  });
+});
 
 test('publication failures restore previous discoveries and receipt; the target lock serializes both platforms', async () => {
-  for (const point of ['locked', 'staged', 'discovery', 'receipt']) await fixture(async (f) => {
-    await f.apply(['research']);
-    const previousReceipt = await fs.readFile(f.receiptFile(), 'utf8');
-    const previousLink = await fs.realpath(f.discovery('research'));
-    await fs.appendFile(path.join(f.repository, 'skills/engineering/research/SKILL.md'), '\nFixture update');
-    await assert.rejects(f.apply(['research', 'tdd'], {}, { checkpoint: async (name) => {
-      if (name !== point) return;
-      const competing = await f.plan(['research'], { platform: 'claude' });
-      assert.equal(competing.applicable, false);
-      await assert.rejects(applyInstallation(competing), /locked/);
-      throw new Error('Injected publication failure');
-    } }), /(?:Injected publication failure|Publication failed).*rolled back/);
-    assert.equal(await fs.readFile(f.receiptFile(), 'utf8'), previousReceipt);
-    assert.equal(await fs.realpath(f.discovery('research')), previousLink);
-    await assert.rejects(fs.lstat(f.discovery('tdd')), { code: 'ENOENT' });
-    assert.equal((await f.plan([], { operation: 'audit' })).applicable, true);
-    await f.apply(['research', 'tdd']);
-  });
+  for (const scope of ['machine', 'project']) {
+    for (const point of ['locked', 'staged', 'discovery', 'receipt']) await fixture(async (f) => {
+      await f.apply(['research'], { scope });
+      const previousReceipt = await fs.readFile(f.receiptFile('codex', scope), 'utf8');
+      const previousLink = await fs.realpath(f.discovery('research'));
+      await fs.appendFile(path.join(f.repository, 'skills/engineering/research/SKILL.md'), '\nFixture update');
+      await assert.rejects(f.apply(['research', 'tdd'], { scope }, { checkpoint: async (name) => {
+        if (name !== point) return;
+        const competing = await f.plan(['research'], { platform: 'claude', scope });
+        assert.equal(competing.applicable, false);
+        await assert.rejects(applyInstallation(competing), /locked/);
+        throw new Error('Injected publication failure');
+      } }), /(?:Injected publication failure|Publication failed).*rolled back/);
+      assert.equal(await fs.readFile(f.receiptFile('codex', scope), 'utf8'), previousReceipt);
+      assert.equal(await fs.realpath(f.discovery('research')), previousLink);
+      await assert.rejects(fs.lstat(f.discovery('tdd')), { code: 'ENOENT' });
+      assert.equal((await f.plan([], { scope, operation: 'audit' })).applicable, true);
+      await f.apply(['research', 'tdd'], { scope });
+    });
+  }
 });
 
 test('edits arriving after staging are preserved', async () => fixture(async (f) => {
@@ -250,7 +329,7 @@ test('CLI defaults to a read-only preview, uses explicit scope/target and needs 
     assert.deepEqual(await snapshot(f.target), before);
   }
   for (const args of [['apply', '--select', 'implement', ...common], ['apply', '--select', 'research', '--apply'],
-    ['apply', '--module', 'skills', ...common], ['apply', '--select', 'research', ...common, '--scope', 'project'],
+    ['apply', '--module', 'skills', ...common],
     ['audit', '--select', 'research', ...common], ['audit', ...common, '--apply']]) {
     assert.notEqual(run(...args).status, 0);
   }
@@ -260,6 +339,13 @@ test('CLI defaults to a read-only preview, uses explicit scope/target and needs 
   assert.equal(JSON.parse(applied.stdout).applied, true);
   assert.equal(run('audit', ...common).status, 0);
   assert.equal(run('remove', '--select', 'research', ...common, '--apply').status, 0);
+  const projectTarget = path.join(f.temporary, 'project');
+  await fs.mkdir(projectTarget);
+  const project = ['--platform', 'codex', '--scope', 'project', '--target', projectTarget, '--json'];
+  assert.equal(run('apply', '--select', 'research', ...project).status, 0);
+  assert.equal(run('apply', '--select', 'research', ...project, '--apply').status, 0);
+  assert.equal(run('audit', ...project).status, 0);
+  assert.equal(run('remove', '--select', 'research', ...project, '--apply').status, 0);
 }));
 
 test('fresh missing targets, user-only metadata, resources and resource-only updates work without source runtime links', async () => fixture(async (f) => {
@@ -297,26 +383,29 @@ test('ambiguous rollback preserves a competing replacement and retains a recover
   await assert.rejects(f.apply(['tdd']), /locked/);
 }));
 
-test('abrupt interruption leaves a visible lock and journal instead of treating a partial install as healthy', async () => fixture(async (f) => {
-  const script = `import {planInstallation,applyInstallation} from ${JSON.stringify(new URL('../scripts/selection-installation.mjs', import.meta.url).href)};
-    const plan = await planInstallation(${JSON.stringify(f.repository)}, ${JSON.stringify(f.options())});
-    await applyInstallation(plan, {checkpoint: async (point) => {if(point === 'discovery') process.exit(73);}});`;
-  const interrupted = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8' });
-  assert.equal(interrupted.status, 73, interrupted.stderr);
-  const audit = await f.plan([], { operation: 'audit' });
-  assert.equal(audit.applicable, false);
-  assert.match(audit.conflicts.join(' '), /locked/);
-  const store = path.dirname(f.receiptFile());
-  const stages = (await fs.readdir(store)).filter((name) => name.startsWith('.stage-'));
-  assert.equal(stages.length, 1);
-  const journal = JSON.parse(await fs.readFile(path.join(store, stages[0], 'transaction.json'), 'utf8'));
-  assert.equal(journal.previousReceipt, null);
-  assert.deepEqual(journal.nextReceipt.selected, ['research']);
-  await assert.rejects(f.apply(), /locked|collision/);
-}));
+test('abrupt interruption leaves a visible lock and journal at either scope', async () => {
+  for (const scope of ['machine', 'project']) await fixture(async (f) => {
+    const script = `import {planInstallation,applyInstallation} from ${JSON.stringify(new URL('../scripts/selection-installation.mjs', import.meta.url).href)};
+      const plan = await planInstallation(${JSON.stringify(f.repository)}, ${JSON.stringify(f.options(['research'], { scope }))});
+      await applyInstallation(plan, {checkpoint: async (point) => {if(point === 'discovery') process.exit(73);}});`;
+    const interrupted = spawnSync(process.execPath, ['--input-type=module', '-e', script], { encoding: 'utf8' });
+    assert.equal(interrupted.status, 73, interrupted.stderr);
+    const audit = await f.plan([], { scope, operation: 'audit' });
+    assert.equal(audit.applicable, false);
+    assert.match(audit.conflicts.join(' '), /locked/);
+    const store = path.dirname(f.receiptFile('codex', scope));
+    const stages = (await fs.readdir(store)).filter((name) => name.startsWith('.stage-'));
+    assert.equal(stages.length, 1);
+    const journal = JSON.parse(await fs.readFile(path.join(store, stages[0], 'transaction.json'), 'utf8'));
+    assert.equal(journal.previousReceipt, null);
+    assert.deepEqual(journal.nextReceipt.selected, ['research']);
+    await assert.rejects(f.apply(['research'], { scope }), /locked|collision/);
+  });
+});
 
 test('a home containing the source checkout is supported but source-overlapping installation paths are denied', async () => fixture(async (f) => {
   await assert.rejects(f.plan(['research'], { target: f.repository }), /outside the source checkout/);
+  await assert.rejects(f.plan(['research'], { scope: 'project', target: f.temporary }), /must not overlap/);
   await f.apply(['research'], { target: f.temporary });
   assert.match(await fs.readFile(path.join(f.temporary, '.agents/skills/research/SKILL.md'), 'utf8'), /name: research/);
   assert.equal((await f.plan([], { operation: 'audit', target: f.temporary })).applicable, true);
@@ -326,19 +415,21 @@ test('a home containing the source checkout is supported but source-overlapping 
   await assert.rejects(planInstallation(insideDiscovery, f.options()), /overlap/);
 }));
 
-test('initial installation and removal failures restore discovery and receipt ownership', async () => fixture(async (f) => {
-  const hooks = { checkpoint: async (point) => { if (point === 'receipt') throw new Error('Receipt failure'); } };
-  await assert.rejects(f.apply(['research'], {}, hooks), /rolled back/);
-  await assert.rejects(fs.lstat(f.discovery('research')), { code: 'ENOENT' });
-  await assert.rejects(fs.lstat(f.receiptFile()), { code: 'ENOENT' });
-  await f.apply(['research', 'tdd']);
-  const previous = await fs.readFile(f.receiptFile(), 'utf8');
-  const discovery = await fs.realpath(f.discovery('research'));
-  await assert.rejects(f.apply(['research'], { operation: 'remove' }, hooks), /rolled back/);
-  assert.equal(await fs.realpath(f.discovery('research')), discovery);
-  assert.equal(await fs.readFile(f.receiptFile(), 'utf8'), previous);
-  assert.equal((await f.plan([], { operation: 'audit' })).applicable, true);
-}));
+test('initial installation and removal failures restore discovery and receipt ownership at either scope', async () => {
+  for (const scope of ['machine', 'project']) await fixture(async (f) => {
+    const hooks = { checkpoint: async (point) => { if (point === 'receipt') throw new Error('Receipt failure'); } };
+    await assert.rejects(f.apply(['research'], { scope }, hooks), /rolled back/);
+    await assert.rejects(fs.lstat(f.discovery('research')), { code: 'ENOENT' });
+    await assert.rejects(fs.lstat(f.receiptFile('codex', scope)), { code: 'ENOENT' });
+    await f.apply(['research', 'tdd'], { scope });
+    const previous = await fs.readFile(f.receiptFile('codex', scope), 'utf8');
+    const discovery = await fs.realpath(f.discovery('research'));
+    await assert.rejects(f.apply(['research'], { scope, operation: 'remove' }, hooks), /rolled back/);
+    assert.equal(await fs.realpath(f.discovery('research')), discovery);
+    assert.equal(await fs.readFile(f.receiptFile('codex', scope), 'utf8'), previous);
+    assert.equal((await f.plan([], { scope, operation: 'audit' })).applicable, true);
+  });
+});
 
 test('a discovery replaced at the rename boundary is restored instead of deleted with staging', async () => fixture(async (f) => {
   await f.apply();
