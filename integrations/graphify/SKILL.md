@@ -11,9 +11,10 @@ Do not run Graphify's own installer: this adapter, its receipt, and the harness
 lifecycle own discovery and configuration.
 
 Before executing a Graphify command, confirm the selected target reports both
-the approved distribution artifact and an available `graphify` entry point. If
-only the artifact is provisioned, report that runtime materialization is still
-required; do not resolve or install dependencies during an unrelated request.
+the approved distribution artifact and an invocable owned runtime. If only the
+artifact is provisioned, report that explicit `--materialize --allow-network`
+setup with Python 3.10+ is still required; do not resolve or install dependencies
+during an unrelated request.
 
 For a first build, prefer code-only local extraction. Keep output project-local
 under `graphify-out/` and confirm the project excludes it from version control

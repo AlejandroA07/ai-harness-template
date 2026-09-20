@@ -94,7 +94,10 @@
       "sources": [
         "components/mcp",
         "catalog/integrations.json",
-        "scripts/integration-catalog.mjs"
+        "integrations",
+        "scripts/integration-catalog.mjs",
+        "scripts/integration-installation.mjs",
+        "scripts/integration-runtime.mjs"
       ],
       "description": "Optional pinned programs and MCP adapters with explicit acquisition and activation definitions."
     },

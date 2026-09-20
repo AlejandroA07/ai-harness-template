@@ -17,7 +17,11 @@ Preview selective adoption with `node scripts/setup.mjs list` and
 Preview a pinned external integration with
 `node scripts/setup.mjs plan --module tool-integrations --select graphify --platform codex --scope project`.
 Target apply requires the separately downloaded catalog artifact through
-`--artifact graphify=<absolute-wheel>`; see
+`--artifact graphify=<absolute-wheel>`. Add `--materialize --allow-network`
+and an absolute Python 3.10+ path for an executable Graphify runtime; dependency
+downloads are constrained by the reviewed hash lock. Self-contained Archify
+archives are materialized directly, while MCP packages use their integrity-locked
+npm trees. See
 [`docs/dev/modularity-m6-tool-integrations.md`](docs/dev/modularity-m6-tool-integrations.md).
 Target-free plans resolve capabilities and conditional uses without inspecting an
 installation. For selected machine or project skills and workflows, use

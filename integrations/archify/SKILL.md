@@ -19,5 +19,6 @@ relationships were extracted completely from source.
 - Use Graphify only as bounded evidence input; verify material relationships in
   source and never present Graphify inference as deterministic Archify evidence.
 
-The harness owns the pinned release archive, discovery adapter, and removal
-receipt. Do not use a vendor global installer or overwrite shared settings.
+The harness securely expands the self-contained pinned release into its owned
+runtime and records the runtime tree, discovery adapter, and removal receipt.
+Do not use a vendor global installer or overwrite shared settings.

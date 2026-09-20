@@ -35,6 +35,13 @@ test('integration catalog pins artifacts, provenance, adapters and inactive defa
       'pr-dashboard', 'pr-triage', 'query-logging', 'update-check', 'watch', 'hooks', 'mcp', 'global-graph', 'memory']);
   assert.deepEqual(graphify.capabilities.find((entry) => entry.id === 'query').writes, []);
   assert.equal(graphify.capabilities.find((entry) => entry.id === 'query-logging').default, 'disabled');
+  assert.deepEqual(graphify.runtime.resources.map((entry) => entry.profile), ['base', 'all']);
+  assert.ok(graphify.runtime.resources.every((entry) => /^[a-f0-9]{64}$/.test(entry.sha256)));
+  for (const id of ['context7', 'playwright']) {
+    const runtime = catalog.integrations.find((entry) => entry.id === id).runtime;
+    assert.equal(runtime.kind, 'npm-package');
+    assert.deepEqual(runtime.resources.map((entry) => path.basename(entry.path)).sort(), ['package-lock.json', 'package.json']);
+  }
   assert.equal(catalog.integrations.find((entry) => entry.id === 'archify').provenance.artifact.sha256,
     '4c59fa6557a2385beaaef8c7219cc414573acc9f0c30a932d5053b0b20689a46');
 });
@@ -78,6 +85,7 @@ test('integration validation rejects untrusted acquisition, automatic activation
     (value) => { value.integrations[0].provenance.artifact.sha256 = '../outside'; },
     (value) => { value.integrations[0].provenance.artifact.size = 30_000_000; },
     (value) => { value.integrations[0].safeguards.automaticNetwork = true; },
+    (value) => { value.integrations.find((entry) => entry.id === 'graphify').runtime.resources[0].path = '../outside'; },
     (value) => { value.integrations.find((entry) => entry.id === 'graphify').capabilities.find((entry) => entry.id === 'memory').default = 'enabled'; },
   ];
   for (const mutate of mutations) {
@@ -90,8 +98,8 @@ test('integration validation rejects untrusted acquisition, automatic activation
   assert.throws(() => planIntegrations(catalog, select(['archify'], { enabled: ['graphify:mcp'] })), /unselected integration/);
 });
 
-test('integration loading rejects linked, drifted or expanded adapters', async () => {
-  for (const kind of ['linked', 'drifted', 'expanded']) {
+test('integration loading rejects linked, drifted or expanded adapters and runtime locks', async () => {
+  for (const kind of ['linked', 'drifted', 'expanded', 'runtime-lock']) {
     const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'integration-catalog-'));
     const repository = path.join(temporary, 'repository');
     try {
@@ -105,7 +113,8 @@ test('integration loading rejects linked, drifted or expanded adapters', async (
         await fs.unlink(adapter);
         await fs.symlink(outside, adapter);
       } else if (kind === 'drifted') await fs.writeFile(adapter, '[mcp_servers.context7]\ncommand = "npx"\nargs = ["-y", "@upstash/context7-mcp@latest"]\n');
-      else await fs.appendFile(adapter, 'env = { SECRET = "unsafe" }\n');
+      else if (kind === 'expanded') await fs.appendFile(adapter, 'env = { SECRET = "unsafe" }\n');
+      else await fs.appendFile(path.join(repository, 'integrations/graphify/base-requirements.txt'), '\nchanged\n');
       await assert.rejects(loadIntegrationCatalog(repository));
     } finally { await fs.rm(temporary, { recursive: true, force: true }); }
   }

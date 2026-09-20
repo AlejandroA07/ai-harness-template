@@ -57,7 +57,7 @@ export async function publishFiles({ target, staging, operations, journal, check
   try {
     await fs.writeFile(path.join(staging, 'transaction.json'), encode(journal), { flag: 'wx', mode: 0o600 });
     for (const [index, operation] of operations.entries()) {
-      if (operation.after !== null) await fs.writeFile(path.join(staging, `${index}.new`), operation.after, { flag: 'wx', mode: 0o600 });
+      if (operation.after !== null) await fs.writeFile(path.join(staging, `${index}.new`), operation.after, { flag: 'wx', mode: operation.mode ?? 0o600 });
     }
     await checkpoint('staged');
     for (const operation of operations) {

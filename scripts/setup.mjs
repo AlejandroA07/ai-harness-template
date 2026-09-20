@@ -16,7 +16,7 @@ const usage = `Usage:
 
   node scripts/setup.mjs <apply|remove> --select <capability> --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--apply] [--json]
   node scripts/setup.mjs audit --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--json]
-  node scripts/setup.mjs <plan|apply|remove> --module tool-integrations --select <id> --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--enable <id>:<capability>] [--artifact <id>=<absolute-file>] [--apply] [--json]
+  node scripts/setup.mjs <plan|apply|remove> --module tool-integrations --select <id> --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--enable <id>:<capability>] [--artifact <id>=<absolute-file>] [--materialize] [--allow-network] [--python <absolute-python>] [--apply] [--json]
   node scripts/setup.mjs audit --module tool-integrations --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--json]
   node scripts/setup.mjs <plan|apply|audit|remove> --module global-configuration --platform <claude|codex> --scope machine --target <absolute-home-path> [--apply] [--json]
   node scripts/setup.mjs <plan|apply|audit|remove> --module project-configuration --platform <claude|codex> --scope project --target <absolute-project-path> [--apply] [--json]
@@ -44,7 +44,13 @@ function parseArgs(args) {
       result.json = true;
       continue;
     }
-    if (operation === 'list' || !['--select', '--module', '--platform', '--scope', '--target', '--verification', '--ci', '--tracker', '--domain-layout', '--enable', '--artifact'].includes(option)) throw new Error(`Unsupported option: ${option}`);
+    if (['--materialize', '--allow-network'].includes(option)) {
+      const key = option.slice(2).replace('-network', 'Network');
+      if (result[key]) throw new Error(`Duplicate ${option}`);
+      result[key] = true;
+      continue;
+    }
+    if (operation === 'list' || !['--select', '--module', '--platform', '--scope', '--target', '--verification', '--ci', '--tracker', '--domain-layout', '--enable', '--artifact', '--python'].includes(option)) throw new Error(`Unsupported option: ${option}`);
     const value = options[++index];
     if (!value || value.startsWith('--')) throw new Error(`Missing value for ${option}`);
     if (option === '--select') result.ids.push(value);
@@ -68,7 +74,7 @@ function parseArgs(args) {
   const integrations = result.modules.length === 1 && result.modules[0] === 'tool-integrations';
   if ((global || project) && (result.ids.length || !result.target)) throw new Error('Configuration modules require --target and cannot be mixed with skills');
   if ((result.target || operation !== 'plan') && result.modules.length && !global && !project && !integrations) throw new Error('Lifecycle supports one configuration module, Tool integrations, or explicit skill IDs');
-  if ((result.enabled.length || Object.keys(result.artifacts).length) && !integrations) throw new Error('--enable and --artifact require --module tool-integrations');
+  if ((result.enabled.length || Object.keys(result.artifacts).length || result.materialize || result.allowNetwork || result.python) && !integrations) throw new Error('--enable, --artifact and runtime materialization options require --module tool-integrations');
   if (integrations && result.platform === 'both') throw new Error('Tool integration lifecycle requires one platform');
   if (integrations && operation === 'audit' && (result.ids.length || result.enabled.length || Object.keys(result.artifacts).length)) throw new Error('Tool integration audit inspects the whole receipt');
   if (!project && ['verification', 'ci', 'tracker', 'domainLayout'].some((key) => result[key] !== undefined)) throw new Error('Project configuration options require --module project-configuration');
@@ -123,7 +129,8 @@ try {
       const applyPlan = options.integrations ? applyIntegrationInstallation : options.project ? applyProjectInstallation : options.global ? applyGlobalInstallation : applyInstallation;
       const plan = await planner(root, { operation: options.operation === 'plan' ? 'apply' : options.operation,
         ids: options.ids, platform: options.platform, scope: options.scope, target: options.target,
-        ...(options.integrations ? { enabled: options.enabled, artifacts: options.artifacts } : {}),
+        ...(options.integrations ? { enabled: options.enabled, artifacts: options.artifacts, materialize: Boolean(options.materialize),
+          allowNetwork: Boolean(options.allowNetwork), python: options.python ?? null } : {}),
         ...(options.project ? { verification: options.verification, ci: options.ci, tracker: options.tracker, domainLayout: options.domainLayout } : {}) });
       const result = options.apply ? await applyPlan(plan) : plan;
       if (options.json) console.log(JSON.stringify(result, null, 2));
@@ -135,7 +142,7 @@ try {
           for (const use of capability.conditionalUses) console.log(`  Conditional [${use.currentStatus} -> ${use.plannedStatus}]: ${use.id} — ${use.when}`);
           for (const route of capability.routes) console.log(`  Route [${route.currentStatus} -> ${route.plannedStatus}]: ${route.id}`);
         }
-        for (const integration of result.integrations ?? []) console.log(`Integration: ${integration.id} (provisioned=${integration.provisioned}; configured=${integration.configured}; invocable=${integration.invocable}; running=${integration.running})`);
+        for (const integration of result.integrations ?? []) console.log(`Integration: ${integration.id} (provisioned=${integration.provisioned}; configured=${integration.configured}; invocable=${integration.invocable}; plannedInvocable=${integration.plannedInvocable}; running=${integration.running})`);
         for (const change of result.changes) console.log(`${change.action}: ${change.id}`);
         if (result.evidence) console.log(`${result.evidence.action}: ${result.evidence.path}`);
         for (const conflict of result.conflicts) console.log(`Conflict: ${conflict}`);

@@ -12,6 +12,7 @@
       "runtime": {
         "kind": "release-archive",
         "command": "node",
+        "entrypoint": "bin/archify.mjs",
         "version": "2.16.0",
         "minimumRuntime": "node>=18"
       },
@@ -59,11 +60,16 @@
         "codex": "components/mcp/codex-context7.toml"
       },
       "runtime": {
-        "kind": "npm-exec",
-        "command": "npx",
+        "kind": "npm-package",
+        "command": "node",
         "package": "@upstash/context7-mcp",
+        "entrypoint": "node_modules/@upstash/context7-mcp/dist/index.js",
         "version": "3.2.5",
-        "minimumRuntime": "node>=20.18.1"
+        "minimumRuntime": "node>=20.18.1",
+        "resources": [
+          { "path": "integrations/context7/package.json", "sha256": "2197567c30937b7c17a2a903baab3f3c69b04b639a41d3542a477bc710328e56", "profile": "runtime" },
+          { "path": "integrations/context7/package-lock.json", "sha256": "625676e056ad1a56933338e401e99808751ffc8e89f194d262fc58e69866dc9a", "profile": "runtime" }
+        ]
       },
       "provenance": {
         "mode": "adapted",
@@ -103,8 +109,14 @@
         "kind": "python-wheel",
         "command": "graphify",
         "package": "graphifyy",
+        "module": "graphify",
+        "mcpModule": "graphify.serve",
         "version": "0.9.58",
-        "minimumRuntime": "python>=3.10"
+        "minimumRuntime": "python>=3.10",
+        "resources": [
+          { "path": "integrations/graphify/base-requirements.txt", "sha256": "db4fc7ac5118f3b0559f3a8125d2e516148c4383e25622da9b4a28c7145044a0", "profile": "base" },
+          { "path": "integrations/graphify/all-requirements.txt", "sha256": "044ce296d7d89591c3801e28e595ad5dd4c6b012c5c0b717344ac956cfed6e5b", "profile": "all" }
+        ]
       },
       "provenance": {
         "mode": "adapted",
@@ -165,11 +177,16 @@
         "codex": "components/mcp/codex-playwright.toml"
       },
       "runtime": {
-        "kind": "npm-exec",
-        "command": "npx",
+        "kind": "npm-package",
+        "command": "node",
         "package": "@playwright/mcp",
+        "entrypoint": "node_modules/@playwright/mcp/cli.js",
         "version": "0.0.78",
-        "minimumRuntime": "node>=18"
+        "minimumRuntime": "node>=18",
+        "resources": [
+          { "path": "integrations/playwright/package.json", "sha256": "456a133d4b6396ab354127e00b51fd0489500ff0028314a6a1cd4dcf50e34258", "profile": "runtime" },
+          { "path": "integrations/playwright/package-lock.json", "sha256": "489750e0cabd757fc8f25ed052422f684dd284dda3e87c92347cb11277db0d36", "profile": "runtime" }
+        ]
       },
       "provenance": {
         "mode": "adapted",

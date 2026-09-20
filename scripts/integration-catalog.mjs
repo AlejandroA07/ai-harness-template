@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { parseSkill, assertSafeDirectory } from './skill-lib.mjs';
 import { readRegular } from './installation-core.mjs';
 
@@ -7,7 +8,7 @@ const idPattern = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const platforms = ['claude', 'codex'];
 const scopes = ['machine', 'project'];
 const targets = platforms.flatMap((platform) => scopes.map((scope) => `${platform}:${scope}`));
-const runtimeKinds = ['npm-exec', 'python-wheel', 'release-archive'];
+const runtimeKinds = ['npm-package', 'python-wheel', 'release-archive'];
 const formats = ['npm', 'wheel', 'zip'];
 const modes = ['invoke', 'activate', 'configure'];
 const defaults = ['enabled', 'disabled'];
@@ -32,7 +33,7 @@ function choices(value, allowed, label) {
   array(value, (entry) => { if (!allowed.includes(entry)) fail(`Unsupported ${label}`); }, label, true);
 }
 function localPath(value, roots) {
-  if (typeof value !== 'string' || !/^[a-zA-Z0-9._/-]+$/.test(value)
+  if (typeof value !== 'string' || !/^[a-zA-Z0-9.@_/-]+$/.test(value)
     || value.split('/').some((part) => !part || part === '.' || part === '..')
     || !roots.includes(value.split('/')[0])) fail('Unsafe integration path');
 }
@@ -42,6 +43,13 @@ function secureUrl(value, hosts) {
   if (url.protocol !== 'https:' || url.username || url.password || !hosts.includes(url.hostname)) {
     fail('Untrusted integration artifact URL');
   }
+}
+
+function runtimeResource(resource) {
+  record(resource, ['path', 'sha256', 'profile'], 'integration runtime resource');
+  localPath(resource.path, ['integrations']);
+  if (!/^[a-f0-9]{64}$/.test(resource.sha256 ?? '')) fail('Invalid integration runtime resource digest');
+  text(resource.profile, 'integration runtime resource profile');
 }
 
 export function validateIntegrationCatalog(catalog) {
@@ -67,14 +75,31 @@ export function validateIntegrationCatalog(catalog) {
       record(integration.adapter, integration.platforms, 'platform adapters');
       for (const platform of integration.platforms) localPath(integration.adapter[platform], ['components']);
     }
-    record(integration.runtime, ['kind', 'command', 'package', 'version', 'minimumRuntime'], 'integration runtime');
+    record(integration.runtime, ['kind', 'command', 'package', 'entrypoint', 'module', 'mcpModule', 'version', 'minimumRuntime', 'resources'], 'integration runtime');
     if (!runtimeKinds.includes(integration.runtime.kind)) fail('Unsupported integration runtime');
     text(integration.runtime.command, 'runtime command');
     text(integration.runtime.version, 'runtime version');
     text(integration.runtime.minimumRuntime, 'minimum runtime');
     if (integration.runtime.kind === 'release-archive') {
-      if (Object.hasOwn(integration.runtime, 'package')) fail('Archive runtime cannot declare a package');
-    } else text(integration.runtime.package, 'runtime package');
+      if (Object.hasOwn(integration.runtime, 'package') || Object.hasOwn(integration.runtime, 'resources')) fail('Archive runtime cannot declare package resources');
+      text(integration.runtime.entrypoint, 'archive runtime entrypoint');
+      localPath(integration.runtime.entrypoint, ['bin']);
+    } else {
+      text(integration.runtime.package, 'runtime package');
+      array(integration.runtime.resources, runtimeResource, 'integration runtime resources', true);
+      if (integration.runtime.kind === 'npm-package') {
+        text(integration.runtime.entrypoint, 'npm runtime entrypoint');
+        localPath(integration.runtime.entrypoint, ['node_modules']);
+      } else {
+        text(integration.runtime.module, 'Python runtime module');
+        text(integration.runtime.mcpModule, 'Python MCP runtime module');
+        if (!/^[a-z][a-z0-9_.]+$/.test(integration.runtime.module)
+          || !/^[a-z][a-z0-9_.]+$/.test(integration.runtime.mcpModule)
+          || integration.runtime.resources.map((entry) => entry.profile).sort().join(',') !== 'all,base') {
+          fail('Invalid Python integration runtime contract');
+        }
+      }
+    }
 
     record(integration.provenance, ['mode', 'repository', 'reviewedCommit', 'upstreamPath', 'localPath', 'release', 'license', 'notices', 'artifact'], 'integration provenance');
     if (integration.provenance.mode !== 'adapted') fail('Executable integrations require an adapted local boundary');
@@ -136,6 +161,11 @@ export async function loadIntegrationCatalog(repositoryRoot) {
   const root = await fs.realpath(repositoryRoot);
   const catalog = validateIntegrationCatalog(JSON.parse((await readSource(root, 'catalog/integrations.json')).toString('utf8')));
   for (const integration of catalog.integrations) {
+    for (const resource of integration.runtime.resources ?? []) {
+      const bytes = await readSource(root, resource.path);
+      const actual = crypto.createHash('sha256').update(bytes).digest('hex');
+      if (actual !== resource.sha256) fail(`Integration runtime resource drifted: ${resource.path}`);
+    }
     if (typeof integration.adapter === 'string') {
       const contents = (await readSource(root, integration.adapter)).toString('utf8');
       const skill = parseSkill(contents, integration.adapter);
@@ -182,7 +212,7 @@ export function planIntegrations(catalog, selection) {
     for (const capability of enabled) {
       if (!integration.capabilities.some((entry) => entry.id === capability)) fail(`Unknown ${name} capability: ${capability}`);
     }
-    return { ...structuredClone(integration), adapter: typeof integration.adapter === 'string'
+    return { ...structuredClone(integration), adapterKind: typeof integration.adapter === 'string' ? 'skill' : 'mcp', adapter: typeof integration.adapter === 'string'
       ? integration.adapter : integration.adapter[selection.platform],
       capabilities: integration.capabilities.map((capability) => ({ ...capability,
         enabled: capability.default === 'enabled' || enabled.has(capability.id),

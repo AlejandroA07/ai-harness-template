@@ -17,7 +17,7 @@ async function fixture(body) {
   const target = path.join(temporary, 'home');
   try {
     await fs.mkdir(repository);
-    for (const directory of ['scripts', 'catalog', 'skills', 'global', 'project', 'components']) {
+    for (const directory of ['scripts', 'catalog', 'skills', 'global', 'project', 'components', 'integrations']) {
       await fs.cp(path.join(root, directory), path.join(repository, directory), { recursive: true });
     }
     await fs.mkdir(target);
