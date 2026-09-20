@@ -2,8 +2,8 @@
 
 - **Kind:** living progress tracker
 - **Last updated:** 2026-09-14
-- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M0–M5 are implemented and locally verified; M6–M8 remain pending. Westcoast Cars remains selected with its baseline pending.
-- **Next action:** implement M6 provenance and tool integrations through the [M5 lifecycle and composition boundary](modularity-m5-workflows.md). Retain the [M4 project lifecycle and limits](modularity-m4-project-configuration.md), [M3 ownership, recovery and activation limits](modularity-m3-global-configuration.md) and [M0 evidence and lifecycle limits](modularity-m0-safety.md). Westcoast Cars evaluation can proceed independently.
+- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M0–M6 are implemented and locally verified; M7–M8 remain pending. Westcoast Cars remains selected with its baseline pending.
+- **Next action:** implement M7 logical architecture and cost views from the catalog and receipts, using the [M6 Tool integration state contract](modularity-m6-tool-integrations.md). Retain the [M5 lifecycle and composition boundary](modularity-m5-workflows.md), [M4 project lifecycle and limits](modularity-m4-project-configuration.md), [M3 ownership, recovery and activation limits](modularity-m3-global-configuration.md) and [M0 evidence and lifecycle limits](modularity-m0-safety.md). Westcoast Cars evaluation can proceed independently.
 
 This file is the durable checklist for the graph-engineering, Graphify, architecture-viewer, CRAP, and hardening work. Update it after every completed step so progress does not depend on remembering a conversation.
 
@@ -46,7 +46,7 @@ Modularity comes first for permanent integration because it establishes ownershi
 - [x] Add project-only configuration with preserved verification, optional CI and self-contained adapter drift checks (M4).
 - [x] Add canonical project-scoped Skills with independent receipts and explicit M4 adapter collision handling (M5a).
 - [x] Add workflow dependency composition, optional routing status and invocation prerequisite reporting at both scopes (M5b).
-- [ ] Integrate Graphify with all capabilities and documented invocation/configuration choices.
+- [x] Integrate Graphify with all capabilities and documented invocation/configuration choices (M6).
 - [ ] Generate the logical architecture overview and evaluate its connection to Graphify.
 
 ### Implementation slice tracker
@@ -63,7 +63,7 @@ the repair record tracks the new regression cases and remaining remote checks.
 | M3 — Global-only platform selection | Repaired locally; remote checks pending | [Independent platforms, exact settings/hook ownership, legacy conflicts and interrupted-operation recovery](modularity-m3-global-configuration.md); 123 tests, 121 passed and two Windows-only skips; local verification gate passed |
 | M4 — Project-only configuration and gates | Complete locally | [Self-contained runtime, preserved verifier/settings, optional CI and adapter drift checks](modularity-m4-project-configuration.md); 146 tests, 144 passed and two Windows-only skips after review fixes; PR CodeQL and live Windows validation remain separate |
 | M5 — Workflow composition and discovery | Complete locally | [Project-skill and workflow lifecycle evidence](modularity-m5-workflows.md); dependency closure, optional route status, prerequisite reporting and unchanged invocation metadata covered |
-| M6 — Provenance and tool integrations | Pending | Graphify full-capability integration and Archify trial with owned setup |
+| M6 — Provenance and tool integrations | Complete locally | [Pinned acquisition, lifecycle and state evidence](modularity-m6-tool-integrations.md); Graphify full-capability boundary, Archify trial and existing MCP adapters covered |
 | M7 — Architecture overview and cost reporting | Pending | Catalog-derived views and preserved runtime measurements |
 | M8 — Full-profile migration and compatibility | Pending | Rehearsal, cross-platform evidence, final documentation and verification |
 
@@ -246,7 +246,7 @@ Record durable harness decisions in [`decisions.md`](decisions.md), including re
 
 ## Decisions still open
 
-- [ ] Graphify configuration: specify how a project enables and invokes builds, queries, watchers, hooks, semantic processing, and MCP. All capabilities are in scope; defaults and setup details remain to implement.
+- [x] Graphify configuration: project selection exposes builds and queries by default; watchers, hooks, semantic processing, MCP, global graphs and memory require explicit capability enablement. Installation never starts or invokes them.
 - [ ] Graphify persistence: project-local ignored cache, checked-in graph, or external per-user cache?
 - [ ] Archify retention: keep it after the direct-read versus Graphify-fed comparison only if its diagrams improve human understanding enough to justify agent context cost.
 - [ ] Westcoast Cars: confirm its location and record the commit, verification command, and coverage baseline before evaluation.

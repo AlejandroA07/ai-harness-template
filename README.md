@@ -14,6 +14,11 @@ All mutating setup commands are dry-run by default and require `--apply`.
 
 Preview selective adoption with `node scripts/setup.mjs list` and
 `node scripts/setup.mjs plan --select implement --platform codex --scope machine`.
+Preview a pinned external integration with
+`node scripts/setup.mjs plan --module tool-integrations --select graphify --platform codex --scope project`.
+Target apply requires the separately downloaded catalog artifact through
+`--artifact graphify=<absolute-wheel>`; see
+[`docs/dev/modularity-m6-tool-integrations.md`](docs/dev/modularity-m6-tool-integrations.md).
 Target-free plans resolve capabilities and conditional uses without inspecting an
 installation. For selected machine or project skills and workflows, use
 `setup.mjs apply`,

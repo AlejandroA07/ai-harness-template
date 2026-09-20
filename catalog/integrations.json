@@ -1,0 +1,201 @@
+{
+  "version": 1,
+  "integrations": [
+    {
+      "id": "archify",
+      "label": "Archify",
+      "description": "User-invoked validation and rendering of authored architecture, workflow, sequence, data-flow and lifecycle diagrams.",
+      "platforms": ["claude", "codex"],
+      "scopes": ["machine", "project"],
+      "targets": ["claude:machine", "claude:project", "codex:machine", "codex:project"],
+      "adapter": "integrations/archify/SKILL.md",
+      "runtime": {
+        "kind": "release-archive",
+        "command": "node",
+        "version": "2.16.0",
+        "minimumRuntime": "node>=18"
+      },
+      "provenance": {
+        "mode": "adapted",
+        "repository": "https://github.com/tt-a1i/archify",
+        "reviewedCommit": "c826e6c3a7abad19c0f3cd1ca57207d54b1ad8de",
+        "upstreamPath": "archify",
+        "localPath": "integrations/archify/SKILL.md",
+        "release": "v2.16.0",
+        "license": "MIT",
+        "notices": ["The approved release archive includes its MIT license and pinned third-party icon notices."],
+        "artifact": {
+          "url": "https://github.com/tt-a1i/archify/releases/download/v2.16.0/archify.zip",
+          "sha256": "4c59fa6557a2385beaaef8c7219cc414573acc9f0c30a932d5053b0b20689a46",
+          "size": 1318273,
+          "format": "zip",
+          "root": "archify"
+        }
+      },
+      "capabilities": [
+        { "id": "doctor", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
+        { "id": "validate", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
+        { "id": "render", "mode": "invoke", "default": "enabled", "network": "none", "model": "agent-authored-input", "writes": ["explicit output path"] },
+        { "id": "deliver", "mode": "invoke", "default": "enabled", "network": "none", "model": "agent-authored-input", "writes": ["explicit HTML output path"] },
+        { "id": "preview", "mode": "invoke", "default": "disabled", "network": "none", "model": "none", "writes": ["explicit output path", "local preview process"] },
+        { "id": "update-check", "mode": "invoke", "default": "disabled", "network": "vendor-release", "model": "none", "writes": [] }
+      ],
+      "safeguards": {
+        "automaticHooks": false,
+        "automaticWatch": false,
+        "automaticMemory": false,
+        "automaticNetwork": false
+      }
+    },
+    {
+      "id": "context7",
+      "label": "Context7 MCP",
+      "description": "Pinned MCP adapter for current third-party library documentation.",
+      "platforms": ["claude", "codex"],
+      "scopes": ["machine", "project"],
+      "targets": ["claude:project", "codex:machine", "codex:project"],
+      "adapter": {
+        "claude": "components/mcp/claude-context7.json",
+        "codex": "components/mcp/codex-context7.toml"
+      },
+      "runtime": {
+        "kind": "npm-exec",
+        "command": "npx",
+        "package": "@upstash/context7-mcp",
+        "version": "3.2.5",
+        "minimumRuntime": "node>=20.18.1"
+      },
+      "provenance": {
+        "mode": "adapted",
+        "repository": "https://github.com/upstash/context7",
+        "reviewedCommit": null,
+        "upstreamPath": "packages/mcp",
+        "localPath": "components/mcp",
+        "release": "npm:@upstash/context7-mcp@3.2.5",
+        "license": "MIT",
+        "notices": ["The approved npm package declares the MIT license."],
+        "artifact": {
+          "url": "https://registry.npmjs.org/@upstash/context7-mcp/-/context7-mcp-3.2.5.tgz",
+          "integrity": "sha512-m+GIwQKBx2yCnLN7Et3wqkuTk1iPkMySQH2i6KiUf4B9wVI0tgtjeXRcDfFZPf5rnRA3gjYhr1FqQqMb9aSRnw==",
+          "size": 98579,
+          "format": "npm"
+        }
+      },
+      "capabilities": [
+        { "id": "mcp", "mode": "configure", "default": "enabled", "network": "upstash", "model": "none", "writes": ["selected platform MCP configuration"] }
+      ],
+      "safeguards": {
+        "automaticHooks": false,
+        "automaticWatch": false,
+        "automaticMemory": false,
+        "automaticNetwork": false
+      }
+    },
+    {
+      "id": "graphify",
+      "label": "Graphify",
+      "description": "User-controlled code knowledge graph build, query and optional activation features.",
+      "platforms": ["claude", "codex"],
+      "scopes": ["machine", "project"],
+      "targets": ["claude:machine", "claude:project", "codex:machine", "codex:project"],
+      "adapter": "integrations/graphify/SKILL.md",
+      "runtime": {
+        "kind": "python-wheel",
+        "command": "graphify",
+        "package": "graphifyy",
+        "version": "0.9.58",
+        "minimumRuntime": "python>=3.10"
+      },
+      "provenance": {
+        "mode": "adapted",
+        "repository": "https://github.com/Graphify-Labs/graphify",
+        "reviewedCommit": "23f2ffaa43fd12f25d9eabe91e6d184b5d89b474",
+        "upstreamPath": "graphify",
+        "localPath": "integrations/graphify/SKILL.md",
+        "release": "v0.9.58",
+        "license": "Apache-2.0 AND MIT",
+        "notices": ["The approved wheel includes Apache-2.0 and bundled MIT license notices."],
+        "artifact": {
+          "url": "https://files.pythonhosted.org/packages/f2/e3/5654558956032fdf67161932575de6e31a67a37eeaceb9fb56e56be59b90/graphifyy-0.9.58-py3-none-any.whl",
+          "sha256": "e239803288e91c723d6e30540860bd6d5a1dc3f0914b9fc1104b0233e98aaeb8",
+          "size": 1411588,
+          "format": "wheel"
+        }
+      },
+      "capabilities": [
+        { "id": "build-code", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": ["project graph output"] },
+        { "id": "refresh", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": ["project graph output"] },
+        { "id": "cluster", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": ["project graph output"] },
+        { "id": "query", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
+        { "id": "path", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
+        { "id": "explain", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
+        { "id": "export", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": ["explicit export path"] },
+        { "id": "merge-graphs", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": ["explicit merged graph path"] },
+        { "id": "semantic-media", "mode": "invoke", "default": "disabled", "network": "selected-model-provider", "model": "required", "writes": ["project graph output", "converted media"] },
+        { "id": "remote-ingest", "mode": "invoke", "default": "disabled", "network": "user-selected-source", "model": "required", "writes": ["project graph output", "downloaded or converted source"] },
+        { "id": "database-connectors", "mode": "invoke", "default": "disabled", "network": "user-selected-destination", "model": "none", "writes": ["project graph output", "selected database"] },
+        { "id": "community-labeling", "mode": "invoke", "default": "disabled", "network": "selected-model-provider", "model": "required", "writes": ["project graph output"] },
+        { "id": "repository-clone", "mode": "invoke", "default": "disabled", "network": "user-selected-source", "model": "none", "writes": ["explicit clone path", "project graph output"] },
+        { "id": "pr-dashboard", "mode": "invoke", "default": "disabled", "network": "github", "model": "none", "writes": [] },
+        { "id": "pr-triage", "mode": "invoke", "default": "disabled", "network": "selected-model-provider", "model": "required", "writes": [] },
+        { "id": "query-logging", "mode": "configure", "default": "disabled", "network": "none", "model": "none", "writes": ["explicit query log path"] },
+        { "id": "update-check", "mode": "invoke", "default": "disabled", "network": "vendor-release", "model": "none", "writes": [] },
+        { "id": "watch", "mode": "activate", "default": "disabled", "network": "none", "model": "none", "writes": ["project graph output", "background process"] },
+        { "id": "hooks", "mode": "activate", "default": "disabled", "network": "none", "model": "none", "writes": ["Git hooks", "Git configuration"] },
+        { "id": "mcp", "mode": "activate", "default": "disabled", "network": "none", "model": "none", "writes": ["selected platform MCP configuration", "stdio process"] },
+        { "id": "global-graph", "mode": "invoke", "default": "disabled", "network": "none", "model": "none", "writes": ["cross-project user graph"] },
+        { "id": "memory", "mode": "invoke", "default": "disabled", "network": "none", "model": "none", "writes": ["work-memory records"] }
+      ],
+      "safeguards": {
+        "automaticHooks": false,
+        "automaticWatch": false,
+        "automaticMemory": false,
+        "automaticNetwork": false
+      }
+    },
+    {
+      "id": "playwright",
+      "label": "Playwright MCP",
+      "description": "Pinned MCP adapter for explicitly requested browser interaction.",
+      "platforms": ["claude", "codex"],
+      "scopes": ["machine", "project"],
+      "targets": ["claude:project", "codex:machine", "codex:project"],
+      "adapter": {
+        "claude": "components/mcp/claude-playwright.json",
+        "codex": "components/mcp/codex-playwright.toml"
+      },
+      "runtime": {
+        "kind": "npm-exec",
+        "command": "npx",
+        "package": "@playwright/mcp",
+        "version": "0.0.78",
+        "minimumRuntime": "node>=18"
+      },
+      "provenance": {
+        "mode": "adapted",
+        "repository": "https://github.com/microsoft/playwright-mcp",
+        "reviewedCommit": "5f8fc00210b27b4407c375b59cda4838045d429c",
+        "upstreamPath": "packages/playwright-mcp",
+        "localPath": "components/mcp",
+        "release": "npm:@playwright/mcp@0.0.78",
+        "license": "Apache-2.0",
+        "notices": ["The approved npm package declares the Apache-2.0 license."],
+        "artifact": {
+          "url": "https://registry.npmjs.org/@playwright/mcp/-/mcp-0.0.78.tgz",
+          "integrity": "sha512-XLTUeA6mEN9sQ+hJ4dfG8EIkDbxS0K3Trc2RBkUJuf02TgE2FQRNTMtq/aJfhyRMINsRl/Ybc4sxcWLtFn4/TQ==",
+          "size": 84517,
+          "format": "npm"
+        }
+      },
+      "capabilities": [
+        { "id": "mcp", "mode": "configure", "default": "enabled", "network": "browser-selected-destinations", "model": "none", "writes": ["selected platform MCP configuration", "browser profile"] }
+      ],
+      "safeguards": {
+        "automaticHooks": false,
+        "automaticWatch": false,
+        "automaticMemory": false,
+        "automaticNetwork": false
+      }
+    }
+  ]
+}

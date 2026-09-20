@@ -2,6 +2,8 @@ await import('./skills.test.mjs');
 await import('./skill-sync.test.mjs');
 await import('./project-skills.test.mjs');
 await import('./module-catalog.test.mjs');
+await import('./integration-catalog.test.mjs');
+await import('./integration-installation.test.mjs');
 await import('./selection-installation.test.mjs');
 await import('./global-installation.test.mjs');
 await import('./project-installation.test.mjs');
