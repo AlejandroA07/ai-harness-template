@@ -14,7 +14,7 @@ const usage = `Usage:
   node scripts/setup.mjs plan --select <id> [--select <id> ...] --platform <claude|codex|both> --scope <machine|project> [--json]
   node scripts/setup.mjs plan --module <skills|workflows> --platform <claude|codex|both> --scope <machine|project> [--json]
   node scripts/setup.mjs plan --module tool-integrations [--select <id> ...] --platform <claude|codex> --scope <machine|project> [--enable <id>:<capability> ...] [--json]
-  node scripts/setup.mjs <plan|apply|audit> --profile full --platform both --scope machine --target <absolute-home-path> [--legacy-root <absolute-old-checkout>] [--apply] [--json]
+  node scripts/setup.mjs <plan|apply|audit|remove> --profile full --platform both --scope machine --target <absolute-home-path> [--legacy-root <absolute-old-checkout>] [--apply] [--json]
 
   node scripts/setup.mjs <apply|remove> --select <capability> --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--apply] [--json]
   node scripts/setup.mjs audit --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--json]
@@ -82,8 +82,8 @@ function parseArgs(args) {
     || result.materialize || result.allowNetwork || result.python || result.verification || result.ci || result.tracker || result.domainLayout)) {
     throw new Error('The full profile cannot be mixed with module, selection, integration or project options');
   }
-  if (full && (!result.target || result.platform !== 'both' || result.scope !== 'machine' || result.operation === 'remove')) {
-    throw new Error('The full profile requires --target, --platform both, --scope machine and plan/apply/audit');
+  if (full && (!result.target || result.platform !== 'both' || result.scope !== 'machine')) {
+    throw new Error('The full profile requires --target, --platform both and --scope machine');
   }
   if (result.legacyRoot && !full) throw new Error('--legacy-root requires --profile full');
   if ((global || project) && (result.ids.length || !result.target)) throw new Error('Configuration modules require --target and cannot be mixed with skills');

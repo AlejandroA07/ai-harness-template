@@ -266,7 +266,9 @@ export async function planGlobalInstallation(repository, options) {
   const plan = { version: 1, stage: 'target-preflight', operation, target, platform, scope, module: 'global-configuration', profile: 'coexistence',
     installed: previous !== null, selected: ['global-configuration'], dependencies: ['shared-policy-runtime'],
     changes: operations.map(({ id, file, before, after }) => ({ id, path: file, action: after === null ? 'remove' : before === null ? 'create' : 'update' })),
-    receiptChanged: operations.some((entry) => entry.receipt), evidence, applicable: conflicts.length === 0, conflicts,
+    receiptChanged: operations.some((entry) => entry.receipt), currentReceiptEvidence: previous?.evidence ?? null,
+    plannedReceiptEvidence: operation === 'apply' ? sealedReceipt.evidence : null,
+    evidence, applicable: conflicts.length === 0, conflicts,
     activation: settings.disableAllHooks === true && operation !== 'remove' ? 'Guard activation is blocked: local settings disable all hooks.' : operation === 'remove' ? 'Removal restores prior owned settings; shared runtime is retained.'
       : operation === 'audit' && !previous ? 'No global installation receipt is present.'
         : platform === 'codex' ? 'Configuration enables hooks and disables memories; review/trust through /hooks remains interactive.' : 'Configuration enables the PreToolUse guard and disables automatic memory.',

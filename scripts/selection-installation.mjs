@@ -283,7 +283,9 @@ export async function planInstallation(root, options) {
     selected: [...nextSelected], entries: structuredClone(nextReceipt.entries), capabilities,
     changes: operation === 'audit' ? [] : changes,
     migrated,
-    receiptChanged, receiptPath: locations.receipt, evidence, conflicts, applicable: conflicts.length === 0, tools: [],
+    receiptChanged, receiptPath: locations.receipt, currentReceiptEvidence: old.receipt?.evidence ?? null,
+    plannedReceiptEvidence: operation === 'audit' ? old.receipt?.evidence ?? null : nextReceipt.evidence,
+    evidence, conflicts, applicable: conflicts.length === 0, tools: [],
     activation: `${scope === 'project' ? 'Project' : 'Machine'} discovery only; no hooks, settings, processes or network activation`,
     retainedPayloads: 'Immutable payload revisions are retained on update/removal; no recursive garbage collection' };
   receipts.set(plan, { root, options: { ...options, ids: [...requested], target }, context, old, nextReceipt, entries,

@@ -140,3 +140,57 @@ test('full-profile migration rejects ambiguous ownership and noncanonical discov
     }
   }
 });
+
+test('full-profile audit rejects a partial selective installation without full-profile ownership', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-partial-profile-'));
+  const target = path.join(root, 'home');
+  await fs.mkdir(target);
+  try {
+    for (const platform of ['claude', 'codex']) {
+      const skill = run(['apply', '--select', 'tdd', '--platform', platform, '--scope', 'machine',
+        '--target', target, '--apply', '--json']);
+      assert.equal(skill.status, 0, skill.stderr || skill.stdout);
+      const global = run(['apply', '--module', 'global-configuration', '--platform', platform, '--scope', 'machine',
+        '--target', target, '--apply', '--json']);
+      assert.equal(global.status, 0, global.stderr || global.stdout);
+    }
+
+    const audit = run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', target, '--json']);
+    assert.notEqual(audit.status, 0, audit.stderr || audit.stdout);
+    const result = JSON.parse(audit.stdout);
+    assert.equal(result.applicable, false);
+    assert.equal(result.installed, false);
+    assert.match(result.conflicts.join('\n'), /full-profile receipt|exact inventory/i);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('full-profile removal removes owned components and preserves unrelated target content', async () => {
+  const fixture = await legacyFixture();
+  const unrelated = path.join(fixture.target, '.agents', 'skills', 'notes.txt');
+  try {
+    const common = ['--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target, '--json'];
+    const apply = run(['apply', ...common, '--legacy-root', fixture.legacyRoot, '--apply']);
+    assert.equal(apply.status, 0, apply.stderr || apply.stdout);
+
+    const preview = run(['remove', ...common]);
+    assert.equal(preview.status, 0, preview.stderr || preview.stdout);
+    assert.equal(JSON.parse(preview.stdout).changes.length > 0, true);
+    await fs.access(path.join(fixture.target, '.ai-harness', 'installations', 'full-managed', 'receipt.json'));
+
+    const remove = run(['remove', ...common, '--apply']);
+    assert.equal(remove.status, 0, remove.stderr || remove.stdout);
+    const result = JSON.parse(remove.stdout);
+    assert.equal(result.installed, false);
+    assert.equal(result.applied, true);
+    await assert.rejects(fs.access(path.join(fixture.target, '.ai-harness', 'installations', 'full-managed', 'receipt.json')), { code: 'ENOENT' });
+    for (const platform of ['claude', 'codex']) {
+      const discovery = path.join(fixture.target, platform === 'codex' ? '.agents' : '.claude', 'skills');
+      for (const skill of fixture.skills) await assert.rejects(fs.lstat(path.join(discovery, skill.name)), { code: 'ENOENT' });
+    }
+    assert.equal(await fs.readFile(unrelated, 'utf8'), 'unmanaged note\n');
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});

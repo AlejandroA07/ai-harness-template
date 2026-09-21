@@ -14,6 +14,8 @@ node scripts/setup.mjs plan --profile full --platform both --scope machine --tar
 node scripts/setup.mjs apply --profile full --platform both --scope machine --target <absolute-home>
 node scripts/setup.mjs apply --profile full --platform both --scope machine --target <absolute-home> --apply
 node scripts/setup.mjs audit --profile full --platform both --scope machine --target <absolute-home>
+node scripts/setup.mjs remove --profile full --platform both --scope machine --target <absolute-home>
+node scripts/setup.mjs remove --profile full --platform both --scope machine --target <absolute-home> --apply
 ```
 
 For a target previously configured by `machine-setup.mjs`, supply the exact old
@@ -39,22 +41,26 @@ receipts under `<target>/.ai-harness/installations/`. Discovery links and guard
 runtimes point into that stable target-owned store, so deleting or moving the old
 checkout does not break the installation. The current checkout remains necessary
 to plan future updates; installed audit/removal uses retained ownership evidence.
+An additional sealed `full-managed` receipt binds the exact canonical selection
+to the four component receipt revisions. Full-profile audit therefore rejects a
+partial selective installation even when both platforms and global configurations
+are otherwise healthy.
 
 Unrelated settings, hooks, permission denials, hidden platform entries and
 ordinary files in discovery directories are preserved. Values already present
 in the legacy configuration are recorded conservatively as prior state rather
 than retroactively claimed. The full profile does not install optional Tool
 integrations, mutate projects, remove custom agents, transfer interactive Codex
-hook trust, or claim existing environment and repository Git configuration.
+hook trust, or remove unrelated target content.
 
 The legacy `machine-setup.mjs`, `sync-skills.mjs` and `audit.mjs` commands remain
 available for an unmigrated checkout-bound profile. `sync-skills.mjs` and therefore
 `machine-setup.mjs` now refuse a receipt-backed skill target: mixing the two modes
 would invalidate ownership and restore checkout-bound links. After migration use
 only `setup.mjs --profile full` for the combined profile, or the matching module
-lifecycle for a deliberate selective change. Full-profile removal is intentionally
-not a combined operation; review and remove owned modules individually so their
-restoration behavior remains visible.
+lifecycle for a deliberate selective change. Full-profile removal previews and
+then removes the four bound component ownership shares and aggregate receipt;
+each component still applies its own restoration and conflict rules.
 
 The four component publishers share a target lock but publish sequentially rather
 than as one cross-module transaction. Each component rechecks preconditions and
