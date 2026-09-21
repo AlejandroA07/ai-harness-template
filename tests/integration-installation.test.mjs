@@ -163,7 +163,8 @@ test('Graphify install, query planning, explicit activation, audit and removal r
   });
   assert.throws(() => planIntegrationAction(preview, { id: 'graphify', capability: 'query', operands: ['auth flow'] }), /not materialized/);
   assert.throws(() => planIntegrationAction(preview, { id: 'graphify', capability: 'watch' }), /not enabled/);
-  assert.equal(preview.activation.includes('never starts a process'), true);
+  assert.equal(preview.activation.includes('never starts or invokes a capability'), true);
+  assert.equal(preview.activation.includes('Explicit hook activation publishes only the planned harness-owned hook files'), true);
   const materialized = await planIntegrationInstallation(f.repository, options(f, {
     materialize: true, allowNetwork: true, python: '/fixture/python',
   }));

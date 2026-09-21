@@ -495,7 +495,8 @@ export async function planIntegrationInstallation(repository, options, internal 
   });
   const plan = { version: 1, module: 'tool-integrations', operation, target, platform, scope, profile: 'coexistence',
     installed: previous.length > 0, integrations: states, changes: operation === 'audit' ? [] : changes,
-    conflicts, applicable: conflicts.length === 0, activation: 'Installation never starts a process, installs a hook, enables memory, or performs network access.',
+    conflicts, applicable: conflicts.length === 0,
+    activation: 'Installation never starts or invokes a capability, enables memory automatically, or performs implicit network access. Explicit hook activation publishes only the planned harness-owned hook files.',
     notes: ['Artifacts are caller-supplied and checked against the catalog size and digest before publication.',
       materialize ? 'Materialization is explicitly requested; network access remains denied unless --allow-network is also present.'
         : 'Use --materialize to build an owned executable runtime from the pinned artifact and lock resources.',
