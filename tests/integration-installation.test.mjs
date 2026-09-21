@@ -263,9 +263,9 @@ test('Graphify install, query planning, explicit activation, audit and removal r
   }));
   assert.equal(removal.applicable, true, removal.conflicts.join('; '));
   await applyIntegrationInstallation(removal);
-  await assert.rejects(fs.readFile(path.join(f.target, '.agents/skills/graphify/SKILL.md')), { code: 'ENOENT' });
-  await assert.rejects(fs.readFile(path.join(f.target, '.harness/installations/codex/integrations/receipt.json')), { code: 'ENOENT' });
-  await assert.rejects(fs.readFile(hook), { code: 'ENOENT' });
+  await assert.rejects(fs.lstat(path.join(f.target, '.agents/skills/graphify/SKILL.md')), { code: 'ENOENT' });
+  await assert.rejects(fs.lstat(path.join(f.target, '.harness/installations/codex/integrations/receipt.json')), { code: 'ENOENT' });
+  await assert.rejects(fs.lstat(hook), { code: 'ENOENT' });
   assert.equal(await fs.readFile(path.join(f.target, 'unrelated.txt'), 'utf8'), 'preserve');
 }));
 
@@ -397,7 +397,7 @@ test('Archify uses the same pinned acquisition and removable adapter contract', 
     platform: 'claude', scope: 'machine', target: f.target,
   });
   await applyIntegrationInstallation(removal);
-  await assert.rejects(fs.readFile(path.join(f.target, '.claude/skills/archify/SKILL.md')), { code: 'ENOENT' });
+  await assert.rejects(fs.lstat(path.join(f.target, '.claude/skills/archify/SKILL.md')), { code: 'ENOENT' });
   assert.equal(await fs.readFile(privateState, 'utf8'), 'must not be inspected');
 }));
 
@@ -472,8 +472,8 @@ test('stale plans and interrupted publication preserve competing and unrelated s
         checkpoint: async (phase) => { if (phase === 'file') throw new Error('fixture interruption'); },
       }), /rolled back/);
     }
-    if (kind !== 'stale') await assert.rejects(fs.readFile(path.join(f.target, '.agents/skills/graphify/SKILL.md')), { code: 'ENOENT' });
-    await assert.rejects(fs.readFile(path.join(f.target, '.harness/installations/codex/integrations/receipt.json')), { code: 'ENOENT' });
+    if (kind !== 'stale') await assert.rejects(fs.lstat(path.join(f.target, '.agents/skills/graphify/SKILL.md')), { code: 'ENOENT' });
+    await assert.rejects(fs.lstat(path.join(f.target, '.harness/installations/codex/integrations/receipt.json')), { code: 'ENOENT' });
     assert.equal(await fs.readFile(unrelated, 'utf8'), 'keep');
   });
 });

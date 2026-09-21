@@ -102,7 +102,7 @@ test('project-scoped skills coexist with project configuration on both platforms
     assert.equal((await f.plan([], { platform, scope: 'project', operation: 'audit' })).applicable, true);
 
     await applyProjectInstallation(await planProjectInstallation(f.repository, { ...projectConfiguration, operation: 'remove' }));
-    await assert.rejects(fs.readFile(path.join(f.discovery('local-sample', platform), 'SKILL.md')), { code: 'ENOENT' });
+    await assert.rejects(fs.lstat(path.join(f.discovery('local-sample', platform), 'SKILL.md')), { code: 'ENOENT' });
     assert.match(await fs.readFile(path.join(f.discovery('research', platform), 'SKILL.md'), 'utf8'), /Project-scope update/);
     await f.apply(['research'], { platform, scope: 'project', operation: 'remove' });
     await assert.rejects(fs.lstat(f.discovery('research', platform)), { code: 'ENOENT' });
