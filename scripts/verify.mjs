@@ -25,7 +25,7 @@ run('gitleaks', ['git', '--redact', '-v'], 'Gitleaks full-history scan');
 run('zizmor', ['.'], 'GitHub Actions security');
 
 const jsonFiles = [
-  'skills/invocation-policy.json', 'catalog/integrations.json', 'global/claude-settings.json',
+  'skills/invocation-policy.json', 'catalog/integrations.json', 'catalog/token-measurements.json', 'global/claude-settings.json',
   'project/.claude/settings.json', 'project/.codex/hooks.json',
 ];
 for (const relative of jsonFiles) JSON.parse(await fs.readFile(path.join(root, relative), 'utf8'));

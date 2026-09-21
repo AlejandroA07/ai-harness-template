@@ -12,6 +12,10 @@
       "scopes": [
         "machine"
       ],
+      "requires": [
+        "installation-core",
+        "shared-policy-runtime"
+      ],
       "sources": [
         "global",
         "scripts/global-installation.mjs",
@@ -29,6 +33,10 @@
       ],
       "scopes": [
         "project"
+      ],
+      "requires": [
+        "installation-core",
+        "shared-policy-runtime"
       ],
       "sources": [
         "project",
@@ -57,6 +65,9 @@
         "machine",
         "project"
       ],
+      "requires": [
+        "installation-core"
+      ],
       "sources": [
         "skills"
       ],
@@ -74,6 +85,10 @@
         "machine",
         "project"
       ],
+      "requires": [
+        "skills",
+        "installation-core"
+      ],
       "sources": [
         "skills"
       ],
@@ -90,6 +105,9 @@
       "scopes": [
         "machine",
         "project"
+      ],
+      "requires": [
+        "installation-core"
       ],
       "sources": [
         "components/mcp",
@@ -113,10 +131,16 @@
         "machine",
         "project"
       ],
+      "requires": [
+        "shared-policy-runtime"
+      ],
       "sources": [
         "catalog",
         "scripts/module-catalog.mjs",
         "scripts/catalog-loader.mjs",
+        "scripts/architecture-view.mjs",
+        "scripts/cost-inventory.mjs",
+        "scripts/token-costs.mjs",
         "scripts/setup.mjs",
         "scripts/installation-core.mjs",
         "scripts/installation-evidence.mjs",
@@ -144,6 +168,7 @@
         "machine",
         "project"
       ],
+      "requires": [],
       "sources": [
         "components/guard-policy.mjs",
         "components/guard-git.mjs",

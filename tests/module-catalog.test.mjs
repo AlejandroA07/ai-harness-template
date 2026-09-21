@@ -126,6 +126,8 @@ test('invalid IDs, cycles, schema, discovery collisions and unsafe catalog paths
     (value) => { value.unexpected = true; },
     (value) => { value.modules[0].scopes = ['unknown']; },
     (value) => { value.modules[0].sources = ['../outside']; },
+    (value) => { value.modules[0].requires = ['unknown']; },
+    (value) => { value.modules[0].requires = [value.modules[0].id]; },
     (value) => { value.capabilities[0].id = '../escape'; },
     (value) => { value.capabilities[1].id = value.capabilities[0].id; },
     (value) => { value.capabilities[1].source = value.capabilities[0].source; },

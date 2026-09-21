@@ -30,7 +30,7 @@ export function validateCatalog(catalog) {
   if (catalog.version !== 1) fail('Unsupported catalog version');
   const modules = new Map();
   array(catalog.modules, (module) => {
-    record(module, ['id', 'label', 'visibility', 'platforms', 'scopes', 'sources', 'description'], 'module');
+    record(module, ['id', 'label', 'visibility', 'platforms', 'scopes', 'requires', 'sources', 'description'], 'module');
     id(module.id);
     if (modules.has(module.id)) fail(`Duplicate module ID: ${module.id}`);
     modules.set(module.id, module);
@@ -39,11 +39,26 @@ export function validateCatalog(catalog) {
     if (!['public', 'internal'].includes(module.visibility)) fail('Invalid module visibility');
     choices(module.platforms, platforms, 'platform');
     choices(module.scopes, scopes, 'scope');
+    array(module.requires, id, 'module dependencies');
     array(module.sources, (source) => {
       localPath(source);
       if (!['global', 'project', 'skills', 'components', 'integrations', 'scripts', 'catalog'].includes(source.split('/')[0])) fail('Unsupported module source root');
     }, 'module sources', true);
   }, 'modules', true);
+  for (const module of modules.values()) {
+    for (const target of module.requires) if (!modules.has(target)) fail(`Unknown module dependency: ${target}`);
+  }
+  const completedModules = new Set();
+  const visitingModules = new Set();
+  function visitModule(name) {
+    if (visitingModules.has(name)) fail(`Module dependency cycle at ${name}`);
+    if (completedModules.has(name)) return;
+    visitingModules.add(name);
+    modules.get(name).requires.forEach(visitModule);
+    visitingModules.delete(name);
+    completedModules.add(name);
+  }
+  [...modules.keys()].forEach(visitModule);
   const capabilities = new Map();
   const sources = new Set();
   array(catalog.capabilities, (capability) => {

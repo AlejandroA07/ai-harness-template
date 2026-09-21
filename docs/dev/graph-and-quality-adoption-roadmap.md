@@ -1,9 +1,9 @@
 # Graph and quality tooling adoption roadmap
 
 - **Kind:** living progress tracker
-- **Last updated:** 2026-09-14
-- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M0–M6 are implemented and locally verified; M7–M8 remain pending. Westcoast Cars remains selected with its baseline pending.
-- **Next action:** implement M7 logical architecture and cost views from the catalog and receipts, using the [M6 Tool integration state contract](modularity-m6-tool-integrations.md). Retain the [M5 lifecycle and composition boundary](modularity-m5-workflows.md), [M4 project lifecycle and limits](modularity-m4-project-configuration.md), [M3 ownership, recovery and activation limits](modularity-m3-global-configuration.md) and [M0 evidence and lifecycle limits](modularity-m0-safety.md). Westcoast Cars evaluation can proceed independently.
+- **Last updated:** 2026-09-21
+- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M0–M7 are implemented and locally verified; M8 remains pending. Westcoast Cars remains selected with its baseline pending.
+- **Next action:** rehearse the full-profile migration and complete compatibility cleanup in M8, retaining the [M7 generated architecture and cost contract](modularity-m7-architecture-cost.md) and the earlier lifecycle contracts. Westcoast Cars evaluation can proceed independently.
 
 This file is the durable checklist for the graph-engineering, Graphify, architecture-viewer, CRAP, and hardening work. Update it after every completed step so progress does not depend on remembering a conversation.
 
@@ -47,7 +47,7 @@ Modularity comes first for permanent integration because it establishes ownershi
 - [x] Add canonical project-scoped Skills with independent receipts and explicit M4 adapter collision handling (M5a).
 - [x] Add workflow dependency composition, optional routing status and invocation prerequisite reporting at both scopes (M5b).
 - [x] Integrate Graphify with all capabilities and documented invocation/configuration choices (M6).
-- [ ] Generate the logical architecture overview and evaluate its connection to Graphify.
+- [x] Generate the logical architecture overview and evaluate its connection to Graphify.
 
 ### Implementation slice tracker
 
@@ -64,7 +64,7 @@ the repair record tracks the new regression cases and remaining remote checks.
 | M4 — Project-only configuration and gates | Complete locally | [Self-contained runtime, preserved verifier/settings, optional CI and adapter drift checks](modularity-m4-project-configuration.md); 146 tests, 144 passed and two Windows-only skips after review fixes; PR CodeQL and live Windows validation remain separate |
 | M5 — Workflow composition and discovery | Complete locally | [Project-skill and workflow lifecycle evidence](modularity-m5-workflows.md); dependency closure, optional route status, prerequisite reporting and unchanged invocation metadata covered |
 | M6 — Provenance and tool integrations | Complete locally | [Pinned acquisition, lifecycle and state evidence](modularity-m6-tool-integrations.md); Graphify full-capability boundary, Archify trial and existing MCP adapters covered |
-| M7 — Architecture overview and cost reporting | Pending | Catalog-derived views and preserved runtime measurements |
+| M7 — Architecture overview and cost reporting | Complete locally | [Catalog-derived navigation, receipt-backed states, preserved runtime measurements and Graphify interchange decision](modularity-m7-architecture-cost.md); 188 tests, 186 passed and two Windows-only skips; full local verification gate passed |
 | M8 — Full-profile migration and compatibility | Pending | Rehearsal, cross-platform evidence, final documentation and verification |
 
 See the plan for exact prerequisites. Mark a slice complete only after its acceptance evidence and the repository gate pass. The review identified implementation risks; it did not fix them.

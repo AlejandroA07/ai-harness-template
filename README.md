@@ -6,6 +6,7 @@ A reusable, cross-platform workflow for Claude Code and Codex. It keeps durable 
 
 - New machine: follow [MACHINE-SETUP.md](MACHINE-SETUP.md), beginning with `node scripts/machine-setup.mjs`.
 - New or existing project: follow [BOOTSTRAP.md](BOOTSTRAP.md), beginning with `node scripts/bootstrap.mjs <project-path>`.
+- Architecture: browse [ARCHITECTURE.md](ARCHITECTURE.md), regenerate it with `node scripts/architecture-view.mjs --write`, or inspect a receipt-backed target with `node scripts/architecture-view.mjs --platform codex --scope project --target <absolute-project-path> --json`.
 - Token cost: review [TOKEN-COSTS.md](TOKEN-COSTS.md) and update it with `node scripts/token-costs.mjs --write`.
 - Audit installed state: run `node scripts/audit.mjs`, or add `--project <path>` to check whether one project conforms to the template.
 - Verify repository correctness: run `node scripts/verify.mjs` to execute the template's tests and security gates. Exit code `0` is the definition of done. CodeQL runs separately in GitHub; check its result before merging.
@@ -62,7 +63,7 @@ project-local adapters.
 | `project/` | Portable project skeleton and CI templates |
 | `global/` | Claude and Codex machine guidance/settings templates |
 | `scripts/` | Dependency-free Node setup, generation, audit, cost, and verification tools |
-| `catalog/` | Versioned module definitions and capability relationships; canonical content stays in `skills/` |
+| `catalog/` | Versioned module definitions, capability relationships, integration definitions, and separately preserved token measurements; canonical content stays in `skills/` |
 
 Claude adapters are generated with Claude's `disable-model-invocation` metadata. Codex adapters are generated with `agents/openai.yaml`. The workflow body has one canonical source.
 

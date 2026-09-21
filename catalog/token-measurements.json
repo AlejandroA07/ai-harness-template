@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "samples": [
+    {
+      "date": "2026-07-31",
+      "agentVersion": "Claude Code 2.1.220",
+      "model": "Opus 5",
+      "project": "Harness session",
+      "scenario": "Before optional-tool trim",
+      "mcps": "2 deferred tools",
+      "result": "System tools 11.2k; total 30.1k / 1m",
+      "method": "User-provided /context sample"
+    },
+    {
+      "date": "2026-07-31",
+      "agentVersion": "Claude Code 2.1.220",
+      "model": "Opus 5",
+      "project": "Harness session",
+      "scenario": "After optional-tool trim",
+      "mcps": "2 deferred tools",
+      "result": "System tools 6.1k; total 25.1k / 1m",
+      "method": "User-provided /context sample; saved 5.1k system-tool tokens (46%)"
+    },
+    {
+      "date": "2026-07-31",
+      "agentVersion": "Claude Code 2.1.220",
+      "model": "Opus 5",
+      "project": "Harness session",
+      "scenario": "Before custom-agent removal",
+      "mcps": "2 deferred tools",
+      "result": "Custom agents 12.6k (156); total 25.1k / 1m",
+      "method": "User-provided /context sample"
+    }
+  ],
+  "plannedSamples": [
+    {
+      "agentVersion": "Claude Code 2.1.220",
+      "model": "Opus 5",
+      "project": "Harness session",
+      "scenario": "After custom-agent removal",
+      "mcps": "2 deferred tools",
+      "method": "Start a fresh session and run /context"
+    }
+  ]
+}
