@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
+import { spawnSync } from 'node:child_process';
 
 const root = path.resolve(import.meta.dirname, '..');
 const read = (relative) => fs.readFile(path.join(root, relative), 'utf8');
@@ -132,6 +133,9 @@ test('machine audit rejects custom Claude agents', async () => {
 
 test('maintainer documentation has no broken relative Markdown links', async () => {
   const files = (await Promise.all(['README.md', 'MACHINE-SETUP.md', 'BOOTSTRAP.md', 'docs/dev'].map(markdownFiles))).flat();
+  const trackedResult = spawnSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' });
+  assert.equal(trackedResult.status, 0, trackedResult.stderr);
+  const tracked = trackedResult.stdout.split('\0').filter(Boolean).map((entry) => entry.replaceAll('\\', '/'));
   const broken = [];
   for (const file of files) {
     const source = await fs.readFile(file, 'utf8');
@@ -140,7 +144,14 @@ test('maintainer documentation has no broken relative Markdown links', async () 
       if (!destination || destination.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(destination)) continue;
       destination = decodeURIComponent(destination.split('#')[0]);
       if (!destination) continue;
-      try { await fs.access(path.resolve(path.dirname(file), destination)); }
+      const resolved = path.resolve(path.dirname(file), destination);
+      const relative = path.relative(root, resolved).replaceAll('\\', '/');
+      const inside = relative !== '..' && !relative.startsWith('../') && !path.isAbsolute(relative);
+      const versioned = !inside || tracked.includes(relative) || tracked.some((entry) => entry.startsWith(`${relative}/`));
+      try {
+        await fs.access(resolved);
+        if (!versioned) broken.push(`${path.relative(root, file)} -> ${match[1]}`);
+      }
       catch { broken.push(`${path.relative(root, file)} -> ${match[1]}`); }
     }
   }

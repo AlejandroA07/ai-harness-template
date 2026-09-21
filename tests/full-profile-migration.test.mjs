@@ -297,7 +297,7 @@ test('full-profile machine controls fail closed on missing tools and stale exter
     assert.match(missing.conflicts.join('\n'), /Required tool is unavailable: git/);
 
     const stale = await planFullProfileControls(root, { operation: 'apply', target,
-      home: target, runTool: statefulRunner });
+      home: target, systemPlatform: 'linux', runTool: statefulRunner });
     external.hooks = 'raced-hooks';
     await assert.rejects(applyFullProfileControls(stale), /Machine-control conflicts|preconditions changed/);
     assert.equal(external.hooks, 'raced-hooks');
