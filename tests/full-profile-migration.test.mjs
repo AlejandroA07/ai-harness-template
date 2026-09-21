@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
+import { applyFullProfileControls, planFullProfileControls } from '../scripts/full-profile-controls.mjs';
 import { discoverSkills, generateSkillTree } from '../scripts/skill-lib.mjs';
 
 const repository = path.resolve(import.meta.dirname, '..');
@@ -15,11 +16,29 @@ async function writeJson(file, value) {
   await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+async function fakeToolEnvironment(root) {
+  const bin = path.join(root, 'fake-tools');
+  await fs.mkdir(bin, { recursive: true });
+  for (const name of ['gh', 'claude', 'codex', 'gitleaks', 'zizmor']) {
+    if (process.platform === 'win32') {
+      const entry = path.join(bin, 'node_modules', name, 'cli.js');
+      await fs.mkdir(path.dirname(entry), { recursive: true });
+      await fs.writeFile(entry, 'process.exit(0);\n');
+      await fs.writeFile(path.join(bin, `${name}.cmd`), `"%dp0%\\node_modules\\${name}\\cli.js" %*\n`);
+    } else {
+      const command = path.join(bin, name);
+      await fs.writeFile(command, `#!${process.execPath}\nprocess.exit(0);\n`, { mode: 0o700 });
+    }
+  }
+  return { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}` };
+}
+
 async function legacyFixture() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-full-profile-'));
   const target = path.join(root, 'home');
   const legacyRoot = path.join(root, 'old checkout');
   await fs.mkdir(target);
+  const env = await fakeToolEnvironment(root);
   await generateSkillTree(path.join(repository, 'skills'), path.join(legacyRoot, '.generated', 'skills'));
   const skills = await discoverSkills(path.join(repository, 'skills'));
   for (const platform of ['claude', 'codex']) {
@@ -52,11 +71,11 @@ async function legacyFixture() {
   codex.companySetting = { retained: true };
   codex.hooks.PreToolUse.push({ matcher: 'Read', hooks: [{ type: 'command', command: 'company-check' }] });
   await writeJson(path.join(target, '.codex', 'hooks.json'), codex);
-  return { root, target, legacyRoot, skills };
+  return { root, target, legacyRoot, skills, env };
 }
 
-function run(args) {
-  return spawnSync(process.execPath, [setup, ...args], { cwd: repository, encoding: 'utf8' });
+function run(args, env = process.env) {
+  return spawnSync(process.execPath, [setup, ...args], { cwd: repository, encoding: 'utf8', env });
 }
 
 function runWithHome(script, target, args = []) {
@@ -70,16 +89,18 @@ test('full managed profile migrates both legacy platforms off a moved checkout a
   try {
     const args = ['--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target,
       '--legacy-root', fixture.legacyRoot, '--json'];
-    const preview = run(['plan', ...args]);
+    const preview = run(['plan', ...args], fixture.env);
     assert.equal(preview.status, 0, preview.stderr || preview.stdout);
     const planned = JSON.parse(preview.stdout);
     assert.equal(planned.applicable, true);
+    assert.equal(planned.profile, 'full-managed');
+    assert.equal(planned.controls.tools.filter((tool) => tool.required).every((tool) => tool.available), true);
     assert.equal(planned.components.filter((entry) => entry.kind === 'skills')
       .every((entry) => entry.migrated.length === fixture.skills.length), true);
     assert.equal(planned.components.filter((entry) => entry.kind === 'global-configuration')
       .every((entry) => entry.migrated.guidance && entry.migrated.hook), true);
 
-    const apply = run(['apply', ...args, '--apply']);
+    const apply = run(['apply', ...args, '--apply'], fixture.env);
     assert.equal(apply.status, 0, apply.stderr || apply.stdout);
     await fs.rm(fixture.legacyRoot, { recursive: true, force: true });
     const canonicalTarget = await fs.realpath(fixture.target);
@@ -93,6 +114,12 @@ test('full managed profile migrates both legacy platforms off a moved checkout a
       await fs.access(path.join(fixture.target, '.ai-harness', 'installations', platform, 'receipt.json'));
       await fs.access(path.join(fixture.target, '.ai-harness', 'installations', platform, 'global.json'));
     }
+    const profileReceiptPath = path.join(fixture.target, '.ai-harness', 'installations', 'full-managed', 'receipt.json');
+    const profileReceipt = JSON.parse(await fs.readFile(profileReceiptPath, 'utf8'));
+    assert.equal(profileReceipt.profile, 'full-managed');
+    assert.equal(profileReceipt.selected.length, fixture.skills.length);
+    assert.equal(profileReceipt.components.length, 4);
+    assert.deepEqual(profileReceipt.controls.repositoryHooks, { applicable: false });
     await fs.access(path.join(fixture.target, '.agents', 'skills', '.system'));
     assert.equal(await fs.readFile(path.join(fixture.target, '.agents', 'skills', 'notes.txt'), 'utf8'), 'unmanaged note\n');
     const claudeSettings = JSON.parse(await fs.readFile(path.join(fixture.target, '.claude', 'settings.json'), 'utf8'));
@@ -102,16 +129,22 @@ test('full managed profile migrates both legacy platforms off a moved checkout a
     assert.equal(JSON.stringify(claudeSettings).includes(fixture.legacyRoot), false);
     assert.equal(JSON.stringify(codexHooks).includes(fixture.legacyRoot), false);
 
-    const audit = run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target, '--json']);
+    const audit = run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target, '--json'], fixture.env);
     assert.equal(audit.status, 0, audit.stderr || audit.stdout);
     assert.equal(JSON.parse(audit.stdout).applicable, true);
-    const repeat = run(['apply', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target, '--json', '--apply']);
+    const repeat = run(['apply', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target, '--json', '--apply'], fixture.env);
     assert.equal(repeat.status, 0, repeat.stderr || repeat.stdout);
     assert.equal(JSON.parse(repeat.stdout).noOp, true);
     const legacySync = runWithHome('scripts/sync-skills.mjs', fixture.target, ['--apply']);
     assert.notEqual(legacySync.status, 0);
     assert.match(`${legacySync.stdout}\n${legacySync.stderr}`, /receipt-backed lifecycle/);
-    assert.equal(run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target]).status, 0);
+    assert.equal(run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target], fixture.env).status, 0);
+
+    profileReceipt.selected.pop();
+    await writeJson(profileReceiptPath, profileReceipt);
+    const tampered = run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target], fixture.env);
+    assert.notEqual(tampered.status, 0);
+    assert.match(`${tampered.stdout}\n${tampered.stderr}`, /ownership evidence does not match/);
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });
   }
@@ -131,7 +164,7 @@ test('full-profile migration rejects ambiguous ownership and noncanonical discov
         await fs.writeFile(path.join(fixture.target, '.claude', 'agents', 'company.md'), '# Company agent\n');
       }
       const result = run(['plan', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target,
-        '--legacy-root', fixture.legacyRoot, '--json']);
+        '--legacy-root', fixture.legacyRoot, '--json'], fixture.env);
       assert.notEqual(result.status, 0, kind);
       assert.equal(JSON.parse(result.stdout).applicable, false, kind);
       await assert.rejects(fs.access(path.join(fixture.target, '.ai-harness')), { code: 'ENOENT' });
@@ -145,6 +178,7 @@ test('full-profile audit rejects a partial selective installation without full-p
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-partial-profile-'));
   const target = path.join(root, 'home');
   await fs.mkdir(target);
+  const env = await fakeToolEnvironment(root);
   try {
     for (const platform of ['claude', 'codex']) {
       const skill = run(['apply', '--select', 'tdd', '--platform', platform, '--scope', 'machine',
@@ -155,7 +189,7 @@ test('full-profile audit rejects a partial selective installation without full-p
       assert.equal(global.status, 0, global.stderr || global.stdout);
     }
 
-    const audit = run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', target, '--json']);
+    const audit = run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', target, '--json'], env);
     assert.notEqual(audit.status, 0, audit.stderr || audit.stdout);
     const result = JSON.parse(audit.stdout);
     assert.equal(result.applicable, false);
@@ -171,15 +205,15 @@ test('full-profile removal removes owned components and preserves unrelated targ
   const unrelated = path.join(fixture.target, '.agents', 'skills', 'notes.txt');
   try {
     const common = ['--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target, '--json'];
-    const apply = run(['apply', ...common, '--legacy-root', fixture.legacyRoot, '--apply']);
+    const apply = run(['apply', ...common, '--legacy-root', fixture.legacyRoot, '--apply'], fixture.env);
     assert.equal(apply.status, 0, apply.stderr || apply.stdout);
 
-    const preview = run(['remove', ...common]);
+    const preview = run(['remove', ...common], fixture.env);
     assert.equal(preview.status, 0, preview.stderr || preview.stdout);
     assert.equal(JSON.parse(preview.stdout).changes.length > 0, true);
     await fs.access(path.join(fixture.target, '.ai-harness', 'installations', 'full-managed', 'receipt.json'));
 
-    const remove = run(['remove', ...common, '--apply']);
+    const remove = run(['remove', ...common, '--apply'], fixture.env);
     assert.equal(remove.status, 0, remove.stderr || remove.stdout);
     const result = JSON.parse(remove.stdout);
     assert.equal(result.installed, false);
@@ -192,5 +226,82 @@ test('full-profile removal removes owned components and preserves unrelated targ
     assert.equal(await fs.readFile(unrelated, 'utf8'), 'unmanaged note\n');
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('full-profile machine controls preflight tools and restore owned Git and Windows state', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-machine-controls-'));
+  const target = path.join(root, 'home');
+  const repositoryRoot = path.join(root, 'repository');
+  await fs.mkdir(target);
+  await fs.mkdir(repositoryRoot);
+  assert.equal(spawnSync('git', ['init', '--quiet'], { cwd: repositoryRoot }).status, 0);
+  assert.equal(spawnSync('git', ['config', '--local', 'core.hooksPath', 'company-hooks'], { cwd: repositoryRoot }).status, 0);
+  const external = { memory: null };
+  const runTool = (command, args, options = {}) => {
+    if (command === 'git') return spawnSync(command, args, { encoding: 'utf8', ...options });
+    if (args.includes('--version') || (command === 'gitleaks' && args[0] === 'version')) return { status: 0, stdout: 'test\n' };
+    if (command === 'reg.exe' && args[0] === 'query') return external.memory === null
+      ? { status: 1, stdout: '' }
+      : { status: 0, stdout: `    CLAUDE_CODE_DISABLE_AUTO_MEMORY    REG_SZ    ${external.memory}\r\n` };
+    if (command === 'reg.exe' && args[0] === 'delete') { external.memory = null; return { status: 0, stdout: '' }; }
+    if (command === 'setx') { external.memory = args[1]; return { status: 0, stdout: '' }; }
+    return { status: 0, stdout: 'test\n' };
+  };
+  try {
+    const applyPlan = await planFullProfileControls(repositoryRoot, { operation: 'apply', target,
+      home: target, systemPlatform: 'win32', runTool });
+    assert.equal(applyPlan.applicable, true);
+    assert.deepEqual(applyPlan.changes.map(({ id }) => id), ['repository-hooks', 'windows-memory-lock']);
+    assert.deepEqual(applyPlan.ownership.repositoryHooks.prior, { present: true, value: 'company-hooks' });
+    assert.deepEqual(applyPlan.ownership.windowsMemoryLock.prior, { present: false });
+    await applyFullProfileControls(applyPlan);
+    assert.equal(spawnSync('git', ['config', '--local', '--get', 'core.hooksPath'], { cwd: repositoryRoot, encoding: 'utf8' }).stdout.trim(), '.githooks');
+    assert.equal(external.memory, '1');
+
+    const audit = await planFullProfileControls(repositoryRoot, { operation: 'audit', target,
+      previous: applyPlan.ownership, home: target, systemPlatform: 'win32', runTool });
+    assert.equal(audit.applicable, true);
+    assert.deepEqual(audit.changes, []);
+
+    const removePlan = await planFullProfileControls(repositoryRoot, { operation: 'remove', target,
+      previous: applyPlan.ownership, home: target, systemPlatform: 'win32', runTool });
+    await applyFullProfileControls(removePlan);
+    assert.equal(spawnSync('git', ['config', '--local', '--get', 'core.hooksPath'], { cwd: repositoryRoot, encoding: 'utf8' }).stdout.trim(), 'company-hooks');
+    assert.equal(external.memory, null);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
+
+test('full-profile machine controls fail closed on missing tools and stale external state', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-machine-control-denied-'));
+  const target = path.join(root, 'home');
+  await fs.mkdir(target);
+  const external = { hooks: null };
+  const missingRunner = (command, args) => {
+    if (command === 'git' && args.includes('--get')) return { status: 1, stdout: '' };
+    return { status: command === process.execPath ? 0 : 1, stdout: '' };
+  };
+  const statefulRunner = (command, args) => {
+    if (args.includes('--version') || (command === 'gitleaks' && args[0] === 'version')) return { status: 0, stdout: 'test\n' };
+    if (command === 'git' && args.includes('--get')) return external.hooks === null
+      ? { status: 1, stdout: '' } : { status: 0, stdout: `${external.hooks}\n` };
+    if (command === 'git' && args[0] === 'config') { external.hooks = args.at(-1); return { status: 0, stdout: '' }; }
+    return { status: 0, stdout: 'test\n' };
+  };
+  try {
+    const missing = await planFullProfileControls(root, { operation: 'apply', target,
+      home: path.join(root, 'other-home'), runTool: missingRunner });
+    assert.equal(missing.applicable, false);
+    assert.match(missing.conflicts.join('\n'), /Required tool is unavailable: git/);
+
+    const stale = await planFullProfileControls(root, { operation: 'apply', target,
+      home: target, runTool: statefulRunner });
+    external.hooks = 'raced-hooks';
+    await assert.rejects(applyFullProfileControls(stale), /Machine-control conflicts|preconditions changed/);
+    assert.equal(external.hooks, 'raced-hooks');
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
   }
 });

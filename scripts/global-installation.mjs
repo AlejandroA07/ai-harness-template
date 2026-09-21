@@ -2,7 +2,7 @@ import { sealReceipt, verifyReceiptEvidence, storeReceiptEvidence, planReceiptEv
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { isDeepStrictEqual as equal } from 'node:util';
-import { assertSafeDirectory, isPathWithin } from './skill-lib.mjs';
+import { assertSafeDirectory, isPathWithin, isAbsolutePathInput } from './skill-lib.mjs';
 import { digest, encode, stat, readRegular, payloadHash, treeFiles, acquireTargetLock, releaseTargetLock, publishFiles } from './installation-core.mjs';
 import { object, parseSettings, getSetting, setSetting, pruneContainers, hookCount, removeExactHook, hookGroups, inspectFeatures, editFeatures } from './global-settings.mjs';
 import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
@@ -110,8 +110,7 @@ export async function planGlobalInstallation(repository, options) {
     || typeof inputTarget !== 'string' || !path.isAbsolute(inputTarget) || /[\x00-\x1f]/.test(inputTarget)) {
     fail('Global lifecycle requires an absolute --target, one --platform and --scope machine');
   }
-  if (inputLegacyRoot !== null && (operation !== 'apply' || typeof inputLegacyRoot !== 'string'
-    || !path.isAbsolute(inputLegacyRoot) || /[\x00-\x1f]/.test(inputLegacyRoot))) {
+  if (inputLegacyRoot !== null && (operation !== 'apply' || !isAbsolutePathInput(inputLegacyRoot))) {
     fail('Legacy global migration requires an absolute legacy root for apply');
   }
   const unresolved = path.resolve(inputTarget);

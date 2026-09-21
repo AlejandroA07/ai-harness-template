@@ -4,7 +4,8 @@ import { isDeepStrictEqual as equal } from 'node:util';
 import { loadCatalog } from './catalog-loader.mjs';
 import { planInstallation, applyInstallation } from './selection-installation.mjs';
 import { planGlobalInstallation, applyGlobalInstallation } from './global-installation.mjs';
-import { assertSafeDirectory, isPathWithin } from './skill-lib.mjs';
+import { planFullProfileControls, applyFullProfileControls } from './full-profile-controls.mjs';
+import { assertSafeDirectory, isPathWithin, isAbsolutePathInput } from './skill-lib.mjs';
 import { acquireTargetLock, encode, publishFiles, readRegular, releaseTargetLock, stat } from './installation-core.mjs';
 import { ownershipHeadBytes, planReceiptEvidence, sealReceipt, storeReceiptEvidence,
   verifyOwnershipHead, verifyReceiptEvidence } from './installation-evidence.mjs';
@@ -21,13 +22,14 @@ function profileLocations(target) {
 }
 
 function validateProfileReceipt(receipt, target) {
-  const fields = ['version', 'evidence', 'target', 'platform', 'scope', 'profile', 'selected', 'components'];
+  const fields = ['version', 'evidence', 'target', 'platform', 'scope', 'profile', 'selected', 'components', 'controls'];
   if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)
     || !same(Object.keys(receipt).sort(), fields.sort()) || receipt.version !== 2 || receipt.target !== target
     || receipt.platform !== 'both' || receipt.scope !== 'machine' || receipt.profile !== 'full-managed'
     || !Array.isArray(receipt.selected) || !same(receipt.selected, [...new Set(receipt.selected)].sort())
     || receipt.selected.some((id) => typeof id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(id))
-    || !Array.isArray(receipt.components) || receipt.components.length !== 4) fail('Malformed full-profile receipt');
+    || !Array.isArray(receipt.components) || receipt.components.length !== 4
+    || !receipt.controls || typeof receipt.controls !== 'object' || Array.isArray(receipt.controls)) fail('Malformed full-profile receipt');
   for (const component of receipt.components) {
     if (!component || typeof component !== 'object' || Array.isArray(component)
       || !same(Object.keys(component).sort(), ['evidence', 'kind', 'platform'])
@@ -65,7 +67,7 @@ async function publishProfileReceipt(target, previous, nextReceipt) {
   const { locations } = await loadProfileReceipt(target);
   await fs.mkdir(target).catch((error) => { if (error.code !== 'EEXIST') throw error; });
   const lock = await acquireTargetLock(target);
-  let staging;
+  let staging, retain = false;
   try {
     const current = await loadProfileReceipt(target);
     if (!same(current.receipt, previous.receipt)) fail('Full-profile receipt changed before publication');
@@ -80,9 +82,14 @@ async function publishProfileReceipt(target, previous, nextReceipt) {
         after: nextReceipt ? Buffer.from(encode(nextReceipt)) : null, receipt: true },
     ], journal: { version: 1, previousReceipt: previous.receipt, nextReceipt,
       changes: ['ownership', 'receipt'] } });
+  } catch (error) {
+    retain = Boolean(error.recoveryRequired);
+    throw error;
   } finally {
-    if (staging) await fs.rm(staging, { recursive: true, force: true });
-    await releaseTargetLock(lock);
+    if (!retain) {
+      if (staging) await fs.rm(staging, { recursive: true, force: true });
+      await releaseTargetLock(lock);
+    }
   }
 }
 
@@ -137,8 +144,7 @@ export async function planFullProfileInstallation(repository, options) {
     || typeof suppliedTarget !== 'string' || !path.isAbsolute(suppliedTarget) || /[\x00-\x1f]/.test(suppliedTarget)) {
     fail('Full managed profile requires plan/apply/audit/remove, --platform both, --scope machine and an absolute --target');
   }
-  if (suppliedLegacyRoot !== null && (operation !== 'apply' || typeof suppliedLegacyRoot !== 'string'
-    || !path.isAbsolute(suppliedLegacyRoot) || /[\x00-\x1f]/.test(suppliedLegacyRoot))) {
+  if (suppliedLegacyRoot !== null && (operation !== 'apply' || !isAbsolutePathInput(suppliedLegacyRoot))) {
     fail('Full-profile migration requires an absolute --legacy-root for apply');
   }
   const root = await fs.realpath(repository);
@@ -153,6 +159,9 @@ export async function planFullProfileInstallation(repository, options) {
 
   const previousProfile = await loadProfileReceipt(target);
   const conflicts = operation === 'remove' ? [] : await customAgentConflicts(target);
+  const controlsPlan = await planFullProfileControls(root, { operation, target,
+    previous: previousProfile.receipt?.controls ?? null });
+  conflicts.push(...controlsPlan.conflicts.map((message) => `machine controls: ${message}`));
   const components = [];
   for (const name of platforms) {
     const discovery = path.join(target, name === 'codex' ? '.agents' : '.claude', 'skills');
@@ -179,12 +188,13 @@ export async function planFullProfileInstallation(repository, options) {
     if (!same(previousProfile.receipt.components, currentComponents)) conflicts.push('Full-profile component ownership changed');
   }
   const nextReceipt = operation === 'apply' ? sealReceipt({ version: 2, target, platform: 'both', scope: 'machine',
-    profile: 'full-managed', selected: ids, components: plannedComponents }) : previousProfile.receipt;
+    profile: 'full-managed', selected: ids, components: plannedComponents, controls: controlsPlan.ownership }) : previousProfile.receipt;
   const receiptChanged = operation === 'remove' ? previousProfile.receipt !== null
     : operation === 'apply' && !same(previousProfile.receipt, nextReceipt);
   const evidence = operation === 'apply' && receiptChanged
     ? await planReceiptEvidence(target, previousProfile.locations.store, nextReceipt) : null;
   const changes = components.flatMap(({ kind, plan }) => plan.changes.map((change) => ({ ...change, component: kind, platform: plan.platform })));
+  changes.push(...controlsPlan.changes.map((change) => ({ ...change, component: 'machine-controls', platform: 'both' })));
   if (receiptChanged) changes.push({ id: 'full-profile-receipt', path: previousProfile.locations.receipt,
     action: operation === 'remove' ? 'remove' : previousProfile.receipt ? 'update' : 'create', component: 'profile', platform: 'both' });
   const result = { version: 1, stage: 'full-profile-preflight', operation, target, platform: 'both', scope: 'machine',
@@ -192,10 +202,13 @@ export async function planFullProfileInstallation(repository, options) {
     installed: previousProfile.receipt !== null && components.every(({ plan }) => plan.installed)
       && same(previousProfile.receipt.selected, ids) && same(previousProfile.receipt.components, currentComponents),
     components: components.map(({ kind, plan }) => componentSummary(kind, plan)),
-    changes, receiptChanged, receiptPath: previousProfile.locations.receipt, evidence, conflicts, applicable: conflicts.length === 0,
-    activation: 'Both platform configurations and the exact canonical skill inventory; hook trust remains interactive.' };
+    controls: structuredClone(controlsPlan), changes, receiptChanged, receiptPath: previousProfile.locations.receipt,
+    evidence, conflicts, applicable: conflicts.length === 0,
+    activation: controlsPlan.active
+      ? 'Both platform configurations, the exact canonical skill inventory, repository hooks and the Windows memory lock where applicable; hook trust remains interactive.'
+      : 'Both platform configurations and the exact canonical skill inventory; live machine controls are reported but not changed for an isolated target.' };
   plans.set(result, { root, options: { operation, target, platform: 'both', scope: 'machine', legacyRoot },
-    previousProfile, nextReceipt, fingerprint: JSON.stringify(result) });
+    previousProfile, nextReceipt, controlsPlan, fingerprint: JSON.stringify(result) });
   return result;
 }
 
@@ -208,6 +221,7 @@ export async function applyFullProfileInstallation(candidate) {
   if (!equal(JSON.parse(prepared.fingerprint), checked)) fail('Full-profile preconditions changed; plan again');
 
   const completed = [];
+  let controlsApplied = false;
   try {
     for (const name of checked.operation === 'remove' ? [...platforms].reverse() : platforms) {
       if (checked.operation === 'remove') {
@@ -227,10 +241,22 @@ export async function applyFullProfileInstallation(candidate) {
         completed.push(`${name} global configuration`);
       }
     }
+    await applyFullProfileControls(prepared.controlsPlan);
+    controlsApplied = true;
+    completed.push('machine controls');
     await publishProfileReceipt(checked.target, prepared.previousProfile,
       checked.operation === 'remove' ? null : prepared.nextReceipt);
     completed.push('full-profile receipt');
   } catch (error) {
+    if (controlsApplied && checked.operation === 'apply' && !prepared.previousProfile.receipt) {
+      try {
+        const rollback = await planFullProfileControls(prepared.root, { operation: 'remove', target: checked.target,
+          previous: prepared.controlsPlan.ownership });
+        await applyFullProfileControls(rollback);
+      } catch {
+        completed.push('machine controls require reviewed recovery');
+      }
+    }
     throw new Error(`Full-profile application stopped; completed: ${completed.join(', ') || 'none'}; rerun the read-only plan after resolving the reported state. ${error.message}`, { cause: error });
   }
   if (checked.operation === 'remove') return { ...checked, installed: false, applied: true,

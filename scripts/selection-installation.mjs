@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { loadCatalog } from './catalog-loader.mjs';
 import { planSelection } from './module-catalog.mjs';
-import { assertSafeDirectory, parseSkill, renderSkillDocuments, isPathWithin } from './skill-lib.mjs';
+import { assertSafeDirectory, parseSkill, renderSkillDocuments, isPathWithin, isAbsolutePathInput } from './skill-lib.mjs';
 
 import { encode, stat, readRegular, payloadHash, treeFiles, acquireTargetLock, releaseTargetLock, publishFiles } from './installation-core.mjs';
 
@@ -168,8 +168,7 @@ export async function planInstallation(root, options) {
     fail('Lifecycle requires an absolute --target, one --platform and --scope machine or project');
   }
   if (suppliedLegacyRoot !== null && (operation !== 'apply' || scope !== 'machine'
-    || typeof suppliedLegacyRoot !== 'string' || !path.isAbsolute(suppliedLegacyRoot)
-    || /[\x00-\x1f]/.test(suppliedLegacyRoot))) {
+    || !isAbsolutePathInput(suppliedLegacyRoot))) {
     fail('Legacy skill migration requires an absolute legacy root for a machine apply');
   }
   if (operation !== 'audit' && !requested.length) fail('Select at least one capability');

@@ -41,10 +41,10 @@ receipts under `<target>/.ai-harness/installations/`. Discovery links and guard
 runtimes point into that stable target-owned store, so deleting or moving the old
 checkout does not break the installation. The current checkout remains necessary
 to plan future updates; installed audit/removal uses retained ownership evidence.
-An additional sealed `full-managed` receipt binds the exact canonical selection
-to the four component receipt revisions. Full-profile audit therefore rejects a
-partial selective installation even when both platforms and global configurations
-are otherwise healthy.
+An additional sealed `full-managed` receipt binds the exact canonical selection,
+the four component receipt revisions and machine-control ownership. Full-profile
+audit therefore rejects a partial selective installation even when both platforms
+and global configurations are otherwise healthy.
 
 Unrelated settings, hooks, permission denials, hidden platform entries and
 ordinary files in discovery directories are preserved. Values already present
@@ -52,6 +52,16 @@ in the legacy configuration are recorded conservatively as prior state rather
 than retroactively claimed. The full profile does not install optional Tool
 integrations, mutate projects, remove custom agents, transfer interactive Codex
 hook trust, or remove unrelated target content.
+
+The full profile preserves the complete-profile tool preflight: Node.js, Git,
+GitHub CLI, Claude, Codex, Gitleaks and Zizmor are required; .NET and Docker are
+reported as optional. Commands use literal argument arrays and never a command
+shell. When `<absolute-home>` resolves to the current user's actual home, the
+profile also owns `core.hooksPath=.githooks` in the source repository and, on
+Windows, `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in the current user's environment.
+The receipt records prior non-secret state and removal restores it only while the
+managed value is unchanged. Plans for isolated fixture homes report these controls
+as inactive and never alter the developer's repository or environment.
 
 The legacy `machine-setup.mjs`, `sync-skills.mjs` and `audit.mjs` commands remain
 available for an unmigrated checkout-bound profile. `sync-skills.mjs` and therefore
@@ -79,13 +89,15 @@ reference with target-owned payloads or the current reviewed guidance pointer.
 The registered full-profile fixtures create the complete legacy layout for both
 platforms in temporary targets, including a checkout path containing a space.
 They prove read-only planning, exact adoption, preservation of unrelated settings
-and hidden entries, deletion of the old checkout, receipt-backed audit, idempotent
-apply, and fail-closed handling of changed links, extra skills and custom agents.
-They also prove the legacy synchronizer cannot overwrite a migrated profile.
+and hidden entries, deletion of the old checkout, sealed full-profile audit,
+idempotent apply, combined removal, machine-control restoration, required-tool
+denial, stale-state rejection and fail-closed handling of changed links, extra
+skills, custom agents and altered ownership evidence. They also prove the legacy
+synchronizer cannot overwrite a migrated profile.
 
 The Windows portability job runs the full-profile fixture alongside the existing
-process and lifecycle suites. Local M8 verification on 2026-09-21 ran on macOS:
-`node scripts/verify.mjs` exited 0 with 191 tests, 189 passed and two Windows-only
+process and lifecycle suites. Local M8 verification on 2026-09-22 ran on macOS:
+`node scripts/verify.mjs` exited 0 with 195 tests, 193 passed and two Windows-only
 shim tests skipped; whitespace, Gitleaks, Zizmor and syntax checks passed. A
 successful GitHub Windows run and CodeQL result remain release evidence to check
 before merging. No real user profile or live platform trust state was changed.
@@ -95,9 +107,9 @@ Security-checklist verdicts:
 | Area | Verdict and evidence |
 |---|---|
 | Access and identity | Pass for local scope: the caller supplies an absolute target and explicit legacy root; remote identity and sessions are not applicable. |
-| Inputs and outputs | Pass: platform/scope/profile are fixed, receipts retain their strict schemas, and errors report roles and paths without configuration values or secrets. |
-| Injection and navigation | Pass: no shell is introduced; link targets must exactly match paths derived from the explicit legacy root, and linked roots/unsafe descendants remain denied. |
+| Inputs and outputs | Pass: platform/scope/profile are fixed, receipts retain strict schemas, environment prior state is limited to the non-secret `0`/`1` policy value, and errors report roles without configuration values or secrets. |
+| Injection and navigation | Pass: external tools receive literal argument arrays with fixed command/configuration names; link targets must exactly match paths derived from the explicit legacy root, and linked roots/unsafe descendants remain denied. |
 | Browser and network | Not applicable: migration performs no browser, server or network operation. |
-| Files and abuse | Pass: preflight covers all four components, ambiguous ownership is preserved, component publishers stage and roll back owned writes, and legacy mode is blocked after receipts exist. Upload and rate-limit controls are not applicable. |
+| Files and abuse | Pass: preflight covers all four payload/configuration components plus machine controls, ambiguous ownership is preserved, publishers stage and roll back owned writes, and legacy mode is blocked after receipts exist. Upload and rate-limit controls are not applicable. |
 | Dependencies and delivery | Pass: no dependency was added; the existing immutable CI action pins and least-privilege workflow remain intact. |
-| Regression evidence | Pass locally: happy path, moved checkout, repeat apply and denied ownership paths are registered in the repository and Windows CI suites. Remote Windows and CodeQL results remain explicit release checks. |
+| Regression evidence | Pass locally: happy path, moved checkout, repeat apply, removal, tool denial, external-state restoration and denied ownership paths are registered in the repository and Windows CI suites. Remote Windows and CodeQL results remain explicit release checks. |

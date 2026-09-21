@@ -26,7 +26,7 @@ const usage = `Usage:
 
 Apply and remove preview by default; --apply performs the operation.
 Add --target to plan for read-only installation preflight. Machine/project Skills, Global configuration and Project configuration are supported.
-The full profile installs both global configurations and the exact canonical skill inventory.
+The full profile installs both global configurations, the exact canonical skill inventory, required-tool preflight and owned machine controls.
 Use --legacy-root only for an explicit migration from checkout-bound legacy state.
 Existing machine setup, bootstrap and audit commands remain compatibility entry points.`;
 
@@ -151,7 +151,7 @@ try {
       const result = options.apply ? await applyPlan(plan) : plan;
       if (options.json) console.log(JSON.stringify(result, null, 2));
       else {
-        console.log(`${options.operation}: ${result.platform} / ${result.scope ?? 'machine'} / coexistence (${options.apply ? 'applied' : 'read-only'})`);
+        console.log(`${options.operation}: ${result.platform} / ${result.scope ?? 'machine'} / ${result.profile ?? 'coexistence'} (${options.apply ? 'applied' : 'read-only'})`);
         for (const capability of result.capabilities ?? []) {
           console.log(`${capability.module === 'workflows' ? 'Workflow' : 'Capability'}: ${capability.id} (${capability.currentStatus} -> ${capability.plannedStatus})`);
           for (const prerequisite of capability.prerequisites) console.log(`  At invocation [${prerequisite.status}]: ${prerequisite.description}`);
