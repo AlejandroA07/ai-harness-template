@@ -9,6 +9,7 @@ import { planGlobalInstallation } from './global-installation.mjs';
 import { planProjectInstallation } from './project-installation.mjs';
 import { planIntegrationInstallation } from './integration-installation.mjs';
 import { buildCostInventory } from './cost-inventory.mjs';
+import { escapeMarkdownTableCell as escapeCell } from './markdown-table.mjs';
 
 const platforms = ['claude', 'codex'];
 const scopes = ['machine', 'project'];
@@ -19,6 +20,18 @@ const platformId = (module, platform) => `platform:${module}:${platform}`;
 const capabilityId = (id) => `capability:${id}`;
 const integrationId = (id) => `integration:${id}`;
 const integrationCapabilityId = (integration, capability) => `integration-capability:${integration}:${capability}`;
+const behaviorId = (id) => `behavior:${id}`;
+const workflowStageId = (workflow, stage) => `workflow-stage:${workflow}:${stage}`;
+const settingId = (behavior, setting) => `setting:${behavior}:${setting}`;
+const modulePolicies = {
+  'global-configuration': { audit: 'global', members: 'configuration' },
+  'project-configuration': { audit: 'project', members: 'configuration' },
+  skills: { audit: 'skills', members: 'capabilities' },
+  workflows: { audit: 'skills', members: 'capabilities' },
+  'tool-integrations': { audit: 'integrations', members: 'integrations' },
+  'installation-core': { audit: null, members: 'internal' },
+  'shared-policy-runtime': { audit: null, members: 'internal' },
+};
 
 function state(planned, installed, observed) {
   return { planned, installed, observed };
@@ -29,10 +42,16 @@ function plannedState(context, selected) {
 function installedState(target, installed) {
   return target ? (installed ? 'installed' : 'not-installed') : 'not-inspected';
 }
-function observedState(target, installed, audit) {
+function observedState(target, installed, audit, identity = null, knownIdentities = new Set()) {
   if (!target) return 'not-inspected';
   if (!installed) return 'absent';
-  return audit?.applicable ? 'consistent' : 'conflict';
+  const conflicts = audit?.conflicts ?? [];
+  if (!identity) return conflicts.length ? 'conflict' : 'consistent';
+  const relevant = conflicts.filter((conflict) => {
+    const prefix = /^([a-z0-9-]+):/.exec(conflict)?.[1];
+    return !prefix || !knownIdentities.has(prefix) || prefix === identity;
+  });
+  return relevant.length ? 'conflict' : 'consistent';
 }
 function addSource(nodes, edges, from, source, relationship = 'sourced-by') {
   const id = sourceId(source);
@@ -40,11 +59,26 @@ function addSource(nodes, edges, from, source, relationship = 'sourced-by') {
   edges.push({ from, to: id, type: relationship, provenance: 'declared' });
 }
 function auditForModule(module, audits) {
-  if (module === 'global-configuration') return audits.global;
-  if (module === 'project-configuration') return audits.project;
-  if (['skills', 'workflows'].includes(module)) return audits.skills;
-  if (module === 'tool-integrations') return audits.integrations;
-  return null;
+  return audits[modulePolicies[module].audit] ?? null;
+}
+function moduleInstalled(module, catalog, audits, installedCapabilities, installedIntegrations) {
+  const policy = modulePolicies[module.id];
+  if (policy.members === 'configuration') return Boolean(audits[policy.audit]?.installed);
+  if (policy.members === 'integrations') return installedIntegrations.size > 0;
+  if (policy.members === 'capabilities') return catalog.capabilities.some((entry) => entry.module === module.id && installedCapabilities.has(entry.id));
+  return false;
+}
+function moduleSelected(module, catalog, selectedModules, plannedCapabilities, plannedIntegrations) {
+  const policy = modulePolicies[module.id];
+  if (selectedModules.includes(module.id)) return true;
+  if (policy.members === 'integrations') return plannedIntegrations.size > 0;
+  if (policy.members === 'capabilities') return catalog.capabilities.some((entry) => entry.module === module.id && plannedCapabilities.has(entry.id));
+  return false;
+}
+function addTrigger(nodes, edges, id, label, target) {
+  const trigger = `trigger:${id}`;
+  if (!nodes.has(trigger)) nodes.set(trigger, { id: trigger, kind: 'trigger', label, state: state('not-applicable', 'not-applicable', 'declared') });
+  edges.push({ from: trigger, to: target, type: 'activates', provenance: 'declared' });
 }
 
 async function inspectTarget(repositoryRoot, context) {
@@ -101,26 +135,24 @@ export async function buildArchitectureModel(repositoryRoot, options = {}) {
   const audits = await inspectTarget(root, context ?? {});
   const installedCapabilities = new Set(audits.skills?.entries.map((entry) => entry.id) ?? []);
   const installedIntegrations = new Map((audits.integrations?.integrations ?? []).map((entry) => [entry.id, entry]));
+  const knownInstalledCapabilities = new Set(installedCapabilities);
+  const knownInstalledIntegrations = new Set(installedIntegrations.keys());
   const costByCapability = new Map(costs.capabilities.map((entry) => [entry.id, entry]));
   const nodes = new Map();
   const edges = [];
   nodes.set('harness', { id: 'harness', kind: 'root', label: 'Harness', state: state('not-applicable', 'not-applicable', 'declared') });
 
   for (const module of catalog.modules) {
+    if (!Object.hasOwn(modulePolicies, module.id)) fail(`Architecture policy is missing for module: ${module.id}`);
     const audit = auditForModule(module.id, audits);
-    const configInstalled = module.id === 'global-configuration' ? Boolean(audits.global?.installed)
-      : module.id === 'project-configuration' ? Boolean(audits.project?.installed) : false;
-    const memberInstalled = module.id === 'tool-integrations' ? installedIntegrations.size > 0
-      : ['skills', 'workflows'].includes(module.id) && catalog.capabilities.some((entry) => entry.module === module.id && installedCapabilities.has(entry.id));
-    const selected = selectedModules.includes(module.id)
-      || (['skills', 'workflows'].includes(module.id) && catalog.capabilities.some((entry) => entry.module === module.id && plannedCapabilities.has(entry.id)))
-      || (module.id === 'tool-integrations' && plannedIntegrations.size > 0);
-    const installed = configInstalled || memberInstalled;
+    const selected = moduleSelected(module, catalog, selectedModules, plannedCapabilities, plannedIntegrations);
+    const installed = moduleInstalled(module, catalog, audits, installedCapabilities, installedIntegrations);
     nodes.set(`module:${module.id}`, { id: `module:${module.id}`, kind: 'module', label: module.label, module: module.id,
       visibility: module.visibility, description: module.description, platforms: [...module.platforms], scopes: [...module.scopes],
       state: state(plannedState(context, selected), installedState(context?.target, installed), observedState(context?.target, installed, audit)) });
     edges.push({ from: 'harness', to: `module:${module.id}`, type: 'contains', provenance: 'declared' });
     for (const dependency of module.requires) edges.push({ from: `module:${module.id}`, to: `module:${dependency}`, type: 'depends-on', provenance: 'declared' });
+    if (module.visibility === 'public') edges.push({ from: 'module:installation-core', to: `module:${module.id}`, type: 'installs', provenance: 'declared' });
     for (const platform of module.platforms) {
       const id = platformId(module.id, platform);
       nodes.set(id, { id, kind: 'platform', label: platform, module: module.id, platform, scopes: [...module.scopes],
@@ -132,19 +164,28 @@ export async function buildArchitectureModel(repositoryRoot, options = {}) {
     for (const source of module.sources) addSource(nodes, edges, `module:${module.id}`, source);
   }
 
-  for (const moduleId of ['global-configuration', 'project-configuration']) {
-    const module = catalog.modules.find((entry) => entry.id === moduleId);
-    for (const platform of module.platforms) {
-      const id = `configuration:${moduleId}:${platform}`;
-      const relevant = context && context.platform === platform && context.scope === module.scopes[0];
-      const audit = moduleId === 'global-configuration' ? audits.global : audits.project;
-      const installed = relevant && Boolean(audit?.installed);
-      const selected = relevant && selectedModules.includes(moduleId);
-      nodes.set(id, { id, kind: 'configuration', label: `${module.label} for ${platform}`, module: moduleId, platform,
-        scopes: [...module.scopes], activation: moduleId === 'global-configuration' ? 'session guidance and platform hooks' : 'project guidance and verification command',
-        state: state(plannedState(context, selected), installedState(context?.target, installed), relevant ? observedState(context?.target, installed, audit) : 'not-inspected') });
-      edges.push({ from: platformId(moduleId, platform), to: id, type: 'contains', provenance: 'declared' });
-      for (const source of module.sources) addSource(nodes, edges, id, source);
+  for (const module of catalog.modules) for (const behavior of module.behaviors) {
+    const id = behaviorId(behavior.id);
+    const audit = auditForModule(module.id, audits);
+    const relevant = Boolean(context && behavior.platforms.includes(context.platform) && behavior.scopes.includes(context.scope));
+    const installed = relevant && Boolean(audit?.installed)
+      && !(behavior.id === 'project-ci' && audit.options?.ci !== 'github');
+    const selected = relevant && selectedModules.includes(module.id);
+    nodes.set(id, { id, kind: 'behavior', label: behavior.label, behavior: behavior.id, module: module.id,
+      purpose: behavior.purpose, platforms: [...behavior.platforms], scopes: [...behavior.scopes], activation: structuredClone(behavior.activation),
+      settings: structuredClone(behavior.settings), state: state(plannedState(context, selected), installedState(context?.target, installed),
+        relevant ? observedState(context?.target, installed, audit) : 'not-inspected') });
+    for (const platform of behavior.platforms) edges.push({ from: platformId(module.id, platform), to: id, type: 'contains', provenance: 'declared' });
+    addSource(nodes, edges, id, behavior.source);
+    addTrigger(nodes, edges, `behavior:${behavior.id}`, behavior.activation.event, id);
+    if (behavior.activation.program) addSource(nodes, edges, id, behavior.activation.program, 'executes');
+    for (const setting of behavior.settings) {
+      const settingNode = settingId(behavior.id, setting.path);
+      nodes.set(settingNode, { id: settingNode, kind: 'setting', label: setting.path, behavior: behavior.id,
+        path: setting.path, value: setting.value, state: state('not-applicable', installedState(context?.target, installed),
+          relevant ? observedState(context?.target, installed, audit) : 'not-inspected') });
+      edges.push({ from: sourceId(behavior.source), to: settingNode, type: 'contains', provenance: 'declared' });
+      edges.push({ from: id, to: settingNode, type: 'configures', provenance: 'declared' });
     }
   }
 
@@ -152,17 +193,25 @@ export async function buildArchitectureModel(repositoryRoot, options = {}) {
     const installed = installedCapabilities.has(capability.id);
     const id = capabilityId(capability.id);
     nodes.set(id, { id, kind: 'capability', label: capability.label, capability: capability.id, module: capability.module,
-      platforms: [...capability.platforms], scopes: [...capability.scopes], activation: capability.activation,
+      purpose: capability.description, platforms: [...capability.platforms], scopes: [...capability.scopes], activation: capability.activation,
       cost: costByCapability.get(capability.id), state: state(plannedState(context, plannedCapabilities.has(capability.id)),
-        installedState(context?.target, installed), observedState(context?.target, installed, audits.skills)) });
+        installedState(context?.target, installed), observedState(context?.target, installed, audits.skills, capability.id, knownInstalledCapabilities)) });
     for (const platform of capability.platforms) edges.push({ from: platformId(capability.module, platform), to: id, type: 'contains', provenance: 'declared' });
+    addTrigger(nodes, edges, 'user-request', 'Explicit user request', id);
+    if (capability.activation === 'model-or-user') addTrigger(nodes, edges, 'model-selection', 'Model selects a matching installed capability', id);
     addSource(nodes, edges, id, capability.source);
     for (const resource of capability.resources) addSource(nodes, edges, id, resource, 'resource');
     for (const dependency of capability.requires) edges.push({ from: id, to: capabilityId(dependency), type: 'requires', provenance: 'declared' });
     for (const use of capability.uses) edges.push({ from: id, to: capabilityId(use.id), type: 'uses', condition: use.when, provenance: 'declared' });
     for (const route of capability.routes) edges.push({ from: id, to: capabilityId(route), type: 'routes-to', provenance: 'declared' });
-    for (const stage of capability.workflow?.stages ?? []) for (const invoked of stage.invokes) {
-      edges.push({ from: id, to: capabilityId(invoked), type: 'stage-invokes', stage: stage.id, condition: stage.when ?? null, provenance: 'declared' });
+    for (const [index, stage] of (capability.workflow?.stages ?? []).entries()) {
+      const stageNode = workflowStageId(capability.id, stage.id);
+      nodes.set(stageNode, { id: stageNode, kind: 'workflow-stage', label: stage.label, workflow: capability.id, stage: stage.id,
+        order: index + 1, condition: stage.when ?? null, approval: stage.approval ?? null, artifacts: [...stage.artifacts], invokes: [...stage.invokes],
+        state: state(plannedState(context, plannedCapabilities.has(capability.id)), installedState(context?.target, installed),
+          observedState(context?.target, installed, audits.skills, capability.id, knownInstalledCapabilities)) });
+      edges.push({ from: id, to: stageNode, type: 'contains-stage', order: index + 1, provenance: 'declared' });
+      for (const invoked of stage.invokes) edges.push({ from: stageNode, to: capabilityId(invoked), type: 'invokes', provenance: 'declared' });
     }
   }
 
@@ -172,13 +221,14 @@ export async function buildArchitectureModel(repositoryRoot, options = {}) {
     const id = integrationId(integration.id);
     const adapters = typeof integration.adapter === 'string' ? [integration.adapter] : Object.values(integration.adapter);
     nodes.set(id, { id, kind: 'integration', label: integration.label, integration: integration.id, module: 'tool-integrations',
-      platforms: [...integration.platforms], scopes: [...integration.scopes], targets: [...integration.targets], activation: 'explicit installation and invocation',
+      purpose: integration.description, platforms: [...integration.platforms], scopes: [...integration.scopes], targets: [...integration.targets], activation: 'explicit installation and invocation',
       provenance: { kind: 'declared', release: integration.provenance.release, mode: integration.provenance.mode },
       cost: costs.integrationAdapters.filter((entry) => entry.id === integration.id),
       state: state(plannedState(context, Boolean(planned)), installedState(context?.target, Boolean(installed)),
-        observedState(context?.target, Boolean(installed), audits.integrations)), runtime: installed ? { provisioned: installed.provisioned,
+        observedState(context?.target, Boolean(installed), audits.integrations, integration.id, knownInstalledIntegrations)), runtime: installed ? { provisioned: installed.provisioned,
         configured: installed.configured, invocable: installed.invocable, hooksActivated: installed.hooksActivated, running: installed.running } : null });
     for (const platform of integration.platforms) edges.push({ from: platformId('tool-integrations', platform), to: id, type: 'contains', provenance: 'declared' });
+    addTrigger(nodes, edges, 'integration-selection', 'Explicit Tool integration selection', id);
     for (const source of [...new Set([...adapters, integration.provenance.localPath, ...(integration.runtime.resources ?? []).map((entry) => entry.path)])]) addSource(nodes, edges, id, source);
     for (const capability of integration.capabilities) {
       const childId = integrationCapabilityId(integration.id, capability.id);
@@ -187,8 +237,9 @@ export async function buildArchitectureModel(repositoryRoot, options = {}) {
       nodes.set(childId, { id: childId, kind: 'integration-capability', label: capability.id, integration: integration.id,
         capability: capability.id, mode: capability.mode, default: capability.default, network: capability.network, model: capability.model,
         state: state(plannedState(context, enabledPlanned), installedState(context?.target, enabledNow),
-          observedState(context?.target, enabledNow, audits.integrations)) });
+          observedState(context?.target, enabledNow, audits.integrations, integration.id, knownInstalledIntegrations)) });
       edges.push({ from: id, to: childId, type: 'exposes', provenance: 'declared' });
+      addTrigger(nodes, edges, `integration-${capability.mode}`, `Explicit integration ${capability.mode}`, childId);
     }
   }
 
@@ -202,28 +253,38 @@ export async function buildArchitectureModel(repositoryRoot, options = {}) {
     interchange: { graphify: { decision: 'linked-separate', joinKey: 'normalized repository-relative source path',
       catalogEvidence: 'declared architecture and receipt-validated installation state', graphifyEvidence: 'extracted or inferred source graph',
       rationale: 'Graphify node-link graphs do not preserve the catalog lifecycle, state, workflow-stage or relationship-provenance contract. Direct merge would blur authored architecture with extracted evidence.',
-      path: '.scratch/graphify-harness-2026-09-10/graph.html' } } };
+      evidence: 'docs/dev/2026-09-10-graphify-architecture-quality-follow-up.md',
+      localArtifact: '.scratch/graphify-harness-2026-09-10/graph.html',
+      regeneration: 'Use the pinned Graphify integration only after an explicit user request; see docs/dev/modularity-m6-tool-integrations.md.' } } };
   return model;
 }
 
-const escapeCell = (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('|', '\\|').replaceAll('\n', ' ');
 const link = (source) => `[\`${source}\`](${source})`;
-const sourceLinks = (model, id) => model.edges.filter((edge) => edge.from === id && ['sourced-by', 'resource'].includes(edge.type))
+const sourceLinks = (model, id) => model.edges.filter((edge) => edge.from === id && ['sourced-by', 'resource', 'executes'].includes(edge.type))
   .map((edge) => model.nodes.find((node) => node.id === edge.to)?.source).filter(Boolean).map(link).join('<br>');
 const renderState = (entry) => `${entry.state.planned} / ${entry.state.installed} / ${entry.state.observed}`;
+const activationText = (entry) => typeof entry.activation === 'string' ? entry.activation
+  : `${entry.activation.kind}: ${entry.activation.event}`;
 
 export function renderArchitectureMarkdown(model) {
   const modules = model.nodes.filter((entry) => entry.kind === 'module');
-  const capabilities = model.nodes.filter((entry) => ['configuration', 'capability', 'integration'].includes(entry.kind));
-  const relationships = model.edges.filter((entry) => ['depends-on', 'requires', 'uses', 'routes-to', 'stage-invokes'].includes(entry.type));
+  const capabilities = model.nodes.filter((entry) => ['behavior', 'capability', 'integration'].includes(entry.kind));
+  const relationships = model.edges.filter((entry) => ['depends-on', 'installs', 'requires', 'uses', 'routes-to', 'activates', 'invokes', 'executes', 'configures'].includes(entry.type));
   const integrationCapabilities = model.nodes.filter((entry) => entry.kind === 'integration-capability');
+  const workflowStages = model.nodes.filter((entry) => entry.kind === 'workflow-stage');
+  const settings = model.nodes.filter((entry) => entry.kind === 'setting');
   const label = new Map(model.nodes.map((entry) => [entry.id, entry.label]));
-  const moduleRows = modules.map((entry) => `| ${escapeCell(entry.label)} | ${entry.visibility} | ${entry.platforms.join('/')} | ${entry.scopes.join('/')} | ${renderState(entry)} | ${model.edges.filter((edge) => edge.from === entry.id && edge.type === 'depends-on').map((edge) => label.get(edge.to)).join(', ') || '—'} |`).join('\n');
+  const moduleRows = modules.map((entry) => `| ${escapeCell(entry.label)} | ${escapeCell(entry.description)} | ${entry.visibility} | ${entry.platforms.join('/')} | ${entry.scopes.join('/')} | ${renderState(entry)} | ${model.edges.filter((edge) => edge.from === entry.id && edge.type === 'depends-on').map((edge) => label.get(edge.to)).join(', ') || '—'} |`).join('\n');
   const pathRows = modules.flatMap((module) => model.nodes.filter((entry) => entry.kind === 'platform' && entry.module === module.module)
     .map((entry) => `| ${escapeCell(module.label)} | ${entry.platform} | ${model.edges.filter((edge) => edge.from === entry.id && edge.type === 'contains').map((edge) => label.get(edge.to)).join(', ') || 'source/runtime ownership'} |`)).join('\n');
-  const capabilityRows = capabilities.map((entry) => `| ${entry.module} | ${escapeCell(entry.label)} | ${(entry.targets ?? entry.platforms ?? [entry.platform]).join('/')} | ${escapeCell(entry.activation)} | ${renderState(entry)} | ${sourceLinks(model, entry.id) || '—'} |`).join('\n');
-  const relationshipRows = relationships.map((entry) => `| ${escapeCell(label.get(entry.from))} | ${entry.type} | ${escapeCell(label.get(entry.to))} | ${entry.stage ?? '—'} | ${escapeCell(entry.condition ?? '—')} | ${entry.provenance} |`).join('\n');
+  const capabilityRows = capabilities.map((entry) => `| ${entry.module} | ${escapeCell(entry.label)} | ${escapeCell(entry.purpose)} | ${(entry.targets ?? entry.platforms ?? [entry.platform]).join('/')} | ${escapeCell(activationText(entry))} | ${renderState(entry)} | ${sourceLinks(model, entry.id) || '—'} |`).join('\n');
+  const relationshipRows = relationships.map((entry) => `| ${escapeCell(label.get(entry.from))} | ${entry.type} | ${escapeCell(label.get(entry.to))} | ${escapeCell(entry.condition ?? '—')} | ${entry.provenance} |`).join('\n');
   const toolRows = integrationCapabilities.map((entry) => `| ${entry.integration} | ${entry.capability} | ${entry.mode} | ${entry.default} | ${entry.network} | ${entry.model} | ${renderState(entry)} |`).join('\n');
+  const stageRows = workflowStages.map((entry) => `| ${entry.workflow} | ${entry.order} | ${escapeCell(entry.label)} | ${escapeCell(entry.condition ?? '—')} | ${entry.invokes.map((id) => label.get(capabilityId(id))).join(', ') || '—'} | ${escapeCell(entry.approval ?? '—')} | ${escapeCell(entry.artifacts.join(', ') || '—')} |`).join('\n');
+  const settingRows = settings.map((entry) => {
+    const behavior = model.nodes.find((node) => node.id === behaviorId(entry.behavior));
+    return `| ${escapeCell(behavior.label)} | ${escapeCell(entry.path)} | ${escapeCell(entry.value)} | ${sourceLinks(model, behavior.id).split('<br>')[0]} | ${escapeCell(behavior.activation.event)} |`;
+  }).join('\n');
   const capabilityCost = model.costs.capabilities.reduce((sum, entry) => sum + entry.metadataEstimatedTokens, 0);
   const bodyCost = model.costs.capabilities.reduce((sum, entry) => sum + entry.bodyEstimatedTokens, 0);
   const adapterCost = model.costs.integrationAdapters.reduce((sum, entry) => sum + entry.metadataEstimatedTokens, 0);
@@ -243,8 +304,8 @@ The checked-in overview is target-free, so its state is normally \`not-evaluated
 
 ## Modules
 
-| Module | Visibility | Platforms | Scopes | Planned / installed / observed | Depends on |
-| --- | --- | --- | --- | --- | --- |
+| Module | Purpose | Visibility | Platforms | Scopes | Planned / installed / observed | Depends on |
+| --- | --- | --- | --- | --- | --- | --- |
 ${moduleRows}
 
 ## Global → platform → capability → source navigation
@@ -253,16 +314,30 @@ ${moduleRows}
 | --- | --- | --- |
 ${pathRows}
 
-| Module | Capability or integration | Platforms or exact targets | Activation | Planned / installed / observed | Canonical source |
-| --- | --- | --- | --- | --- | --- |
+| Module | Capability, behavior or integration | Purpose | Platforms or exact targets | Activation event or command | Planned / installed / observed | Canonical source / program |
+| --- | --- | --- | --- | --- | --- | --- |
 ${capabilityRows}
+
+## Individual configuration settings
+
+| Behavior | Setting | Declared value | Source | Activation event or command |
+| --- | --- | --- | --- | --- |
+${settingRows}
+
+## Ordered workflow stages
+
+Stages remain ordered even when they invoke no capability. Approval points and artifacts are architecture facts, not installation dependencies.
+
+| Workflow | Order | Stage | Condition | Invokes | Approval | Artifacts |
+| --- | ---: | --- | --- | --- | --- | --- |
+${stageRows}
 
 ## Declared relationships
 
-Installation dependencies, conditional uses, routes and workflow-stage invocations remain different edge kinds. A route or conditional use is not an installation dependency.
+Containment, installation, activation, dependencies, conditional uses, routes and workflow-stage invocations remain different edge kinds. A route or conditional use is not an installation dependency.
 
-| From | Edge | To | Stage | Condition | Provenance |
-| --- | --- | --- | --- | --- | --- |
+| From | Edge | To | Condition | Provenance |
+| --- | --- | --- | --- | --- |
 ${relationshipRows}
 
 ## Tool capability edges
@@ -277,7 +352,7 @@ Static discovery metadata is approximately ${capabilityCost} tokens across the 2
 
 ## Graphify interchange decision
 
-Keep the catalog view and Graphify source graph linked but separate. Their safe join key is a normalized repository-relative source path. The catalog owns declared modules, workflow stages, activation and receipt-backed state; Graphify owns extracted or inferred source evidence. Direct graph merge is rejected for M7 because Graphify's node-link format cannot preserve those lifecycle and provenance distinctions. The existing local [Graphify relationship view](.scratch/graphify-harness-2026-09-10/graph.html) remains a separate regenerable code view.
+Keep the catalog view and Graphify source graph linked but separate. Their safe join key is a normalized repository-relative source path. The catalog owns declared modules, workflow stages, activation and receipt-backed state; Graphify owns extracted or inferred source evidence. Direct graph merge is rejected for M7 because Graphify's node-link format cannot preserve those lifecycle and provenance distinctions. The tracked [Graphify pilot record](docs/dev/2026-09-10-graphify-architecture-quality-follow-up.md) explains the evidence; a local code view can be regenerated through the pinned integration only after an explicit request, following [the M6 contract](docs/dev/modularity-m6-tool-integrations.md).
 `;
 }
 

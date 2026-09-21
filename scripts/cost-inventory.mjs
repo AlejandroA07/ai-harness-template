@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { assertSafeDirectory, parseSkill } from './skill-lib.mjs';
 import { readRegular } from './installation-core.mjs';
+import { escapeMarkdownTableCell as escapeCell } from './markdown-table.mjs';
 
 const estimate = (value) => Math.ceil(Buffer.byteLength(value, 'utf8') / 4);
 const measuredFields = ['date', 'agentVersion', 'model', 'project', 'scenario', 'mcps', 'result', 'method'];
@@ -78,7 +79,6 @@ export async function buildCostInventory(repositoryRoot, catalog, integrationCat
     measurements: await loadTokenMeasurements(repositoryRoot) };
 }
 
-const escapeCell = (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('|', '\\|').replaceAll('\n', ' ');
 const measurementRow = (entry, pending = false) => `| ${pending ? '—' : escapeCell(entry.date)} | ${escapeCell(entry.agentVersion)} | ${escapeCell(entry.model)} | ${escapeCell(entry.project)} | ${escapeCell(entry.scenario)} | ${escapeCell(entry.mcps)} | ${pending ? 'Pending' : escapeCell(entry.result)} | ${escapeCell(entry.method)} |`;
 
 export function renderCostMarkdown(inventory, deniedTools) {

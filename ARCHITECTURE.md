@@ -14,24 +14,24 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 
 ## Modules
 
-| Module | Visibility | Platforms | Scopes | Planned / installed / observed | Depends on |
-| --- | --- | --- | --- | --- | --- |
-| Global configuration | public | claude/codex | machine | not-evaluated / not-inspected / not-inspected | Installation core, Shared policy/runtime |
-| Project configuration | public | claude/codex | project | not-evaluated / not-inspected / not-inspected | Installation core, Shared policy/runtime |
-| Skills | public | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Installation core |
-| Workflows | public | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Skills, Installation core |
-| Tool integrations | public | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Installation core |
-| Installation core | internal | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Shared policy/runtime |
-| Shared policy/runtime | internal | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | — |
+| Module | Purpose | Visibility | Platforms | Scopes | Planned / installed / observed | Depends on |
+| --- | --- | --- | --- | --- | --- | --- |
+| Global configuration | Machine-wide guidance and platform settings. | public | claude/codex | machine | not-evaluated / not-inspected / not-inspected | Installation core, Shared policy/runtime |
+| Project configuration | Repository guidance, verification and optional CI. | public | claude/codex | project | not-evaluated / not-inspected / not-inspected | Installation core, Shared policy/runtime |
+| Skills | Individual reusable capabilities; ownership is refined per capability. | public | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Installation core |
+| Workflows | Ordered compositions packaged through the existing skill adapters. | public | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Skills, Installation core |
+| Tool integrations | Optional pinned programs and MCP adapters with explicit acquisition and activation definitions. | public | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Installation core |
+| Installation core | Shared selection, generation, installation and audit machinery. | internal | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Shared policy/runtime |
+| Shared policy/runtime | Shared guards, attribution policy and portable process execution. | internal | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | — |
 
 ## Global → platform → capability → source navigation
 
 | Module | Platform | Capabilities |
 | --- | --- | --- |
-| Global configuration | claude | Global configuration for claude |
-| Global configuration | codex | Global configuration for codex |
-| Project configuration | claude | Project configuration for claude |
-| Project configuration | codex | Project configuration for codex |
+| Global configuration | claude | Claude machine guidance, Claude machine policy |
+| Global configuration | codex | Codex machine guidance, Codex machine policy |
+| Project configuration | claude | Claude project guidance, Claude project policy, Project verification, Project CI |
+| Project configuration | codex | Codex project guidance, Codex project policy, Project verification, Project CI |
 | Skills | claude | Code Review, Codebase Design, Diagnosing Bugs, Domain Modeling, Grilling, Handoff, Prototype, Research, Security Checklist, Tdd, To Questionnaire, Wait What, Writing For Agents |
 | Skills | codex | Code Review, Codebase Design, Diagnosing Bugs, Domain Modeling, Grilling, Handoff, Prototype, Research, Security Checklist, Tdd, To Questionnaire, Wait What, Writing For Agents |
 | Workflows | claude | Ask Alfred, Grill Me, Grill With Docs, Implement, Improve Codebase Architecture, Teach, To Spec, To Tickets, Wayfinder |
@@ -43,110 +43,279 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | Shared policy/runtime | claude | source/runtime ownership |
 | Shared policy/runtime | codex | source/runtime ownership |
 
-| Module | Capability or integration | Platforms or exact targets | Activation | Planned / installed / observed | Canonical source |
-| --- | --- | --- | --- | --- | --- |
-| global-configuration | Global configuration for claude | claude | session guidance and platform hooks | not-evaluated / not-inspected / not-inspected | [`global`](global)<br>[`scripts/global-installation.mjs`](scripts/global-installation.mjs)<br>[`scripts/global-settings.mjs`](scripts/global-settings.mjs) |
-| global-configuration | Global configuration for codex | codex | session guidance and platform hooks | not-evaluated / not-inspected / not-inspected | [`global`](global)<br>[`scripts/global-installation.mjs`](scripts/global-installation.mjs)<br>[`scripts/global-settings.mjs`](scripts/global-settings.mjs) |
-| project-configuration | Project configuration for claude | claude | project guidance and verification command | not-evaluated / not-inspected / not-inspected | [`project`](project)<br>[`scripts/bootstrap.mjs`](scripts/bootstrap.mjs)<br>[`scripts/project-configuration.mjs`](scripts/project-configuration.mjs)<br>[`scripts/project-verification.mjs`](scripts/project-verification.mjs)<br>[`scripts/project-installation.mjs`](scripts/project-installation.mjs)<br>[`scripts/project-settings.mjs`](scripts/project-settings.mjs)<br>[`scripts/project-state.mjs`](scripts/project-state.mjs)<br>[`scripts/project-adapters.mjs`](scripts/project-adapters.mjs)<br>[`scripts/project-receipt.mjs`](scripts/project-receipt.mjs)<br>[`scripts/project-provenance.mjs`](scripts/project-provenance.mjs)<br>[`scripts/project-check.mjs`](scripts/project-check.mjs) |
-| project-configuration | Project configuration for codex | codex | project guidance and verification command | not-evaluated / not-inspected / not-inspected | [`project`](project)<br>[`scripts/bootstrap.mjs`](scripts/bootstrap.mjs)<br>[`scripts/project-configuration.mjs`](scripts/project-configuration.mjs)<br>[`scripts/project-verification.mjs`](scripts/project-verification.mjs)<br>[`scripts/project-installation.mjs`](scripts/project-installation.mjs)<br>[`scripts/project-settings.mjs`](scripts/project-settings.mjs)<br>[`scripts/project-state.mjs`](scripts/project-state.mjs)<br>[`scripts/project-adapters.mjs`](scripts/project-adapters.mjs)<br>[`scripts/project-receipt.mjs`](scripts/project-receipt.mjs)<br>[`scripts/project-provenance.mjs`](scripts/project-provenance.mjs)<br>[`scripts/project-check.mjs`](scripts/project-check.mjs) |
-| workflows | Ask Alfred | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/ask-alfred/SKILL.md`](skills/engineering/ask-alfred/SKILL.md)<br>[`skills/engineering/ask-alfred/PHASE-BOUNDARIES.md`](skills/engineering/ask-alfred/PHASE-BOUNDARIES.md) |
-| skills | Code Review | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/code-review/SKILL.md`](skills/engineering/code-review/SKILL.md) |
-| skills | Codebase Design | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/codebase-design/SKILL.md`](skills/engineering/codebase-design/SKILL.md)<br>[`skills/engineering/codebase-design/DEEPENING.md`](skills/engineering/codebase-design/DEEPENING.md)<br>[`skills/engineering/codebase-design/DESIGN-IT-TWICE.md`](skills/engineering/codebase-design/DESIGN-IT-TWICE.md) |
-| skills | Diagnosing Bugs | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/diagnosing-bugs/SKILL.md`](skills/engineering/diagnosing-bugs/SKILL.md)<br>[`skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.ps1`](skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.ps1)<br>[`skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh`](skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh) |
-| skills | Domain Modeling | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/domain-modeling/SKILL.md`](skills/engineering/domain-modeling/SKILL.md)<br>[`skills/engineering/domain-modeling/ADR-FORMAT.md`](skills/engineering/domain-modeling/ADR-FORMAT.md)<br>[`skills/engineering/domain-modeling/CONTEXT-FORMAT.md`](skills/engineering/domain-modeling/CONTEXT-FORMAT.md) |
-| workflows | Grill Me | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/productivity/grill-me/SKILL.md`](skills/productivity/grill-me/SKILL.md) |
-| workflows | Grill With Docs | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/grill-with-docs/SKILL.md`](skills/engineering/grill-with-docs/SKILL.md) |
-| skills | Grilling | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/productivity/grilling/SKILL.md`](skills/productivity/grilling/SKILL.md) |
-| skills | Handoff | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/productivity/handoff/SKILL.md`](skills/productivity/handoff/SKILL.md) |
-| workflows | Implement | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/implement/SKILL.md`](skills/engineering/implement/SKILL.md) |
-| workflows | Improve Codebase Architecture | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/improve-codebase-architecture/SKILL.md`](skills/engineering/improve-codebase-architecture/SKILL.md)<br>[`skills/engineering/improve-codebase-architecture/HTML-REPORT.md`](skills/engineering/improve-codebase-architecture/HTML-REPORT.md) |
-| skills | Prototype | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/prototype/SKILL.md`](skills/engineering/prototype/SKILL.md)<br>[`skills/engineering/prototype/LOGIC.md`](skills/engineering/prototype/LOGIC.md)<br>[`skills/engineering/prototype/UI.md`](skills/engineering/prototype/UI.md) |
-| skills | Research | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/research/SKILL.md`](skills/engineering/research/SKILL.md) |
-| skills | Security Checklist | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/security-checklist/SKILL.md`](skills/engineering/security-checklist/SKILL.md) |
-| skills | Tdd | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/tdd/SKILL.md`](skills/engineering/tdd/SKILL.md)<br>[`skills/engineering/tdd/mocking.md`](skills/engineering/tdd/mocking.md)<br>[`skills/engineering/tdd/tests.md`](skills/engineering/tdd/tests.md) |
-| workflows | Teach | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/productivity/teach/SKILL.md`](skills/productivity/teach/SKILL.md)<br>[`skills/productivity/teach/GLOSSARY-FORMAT.md`](skills/productivity/teach/GLOSSARY-FORMAT.md)<br>[`skills/productivity/teach/LEARNING-RECORD-FORMAT.md`](skills/productivity/teach/LEARNING-RECORD-FORMAT.md)<br>[`skills/productivity/teach/MISSION-FORMAT.md`](skills/productivity/teach/MISSION-FORMAT.md)<br>[`skills/productivity/teach/RESOURCES-FORMAT.md`](skills/productivity/teach/RESOURCES-FORMAT.md) |
-| skills | To Questionnaire | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/productivity/to-questionnaire/SKILL.md`](skills/productivity/to-questionnaire/SKILL.md) |
-| workflows | To Spec | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/to-spec/SKILL.md`](skills/engineering/to-spec/SKILL.md) |
-| workflows | To Tickets | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/to-tickets/SKILL.md`](skills/engineering/to-tickets/SKILL.md) |
-| skills | Wait What | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/productivity/wait-what/SKILL.md`](skills/productivity/wait-what/SKILL.md) |
-| workflows | Wayfinder | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/wayfinder/SKILL.md`](skills/engineering/wayfinder/SKILL.md) |
-| skills | Writing For Agents | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/productivity/writing-for-agents/SKILL.md`](skills/productivity/writing-for-agents/SKILL.md)<br>[`skills/productivity/writing-for-agents/SKILL-MECHANICS.md`](skills/productivity/writing-for-agents/SKILL-MECHANICS.md) |
-| tool-integrations | Archify | claude:machine/claude:project/codex:machine/codex:project | explicit installation and invocation | not-evaluated / not-inspected / not-inspected | [`integrations/archify/SKILL.md`](integrations/archify/SKILL.md) |
-| tool-integrations | Context7 MCP | claude:project/codex:machine/codex:project | explicit installation and invocation | not-evaluated / not-inspected / not-inspected | [`components/mcp/claude-context7.json`](components/mcp/claude-context7.json)<br>[`components/mcp/codex-context7.toml`](components/mcp/codex-context7.toml)<br>[`components/mcp`](components/mcp)<br>[`integrations/context7/package.json`](integrations/context7/package.json)<br>[`integrations/context7/package-lock.json`](integrations/context7/package-lock.json) |
-| tool-integrations | Graphify | claude:machine/claude:project/codex:machine/codex:project | explicit installation and invocation | not-evaluated / not-inspected / not-inspected | [`integrations/graphify/SKILL.md`](integrations/graphify/SKILL.md)<br>[`integrations/graphify/base-requirements.txt`](integrations/graphify/base-requirements.txt)<br>[`integrations/graphify/all-requirements.txt`](integrations/graphify/all-requirements.txt) |
-| tool-integrations | Playwright MCP | claude:project/codex:machine/codex:project | explicit installation and invocation | not-evaluated / not-inspected / not-inspected | [`components/mcp/claude-playwright.json`](components/mcp/claude-playwright.json)<br>[`components/mcp/codex-playwright.toml`](components/mcp/codex-playwright.toml)<br>[`components/mcp`](components/mcp)<br>[`integrations/playwright/package.json`](integrations/playwright/package.json)<br>[`integrations/playwright/package-lock.json`](integrations/playwright/package-lock.json) |
+| Module | Capability, behavior or integration | Purpose | Platforms or exact targets | Activation event or command | Planned / installed / observed | Canonical source / program |
+| --- | --- | --- | --- | --- | --- | --- |
+| global-configuration | Claude machine guidance | Load durable machine-wide operating policy into Claude sessions. | claude | session: Claude session startup loads the installed ~/.claude/CLAUDE.md | not-evaluated / not-inspected / not-inspected | [`global/CLAUDE.md`](global/CLAUDE.md) |
+| global-configuration | Codex machine guidance | Load durable machine-wide operating policy into Codex sessions. | codex | session: Codex session startup loads the installed ~/.codex/AGENTS.md | not-evaluated / not-inspected / not-inspected | [`global/AGENTS.md`](global/AGENTS.md) |
+| global-configuration | Claude machine policy | Deny secret reads, disable automatic memory and run the command guard. | claude | hook: Claude PreToolUse for Bash, PowerShell or Read | not-evaluated / not-inspected / not-inspected | [`global/claude-settings.json`](global/claude-settings.json)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
+| global-configuration | Codex machine policy | Enable the command guard and keep automatic memory disabled. | codex | hook: Codex PreToolUse for Bash or Read after interactive hook trust | not-evaluated / not-inspected / not-inspected | [`scripts/global-installation.mjs`](scripts/global-installation.mjs)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
+| project-configuration | Claude project guidance | Load repository-owned guidance into Claude sessions. | claude | session: Claude opens the repository and loads CLAUDE.md | not-evaluated / not-inspected / not-inspected | [`project/CLAUDE.md`](project/CLAUDE.md) |
+| project-configuration | Codex project guidance | Load repository-owned guidance into Codex sessions. | codex | session: Codex opens the repository and loads AGENTS.md | not-evaluated / not-inspected / not-inspected | [`project/AGENTS.selected.md`](project/AGENTS.selected.md) |
+| project-configuration | Claude project policy | Run repository-owned command and secret-path checks. | claude | hook: Claude PreToolUse for Bash, PowerShell or Read | not-evaluated / not-inspected / not-inspected | [`project/.claude/settings.json`](project/.claude/settings.json)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
+| project-configuration | Codex project policy | Run repository-owned command and secret-path checks. | codex | hook: Codex PreToolUse for Bash or Read after interactive hook trust | not-evaluated / not-inspected / not-inspected | [`project/.codex/hooks.json`](project/.codex/hooks.json)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
+| project-configuration | Project verification | Run the repository's selected deterministic completion gate. | claude/codex | command: node scripts/verify-harness.mjs | not-evaluated / not-inspected / not-inspected | [`project/scripts/verify-harness.mjs`](project/scripts/verify-harness.mjs) |
+| project-configuration | Project CI | Run the generated project verification gate in GitHub Actions when selected. | claude/codex | ci: GitHub push to main or pull_request when --ci github is selected | not-evaluated / not-inspected / not-inspected | [`project/.github/workflows/verify.yml`](project/.github/workflows/verify.yml) |
+| workflows | Ask Alfred | Ask which skill or flow fits your situation. A router over the skills in this harness. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/ask-alfred/SKILL.md`](skills/engineering/ask-alfred/SKILL.md)<br>[`skills/engineering/ask-alfred/PHASE-BOUNDARIES.md`](skills/engineering/ask-alfred/PHASE-BOUNDARIES.md) |
+| skills | Code Review | Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to "review since X". | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/code-review/SKILL.md`](skills/engineering/code-review/SKILL.md) |
+| skills | Codebase Design | Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary. | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/codebase-design/SKILL.md`](skills/engineering/codebase-design/SKILL.md)<br>[`skills/engineering/codebase-design/DEEPENING.md`](skills/engineering/codebase-design/DEEPENING.md)<br>[`skills/engineering/codebase-design/DESIGN-IT-TWICE.md`](skills/engineering/codebase-design/DESIGN-IT-TWICE.md) |
+| skills | Diagnosing Bugs | Diagnosis loop for hard bugs and performance regressions. Use when the user says "diagnose"/"debug this", or reports something broken/throwing/failing/slow. | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/diagnosing-bugs/SKILL.md`](skills/engineering/diagnosing-bugs/SKILL.md)<br>[`skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.ps1`](skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.ps1)<br>[`skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh`](skills/engineering/diagnosing-bugs/scripts/hitl-loop.template.sh) |
+| skills | Domain Modeling | Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a CONTEXT.md, or recording or editing an ADR. | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/domain-modeling/SKILL.md`](skills/engineering/domain-modeling/SKILL.md)<br>[`skills/engineering/domain-modeling/ADR-FORMAT.md`](skills/engineering/domain-modeling/ADR-FORMAT.md)<br>[`skills/engineering/domain-modeling/CONTEXT-FORMAT.md`](skills/engineering/domain-modeling/CONTEXT-FORMAT.md) |
+| workflows | Grill Me | A relentless interview to sharpen a plan or design. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/productivity/grill-me/SKILL.md`](skills/productivity/grill-me/SKILL.md) |
+| workflows | Grill With Docs | A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/grill-with-docs/SKILL.md`](skills/engineering/grill-with-docs/SKILL.md) |
+| skills | Grilling | Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases. | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/productivity/grilling/SKILL.md`](skills/productivity/grilling/SKILL.md) |
+| skills | Handoff | Compact the current conversation into a handoff document for another agent to pick up. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/productivity/handoff/SKILL.md`](skills/productivity/handoff/SKILL.md) |
+| workflows | Implement | Implement an approved specification or ticket through verified vertical slices, review the exact task patch, and create a clean local commit. Use only when the user explicitly asks to implement approved work. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/implement/SKILL.md`](skills/engineering/implement/SKILL.md) |
+| workflows | Improve Codebase Architecture | Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/improve-codebase-architecture/SKILL.md`](skills/engineering/improve-codebase-architecture/SKILL.md)<br>[`skills/engineering/improve-codebase-architecture/HTML-REPORT.md`](skills/engineering/improve-codebase-architecture/HTML-REPORT.md) |
+| skills | Prototype | Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like. | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/prototype/SKILL.md`](skills/engineering/prototype/SKILL.md)<br>[`skills/engineering/prototype/LOGIC.md`](skills/engineering/prototype/LOGIC.md)<br>[`skills/engineering/prototype/UI.md`](skills/engineering/prototype/UI.md) |
+| skills | Research | Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/research/SKILL.md`](skills/engineering/research/SKILL.md) |
+| skills | Security Checklist | Review security-sensitive changes at attacker-reachable boundaries. Use for endpoints, authentication or authorization, untrusted input, uploads, outbound requests, redirects, webhooks, credentials, sensitive data, command execution, filesystem paths, dependencies, or CI security. | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/security-checklist/SKILL.md`](skills/engineering/security-checklist/SKILL.md) |
+| skills | Tdd | Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions "red-green-refactor", or wants integration tests. | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/engineering/tdd/SKILL.md`](skills/engineering/tdd/SKILL.md)<br>[`skills/engineering/tdd/mocking.md`](skills/engineering/tdd/mocking.md)<br>[`skills/engineering/tdd/tests.md`](skills/engineering/tdd/tests.md) |
+| workflows | Teach | Teach the user a new skill or concept, within this workspace. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/productivity/teach/SKILL.md`](skills/productivity/teach/SKILL.md)<br>[`skills/productivity/teach/GLOSSARY-FORMAT.md`](skills/productivity/teach/GLOSSARY-FORMAT.md)<br>[`skills/productivity/teach/LEARNING-RECORD-FORMAT.md`](skills/productivity/teach/LEARNING-RECORD-FORMAT.md)<br>[`skills/productivity/teach/MISSION-FORMAT.md`](skills/productivity/teach/MISSION-FORMAT.md)<br>[`skills/productivity/teach/RESOURCES-FORMAT.md`](skills/productivity/teach/RESOURCES-FORMAT.md) |
+| skills | To Questionnaire | Turn a decision you can't fully answer into a questionnaire for someone else to fill in. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/productivity/to-questionnaire/SKILL.md`](skills/productivity/to-questionnaire/SKILL.md) |
+| workflows | To Spec | Turn the current conversation into a spec and publish it to the project issue tracker — no interview, just synthesis of what you've already discussed. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/to-spec/SKILL.md`](skills/engineering/to-spec/SKILL.md) |
+| workflows | To Tickets | Break a plan, spec, or the current conversation into a set of tracer-bullet tickets, each declaring its blocking edges, published to the configured tracker — edges as text in one file per ticket locally, or native blocking links on a real tracker. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/to-tickets/SKILL.md`](skills/engineering/to-tickets/SKILL.md) |
+| skills | Wait What | Stop. That last message did not land — re-pitch it. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/productivity/wait-what/SKILL.md`](skills/productivity/wait-what/SKILL.md) |
+| workflows | Wayfinder | Plan a huge chunk of work — more than one agent session can hold — as a shared map of decision tickets on your issue tracker, and resolve them one at a time until the way to the destination is clear. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/wayfinder/SKILL.md`](skills/engineering/wayfinder/SKILL.md) |
+| skills | Writing For Agents | Writing documents for agents. Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md. | claude/codex | model-or-user | not-evaluated / not-inspected / not-inspected | [`skills/productivity/writing-for-agents/SKILL.md`](skills/productivity/writing-for-agents/SKILL.md)<br>[`skills/productivity/writing-for-agents/SKILL-MECHANICS.md`](skills/productivity/writing-for-agents/SKILL-MECHANICS.md) |
+| tool-integrations | Archify | User-invoked validation and rendering of authored architecture, workflow, sequence, data-flow and lifecycle diagrams. | claude:machine/claude:project/codex:machine/codex:project | explicit installation and invocation | not-evaluated / not-inspected / not-inspected | [`integrations/archify/SKILL.md`](integrations/archify/SKILL.md) |
+| tool-integrations | Context7 MCP | Pinned MCP adapter for current third-party library documentation. | claude:project/codex:machine/codex:project | explicit installation and invocation | not-evaluated / not-inspected / not-inspected | [`components/mcp/claude-context7.json`](components/mcp/claude-context7.json)<br>[`components/mcp/codex-context7.toml`](components/mcp/codex-context7.toml)<br>[`components/mcp`](components/mcp)<br>[`integrations/context7/package.json`](integrations/context7/package.json)<br>[`integrations/context7/package-lock.json`](integrations/context7/package-lock.json) |
+| tool-integrations | Graphify | User-controlled code knowledge graph build, query and optional activation features. | claude:machine/claude:project/codex:machine/codex:project | explicit installation and invocation | not-evaluated / not-inspected / not-inspected | [`integrations/graphify/SKILL.md`](integrations/graphify/SKILL.md)<br>[`integrations/graphify/base-requirements.txt`](integrations/graphify/base-requirements.txt)<br>[`integrations/graphify/all-requirements.txt`](integrations/graphify/all-requirements.txt) |
+| tool-integrations | Playwright MCP | Pinned MCP adapter for explicitly requested browser interaction. | claude:project/codex:machine/codex:project | explicit installation and invocation | not-evaluated / not-inspected / not-inspected | [`components/mcp/claude-playwright.json`](components/mcp/claude-playwright.json)<br>[`components/mcp/codex-playwright.toml`](components/mcp/codex-playwright.toml)<br>[`components/mcp`](components/mcp)<br>[`integrations/playwright/package.json`](integrations/playwright/package.json)<br>[`integrations/playwright/package-lock.json`](integrations/playwright/package-lock.json) |
+
+## Individual configuration settings
+
+| Behavior | Setting | Declared value | Source | Activation event or command |
+| --- | --- | --- | --- | --- |
+| Claude machine policy | includeCoAuthoredBy | false | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
+| Claude machine policy | autoMemoryEnabled | false | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
+| Claude machine policy | permissions.disableBypassPermissionsMode | disable | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
+| Claude machine policy | permissions.deny | canonical secret paths plus reviewed built-in tool denials | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
+| Claude machine policy | hooks.PreToolUse | one harness-owned guard | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
+| Codex machine policy | features.hooks | true | [`scripts/global-installation.mjs`](scripts/global-installation.mjs) | Codex PreToolUse for Bash or Read after interactive hook trust |
+| Codex machine policy | features.memories | false | [`scripts/global-installation.mjs`](scripts/global-installation.mjs) | Codex PreToolUse for Bash or Read after interactive hook trust |
+| Codex machine policy | hooks.PreToolUse | one harness-owned guard | [`scripts/global-installation.mjs`](scripts/global-installation.mjs) | Codex PreToolUse for Bash or Read after interactive hook trust |
+| Claude project policy | includeCoAuthoredBy | false | [`project/.claude/settings.json`](project/.claude/settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
+| Claude project policy | autoMemoryEnabled | false | [`project/.claude/settings.json`](project/.claude/settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
+| Claude project policy | permissions.deny | project and nested secret paths | [`project/.claude/settings.json`](project/.claude/settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
+| Claude project policy | hooks.PreToolUse | one harness-owned project guard | [`project/.claude/settings.json`](project/.claude/settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
+| Codex project policy | features.hooks | true | [`project/.codex/hooks.json`](project/.codex/hooks.json) | Codex PreToolUse for Bash or Read after interactive hook trust |
+| Codex project policy | features.memories | false | [`project/.codex/hooks.json`](project/.codex/hooks.json) | Codex PreToolUse for Bash or Read after interactive hook trust |
+| Codex project policy | hooks.PreToolUse | one harness-owned project guard | [`project/.codex/hooks.json`](project/.codex/hooks.json) | Codex PreToolUse for Bash or Read after interactive hook trust |
+| Project verification | verification | existing or generated | [`project/scripts/verify-harness.mjs`](project/scripts/verify-harness.mjs) | node scripts/verify-harness.mjs |
+| Project CI | ci | none or github | [`project/.github/workflows/verify.yml`](project/.github/workflows/verify.yml) | GitHub push to main or pull_request when --ci github is selected |
+
+## Ordered workflow stages
+
+Stages remain ordered even when they invoke no capability. Approval points and artifacts are architecture facts, not installation dependencies.
+
+| Workflow | Order | Stage | Condition | Invokes | Approval | Artifacts |
+| --- | ---: | --- | --- | --- | --- | --- |
+| ask-alfred | 1 | Explain the suitable capability or flow | — | — | The user chooses whether to invoke a recommended capability. | — |
+| grill-me | 1 | Sharpen the plan through decision rounds | — | Grilling | The user answers each decision frontier before the next round. | — |
+| grill-with-docs | 1 | Sharpen decisions and record durable domain knowledge | — | Grilling, Domain Modeling | The user answers each decision frontier before the next round. | CONTEXT.md glossary updates, docs/adr decision records |
+| implement | 1 | Read the approved work and define the exact patch | — | — | An approved specification or ticket defines behavior, test seams, authorization and scope. | — |
+| implement | 2 | Build verified vertical slices | — | Tdd | — | tested source patch |
+| implement | 3 | Review security-sensitive changes | The patch touches an attacker-reachable interface or security-sensitive configuration. | Security Checklist | — | security checklist verdicts |
+| implement | 4 | Review the exact staged patch | — | Code Review | — | standards and specification review |
+| implement | 5 | Run the project gate and create the local commit | — | — | — | verified local Git commit |
+| improve-codebase-architecture | 1 | Find deepening opportunities using the shared vocabulary | — | Codebase Design | — | — |
+| improve-codebase-architecture | 2 | Present candidates in an architecture report | — | — | The user selects which candidate to explore. | temporary architecture review HTML |
+| improve-codebase-architecture | 3 | Work through the selected module design | The user selects a candidate. | Grilling, Domain Modeling | — | CONTEXT.md glossary updates when needed, docs/adr decision records when needed |
+| teach | 1 | Ground teaching in the learner's mission | — | — | The user clarifies an absent mission and confirms any later mission change. | MISSION.md, RESOURCES.md |
+| teach | 2 | Create and run a focused interactive lesson | — | — | — | lesson HTML, reusable lesson assets, reference HTML |
+| teach | 3 | Record durable learning and teaching preferences | — | — | — | learning record Markdown, NOTES.md |
+| to-spec | 1 | Explore the repository and existing decisions | — | — | — | — |
+| to-spec | 2 | Choose the highest practical test seams | — | — | The user confirms that the proposed test seams match expectations. | testing decisions |
+| to-spec | 3 | Write and publish the specification | — | — | — | ready-for-agent specification |
+| to-tickets | 1 | Gather context and draft dependency-ordered vertical slices | — | — | — | proposed ticket breakdown |
+| to-tickets | 2 | Quiz and refine the breakdown | — | — | The user approves ticket granularity and blocking relationships. | approved ticket breakdown |
+| to-tickets | 3 | Publish tickets and their blocking relationships | — | — | — | ready-for-agent tickets, ticket blocking relationships |
+| wayfinder | 1 | Resolve the destination with the user | Chart mode: starting a new map. | Grilling, Domain Modeling | The user settles the destination and each human-in-the-loop decision. | destination and domain decisions |
+| wayfinder | 2 | Create the map, tickets and blocking relationships | Chart mode: the destination needs a multi-session decision map. Stop after charting; do not resolve tickets in this invocation. | — | — | wayfinder map issue, decision tickets, blocking relationships |
+| wayfinder | 3 | Resolve research tickets in parallel | Chart mode created research tickets, or work mode selected a research ticket. | Research | — | research branch findings, ticket context pointers |
+| wayfinder | 4 | Resolve a prototype ticket with the user | Work mode selected a prototype ticket that needs a concrete artifact to support a decision. | Prototype | The user evaluates the prototype as part of the decision. | linked prototype evidence |
+| wayfinder | 5 | Resolve a decision through discussion | Work mode selected a grilling ticket, the ticket notes name these capabilities, or the approach is unclear. | Grilling, Domain Modeling | The user supplies the human side of each decision. | decision answer |
+| wayfinder | 6 | Record the resolution and update the map | Work mode: after the selected ticket is resolved. Do not run the chart-mode stages first. | — | — | resolution comments, updated decisions and frontier |
 
 ## Declared relationships
 
-Installation dependencies, conditional uses, routes and workflow-stage invocations remain different edge kinds. A route or conditional use is not an installation dependency.
+Containment, installation, activation, dependencies, conditional uses, routes and workflow-stage invocations remain different edge kinds. A route or conditional use is not an installation dependency.
 
-| From | Edge | To | Stage | Condition | Provenance |
-| --- | --- | --- | --- | --- | --- |
-| Global configuration | depends-on | Installation core | — | — | declared |
-| Global configuration | depends-on | Shared policy/runtime | — | — | declared |
-| Project configuration | depends-on | Installation core | — | — | declared |
-| Project configuration | depends-on | Shared policy/runtime | — | — | declared |
-| Skills | depends-on | Installation core | — | — | declared |
-| Workflows | depends-on | Skills | — | — | declared |
-| Workflows | depends-on | Installation core | — | — | declared |
-| Tool integrations | depends-on | Installation core | — | — | declared |
-| Installation core | depends-on | Shared policy/runtime | — | — | declared |
-| Ask Alfred | routes-to | Code Review | — | — | declared |
-| Ask Alfred | routes-to | Codebase Design | — | — | declared |
-| Ask Alfred | routes-to | Diagnosing Bugs | — | — | declared |
-| Ask Alfred | routes-to | Domain Modeling | — | — | declared |
-| Ask Alfred | routes-to | Grill Me | — | — | declared |
-| Ask Alfred | routes-to | Grill With Docs | — | — | declared |
-| Ask Alfred | routes-to | Grilling | — | — | declared |
-| Ask Alfred | routes-to | Handoff | — | — | declared |
-| Ask Alfred | routes-to | Implement | — | — | declared |
-| Ask Alfred | routes-to | Improve Codebase Architecture | — | — | declared |
-| Ask Alfred | routes-to | Prototype | — | — | declared |
-| Ask Alfred | routes-to | Research | — | — | declared |
-| Ask Alfred | routes-to | Security Checklist | — | — | declared |
-| Ask Alfred | routes-to | Tdd | — | — | declared |
-| Ask Alfred | routes-to | Teach | — | — | declared |
-| Ask Alfred | routes-to | To Questionnaire | — | — | declared |
-| Ask Alfred | routes-to | To Spec | — | — | declared |
-| Ask Alfred | routes-to | To Tickets | — | — | declared |
-| Ask Alfred | routes-to | Wait What | — | — | declared |
-| Ask Alfred | routes-to | Wayfinder | — | — | declared |
-| Ask Alfred | routes-to | Writing For Agents | — | — | declared |
-| Diagnosing Bugs | routes-to | Improve Codebase Architecture | — | — | declared |
-| Grill Me | requires | Grilling | — | — | declared |
-| Grill Me | stage-invokes | Grilling | interview | — | declared |
-| Grill With Docs | requires | Grilling | — | — | declared |
-| Grill With Docs | requires | Domain Modeling | — | — | declared |
-| Grill With Docs | stage-invokes | Grilling | interview-and-record | — | declared |
-| Grill With Docs | stage-invokes | Domain Modeling | interview-and-record | — | declared |
-| Implement | requires | Tdd | — | — | declared |
-| Implement | requires | Code Review | — | — | declared |
-| Implement | uses | Security Checklist | — | When changes touch an attacker-reachable interface or security-sensitive configuration. | declared |
-| Implement | stage-invokes | Tdd | implement | — | declared |
-| Implement | stage-invokes | Security Checklist | security-review | The patch touches an attacker-reachable interface or security-sensitive configuration. | declared |
-| Implement | stage-invokes | Code Review | review | — | declared |
-| Improve Codebase Architecture | requires | Codebase Design | — | — | declared |
-| Improve Codebase Architecture | uses | Grilling | — | After the user selects a candidate. | declared |
-| Improve Codebase Architecture | uses | Domain Modeling | — | As domain decisions crystallize while exploring the selected candidate. | declared |
-| Improve Codebase Architecture | routes-to | Grill With Docs | — | — | declared |
-| Improve Codebase Architecture | stage-invokes | Codebase Design | explore | — | declared |
-| Improve Codebase Architecture | stage-invokes | Grilling | design | The user selects a candidate. | declared |
-| Improve Codebase Architecture | stage-invokes | Domain Modeling | design | The user selects a candidate. | declared |
-| Tdd | uses | Codebase Design | — | When the shape of the test interface is in question. | declared |
-| Tdd | routes-to | Code Review | — | — | declared |
-| Wayfinder | requires | Grilling | — | — | declared |
-| Wayfinder | requires | Domain Modeling | — | — | declared |
-| Wayfinder | uses | Research | — | When resolving a research ticket. | declared |
-| Wayfinder | uses | Prototype | — | When resolving a prototype ticket. | declared |
-| Wayfinder | routes-to | To Spec | — | — | declared |
-| Wayfinder | routes-to | To Tickets | — | — | declared |
-| Wayfinder | routes-to | Implement | — | — | declared |
-| Wayfinder | stage-invokes | Grilling | name-destination | Chart mode: starting a new map. | declared |
-| Wayfinder | stage-invokes | Domain Modeling | name-destination | Chart mode: starting a new map. | declared |
-| Wayfinder | stage-invokes | Research | research | Chart mode created research tickets, or work mode selected a research ticket. | declared |
-| Wayfinder | stage-invokes | Prototype | prototype | Work mode selected a prototype ticket that needs a concrete artifact to support a decision. | declared |
-| Wayfinder | stage-invokes | Grilling | discuss-decision | Work mode selected a grilling ticket, the ticket notes name these capabilities, or the approach is unclear. | declared |
-| Wayfinder | stage-invokes | Domain Modeling | discuss-decision | Work mode selected a grilling ticket, the ticket notes name these capabilities, or the approach is unclear. | declared |
+| From | Edge | To | Condition | Provenance |
+| --- | --- | --- | --- | --- |
+| Global configuration | depends-on | Installation core | — | declared |
+| Global configuration | depends-on | Shared policy/runtime | — | declared |
+| Installation core | installs | Global configuration | — | declared |
+| Project configuration | depends-on | Installation core | — | declared |
+| Project configuration | depends-on | Shared policy/runtime | — | declared |
+| Installation core | installs | Project configuration | — | declared |
+| Skills | depends-on | Installation core | — | declared |
+| Installation core | installs | Skills | — | declared |
+| Workflows | depends-on | Skills | — | declared |
+| Workflows | depends-on | Installation core | — | declared |
+| Installation core | installs | Workflows | — | declared |
+| Tool integrations | depends-on | Installation core | — | declared |
+| Installation core | installs | Tool integrations | — | declared |
+| Installation core | depends-on | Shared policy/runtime | — | declared |
+| Claude session startup loads the installed ~/.claude/CLAUDE.md | activates | Claude machine guidance | — | declared |
+| Codex session startup loads the installed ~/.codex/AGENTS.md | activates | Codex machine guidance | — | declared |
+| Claude PreToolUse for Bash, PowerShell or Read | activates | Claude machine policy | — | declared |
+| Claude machine policy | executes | components/guard-git.mjs | — | declared |
+| Claude machine policy | configures | includeCoAuthoredBy | — | declared |
+| Claude machine policy | configures | autoMemoryEnabled | — | declared |
+| Claude machine policy | configures | permissions.disableBypassPermissionsMode | — | declared |
+| Claude machine policy | configures | permissions.deny | — | declared |
+| Claude machine policy | configures | hooks.PreToolUse | — | declared |
+| Codex PreToolUse for Bash or Read after interactive hook trust | activates | Codex machine policy | — | declared |
+| Codex machine policy | executes | components/guard-git.mjs | — | declared |
+| Codex machine policy | configures | features.hooks | — | declared |
+| Codex machine policy | configures | features.memories | — | declared |
+| Codex machine policy | configures | hooks.PreToolUse | — | declared |
+| Claude opens the repository and loads CLAUDE.md | activates | Claude project guidance | — | declared |
+| Codex opens the repository and loads AGENTS.md | activates | Codex project guidance | — | declared |
+| Claude PreToolUse for Bash, PowerShell or Read | activates | Claude project policy | — | declared |
+| Claude project policy | executes | components/guard-git.mjs | — | declared |
+| Claude project policy | configures | includeCoAuthoredBy | — | declared |
+| Claude project policy | configures | autoMemoryEnabled | — | declared |
+| Claude project policy | configures | permissions.deny | — | declared |
+| Claude project policy | configures | hooks.PreToolUse | — | declared |
+| Codex PreToolUse for Bash or Read after interactive hook trust | activates | Codex project policy | — | declared |
+| Codex project policy | executes | components/guard-git.mjs | — | declared |
+| Codex project policy | configures | features.hooks | — | declared |
+| Codex project policy | configures | features.memories | — | declared |
+| Codex project policy | configures | hooks.PreToolUse | — | declared |
+| node scripts/verify-harness.mjs | activates | Project verification | — | declared |
+| Project verification | configures | verification | — | declared |
+| GitHub push to main or pull_request when --ci github is selected | activates | Project CI | — | declared |
+| Project CI | configures | ci | — | declared |
+| Explicit user request | activates | Ask Alfred | — | declared |
+| Ask Alfred | routes-to | Code Review | — | declared |
+| Ask Alfred | routes-to | Codebase Design | — | declared |
+| Ask Alfred | routes-to | Diagnosing Bugs | — | declared |
+| Ask Alfred | routes-to | Domain Modeling | — | declared |
+| Ask Alfred | routes-to | Grill Me | — | declared |
+| Ask Alfred | routes-to | Grill With Docs | — | declared |
+| Ask Alfred | routes-to | Grilling | — | declared |
+| Ask Alfred | routes-to | Handoff | — | declared |
+| Ask Alfred | routes-to | Implement | — | declared |
+| Ask Alfred | routes-to | Improve Codebase Architecture | — | declared |
+| Ask Alfred | routes-to | Prototype | — | declared |
+| Ask Alfred | routes-to | Research | — | declared |
+| Ask Alfred | routes-to | Security Checklist | — | declared |
+| Ask Alfred | routes-to | Tdd | — | declared |
+| Ask Alfred | routes-to | Teach | — | declared |
+| Ask Alfred | routes-to | To Questionnaire | — | declared |
+| Ask Alfred | routes-to | To Spec | — | declared |
+| Ask Alfred | routes-to | To Tickets | — | declared |
+| Ask Alfred | routes-to | Wait What | — | declared |
+| Ask Alfred | routes-to | Wayfinder | — | declared |
+| Ask Alfred | routes-to | Writing For Agents | — | declared |
+| Explicit user request | activates | Code Review | — | declared |
+| Model selects a matching installed capability | activates | Code Review | — | declared |
+| Explicit user request | activates | Codebase Design | — | declared |
+| Model selects a matching installed capability | activates | Codebase Design | — | declared |
+| Explicit user request | activates | Diagnosing Bugs | — | declared |
+| Model selects a matching installed capability | activates | Diagnosing Bugs | — | declared |
+| Diagnosing Bugs | routes-to | Improve Codebase Architecture | — | declared |
+| Explicit user request | activates | Domain Modeling | — | declared |
+| Model selects a matching installed capability | activates | Domain Modeling | — | declared |
+| Explicit user request | activates | Grill Me | — | declared |
+| Grill Me | requires | Grilling | — | declared |
+| Sharpen the plan through decision rounds | invokes | Grilling | — | declared |
+| Explicit user request | activates | Grill With Docs | — | declared |
+| Grill With Docs | requires | Grilling | — | declared |
+| Grill With Docs | requires | Domain Modeling | — | declared |
+| Sharpen decisions and record durable domain knowledge | invokes | Grilling | — | declared |
+| Sharpen decisions and record durable domain knowledge | invokes | Domain Modeling | — | declared |
+| Explicit user request | activates | Grilling | — | declared |
+| Model selects a matching installed capability | activates | Grilling | — | declared |
+| Explicit user request | activates | Handoff | — | declared |
+| Explicit user request | activates | Implement | — | declared |
+| Implement | requires | Tdd | — | declared |
+| Implement | requires | Code Review | — | declared |
+| Implement | uses | Security Checklist | When changes touch an attacker-reachable interface or security-sensitive configuration. | declared |
+| Build verified vertical slices | invokes | Tdd | — | declared |
+| Review security-sensitive changes | invokes | Security Checklist | — | declared |
+| Review the exact staged patch | invokes | Code Review | — | declared |
+| Explicit user request | activates | Improve Codebase Architecture | — | declared |
+| Improve Codebase Architecture | requires | Codebase Design | — | declared |
+| Improve Codebase Architecture | uses | Grilling | After the user selects a candidate. | declared |
+| Improve Codebase Architecture | uses | Domain Modeling | As domain decisions crystallize while exploring the selected candidate. | declared |
+| Improve Codebase Architecture | routes-to | Grill With Docs | — | declared |
+| Find deepening opportunities using the shared vocabulary | invokes | Codebase Design | — | declared |
+| Work through the selected module design | invokes | Grilling | — | declared |
+| Work through the selected module design | invokes | Domain Modeling | — | declared |
+| Explicit user request | activates | Prototype | — | declared |
+| Model selects a matching installed capability | activates | Prototype | — | declared |
+| Explicit user request | activates | Research | — | declared |
+| Model selects a matching installed capability | activates | Research | — | declared |
+| Explicit user request | activates | Security Checklist | — | declared |
+| Model selects a matching installed capability | activates | Security Checklist | — | declared |
+| Explicit user request | activates | Tdd | — | declared |
+| Model selects a matching installed capability | activates | Tdd | — | declared |
+| Tdd | uses | Codebase Design | When the shape of the test interface is in question. | declared |
+| Tdd | routes-to | Code Review | — | declared |
+| Explicit user request | activates | Teach | — | declared |
+| Explicit user request | activates | To Questionnaire | — | declared |
+| Explicit user request | activates | To Spec | — | declared |
+| Explicit user request | activates | To Tickets | — | declared |
+| Explicit user request | activates | Wait What | — | declared |
+| Explicit user request | activates | Wayfinder | — | declared |
+| Wayfinder | requires | Grilling | — | declared |
+| Wayfinder | requires | Domain Modeling | — | declared |
+| Wayfinder | uses | Research | When resolving a research ticket. | declared |
+| Wayfinder | uses | Prototype | When resolving a prototype ticket. | declared |
+| Wayfinder | routes-to | To Spec | — | declared |
+| Wayfinder | routes-to | To Tickets | — | declared |
+| Wayfinder | routes-to | Implement | — | declared |
+| Resolve the destination with the user | invokes | Grilling | — | declared |
+| Resolve the destination with the user | invokes | Domain Modeling | — | declared |
+| Resolve research tickets in parallel | invokes | Research | — | declared |
+| Resolve a prototype ticket with the user | invokes | Prototype | — | declared |
+| Resolve a decision through discussion | invokes | Grilling | — | declared |
+| Resolve a decision through discussion | invokes | Domain Modeling | — | declared |
+| Explicit user request | activates | Writing For Agents | — | declared |
+| Model selects a matching installed capability | activates | Writing For Agents | — | declared |
+| Explicit Tool integration selection | activates | Archify | — | declared |
+| Explicit integration invoke | activates | doctor | — | declared |
+| Explicit integration invoke | activates | validate | — | declared |
+| Explicit integration invoke | activates | render | — | declared |
+| Explicit integration invoke | activates | deliver | — | declared |
+| Explicit integration invoke | activates | preview | — | declared |
+| Explicit Tool integration selection | activates | Context7 MCP | — | declared |
+| Explicit integration configure | activates | mcp | — | declared |
+| Explicit Tool integration selection | activates | Graphify | — | declared |
+| Explicit integration invoke | activates | build-code | — | declared |
+| Explicit integration invoke | activates | refresh | — | declared |
+| Explicit integration invoke | activates | cluster | — | declared |
+| Explicit integration invoke | activates | query | — | declared |
+| Explicit integration invoke | activates | affected | — | declared |
+| Explicit integration invoke | activates | god-nodes | — | declared |
+| Explicit integration invoke | activates | path | — | declared |
+| Explicit integration invoke | activates | explain | — | declared |
+| Explicit integration invoke | activates | diagnose-multigraph | — | declared |
+| Explicit integration invoke | activates | export | — | declared |
+| Explicit integration invoke | activates | tree | — | declared |
+| Explicit integration invoke | activates | benchmark | — | declared |
+| Explicit integration invoke | activates | merge-graphs | — | declared |
+| Explicit integration invoke | activates | semantic-media | — | declared |
+| Explicit integration invoke | activates | remote-ingest | — | declared |
+| Explicit integration invoke | activates | database-connectors | — | declared |
+| Explicit integration invoke | activates | community-labeling | — | declared |
+| Explicit integration configure | activates | provider-management | — | declared |
+| Explicit integration invoke | activates | repository-clone | — | declared |
+| Explicit integration invoke | activates | pr-dashboard | — | declared |
+| Explicit integration invoke | activates | pr-triage | — | declared |
+| Explicit integration configure | activates | query-logging | — | declared |
+| Explicit integration invoke | activates | semantic-update-check | — | declared |
+| Explicit integration activate | activates | watch | — | declared |
+| Explicit integration activate | activates | hooks | — | declared |
+| Explicit integration activate | activates | mcp | — | declared |
+| Explicit integration invoke | activates | global-graph | — | declared |
+| Explicit integration invoke | activates | memory | — | declared |
+| Explicit integration invoke | activates | reflection | — | declared |
+| Explicit Tool integration selection | activates | Playwright MCP | — | declared |
+| Explicit integration configure | activates | mcp | — | declared |
 
 ## Tool capability edges
 
@@ -195,4 +364,4 @@ Static discovery metadata is approximately 974 tokens across the 22 canonical sk
 
 ## Graphify interchange decision
 
-Keep the catalog view and Graphify source graph linked but separate. Their safe join key is a normalized repository-relative source path. The catalog owns declared modules, workflow stages, activation and receipt-backed state; Graphify owns extracted or inferred source evidence. Direct graph merge is rejected for M7 because Graphify's node-link format cannot preserve those lifecycle and provenance distinctions. The existing local [Graphify relationship view](.scratch/graphify-harness-2026-09-10/graph.html) remains a separate regenerable code view.
+Keep the catalog view and Graphify source graph linked but separate. Their safe join key is a normalized repository-relative source path. The catalog owns declared modules, workflow stages, activation and receipt-backed state; Graphify owns extracted or inferred source evidence. Direct graph merge is rejected for M7 because Graphify's node-link format cannot preserve those lifecycle and provenance distinctions. The tracked [Graphify pilot record](docs/dev/2026-09-10-graphify-architecture-quality-follow-up.md) explains the evidence; a local code view can be regenerated through the pinned integration only after an explicit request, following [the M6 contract](docs/dev/modularity-m6-tool-integrations.md).

@@ -27,10 +27,11 @@ function localPath(value) {
 
 export function validateCatalog(catalog) {
   record(catalog, ['version', 'modules', 'capabilities'], 'catalog');
-  if (catalog.version !== 1) fail('Unsupported catalog version');
+  if (catalog.version !== 2) fail('Unsupported catalog version');
   const modules = new Map();
+  const behaviorIds = new Set();
   array(catalog.modules, (module) => {
-    record(module, ['id', 'label', 'visibility', 'platforms', 'scopes', 'requires', 'sources', 'description'], 'module');
+    record(module, ['id', 'label', 'visibility', 'platforms', 'scopes', 'requires', 'behaviors', 'sources', 'description'], 'module');
     id(module.id);
     if (modules.has(module.id)) fail(`Duplicate module ID: ${module.id}`);
     modules.set(module.id, module);
@@ -44,9 +45,36 @@ export function validateCatalog(catalog) {
       localPath(source);
       if (!['global', 'project', 'skills', 'components', 'integrations', 'scripts', 'catalog'].includes(source.split('/')[0])) fail('Unsupported module source root');
     }, 'module sources', true);
+    array(module.behaviors, (behavior) => {
+      record(behavior, ['id', 'label', 'purpose', 'platforms', 'scopes', 'source', 'activation', 'settings'], 'module behavior');
+      id(behavior.id);
+      if (behaviorIds.has(behavior.id)) fail(`Duplicate module behavior: ${behavior.id}`);
+      behaviorIds.add(behavior.id);
+      text(behavior.label, 'module behavior label');
+      text(behavior.purpose, 'module behavior purpose');
+      choices(behavior.platforms, platforms, 'behavior platform');
+      choices(behavior.scopes, scopes, 'behavior scope');
+      if (behavior.platforms.some((value) => !module.platforms.includes(value))
+        || behavior.scopes.some((value) => !module.scopes.includes(value))) fail('Module behavior support exceeds its module');
+      localPath(behavior.source);
+      if (!module.sources.some((source) => behavior.source === source || behavior.source.startsWith(`${source}/`))) fail('Module behavior source is not owned by its module');
+      record(behavior.activation, ['kind', 'event', 'program'], 'module behavior activation');
+      if (!['session', 'hook', 'command', 'ci'].includes(behavior.activation.kind)) fail('Invalid module behavior activation');
+      text(behavior.activation.event, 'module behavior activation event');
+      if (Object.hasOwn(behavior.activation, 'program')) localPath(behavior.activation.program);
+      array(behavior.settings, (setting) => {
+        record(setting, ['path', 'value'], 'module behavior setting');
+        if (Object.keys(setting).length !== 2 || typeof setting.path !== 'string' || !/^[a-zA-Z0-9._-]+$/.test(setting.path)) fail('Invalid module behavior setting path');
+        text(setting.value, 'module behavior setting value');
+      }, 'module behavior settings');
+      if (new Set(behavior.settings.map((setting) => setting.path)).size !== behavior.settings.length) fail('Duplicate module behavior setting path');
+    }, 'module behaviors');
   }, 'modules', true);
   for (const module of modules.values()) {
     for (const target of module.requires) if (!modules.has(target)) fail(`Unknown module dependency: ${target}`);
+    for (const behavior of module.behaviors) if (behavior.activation.program
+      && ![...modules.values()].some((owner) => owner.sources.some((source) => behavior.activation.program === source
+        || behavior.activation.program.startsWith(`${source}/`)))) fail('Unknown module behavior program');
   }
   const completedModules = new Set();
   const visitingModules = new Set();

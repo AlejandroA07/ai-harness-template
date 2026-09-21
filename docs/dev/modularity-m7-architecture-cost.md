@@ -31,24 +31,32 @@ checked-in Markdown can be reproduced byte-for-byte from the validated inputs.
 
 `buildArchitectureModel` is the module interface. It returns versioned nodes and
 typed edges for the Harness root, seven public/internal modules, platform paths,
-the 22 canonical Skills and Workflows, project/global configuration, four Tool
-integrations, their individual features and canonical sources. Module
-dependencies now live in `catalog/modules.json`, are cycle-checked, and remain
-distinct from capability installation dependencies.
+the 22 canonical Skills and Workflows, ten project/global behaviors, their
+individual settings, four Tool integrations, ordered Workflow stages and
+canonical sources. M7 advances `catalog/modules.json` to schema version 2:
+module dependencies and behaviors are cycle/schema checked, and every behavior
+declares its purpose, source, activation event or command, and settings.
+Capability installation dependencies remain a separate graph.
 
 Edges retain their meaning and provenance:
 
 - `contains` and `supports` form the logical navigation hierarchy;
-- `depends-on` and `requires` affect module or capability dependencies;
+- `depends-on`, `requires` and `installs` retain module/capability lifecycle
+  meaning;
 - `uses` and `routes-to` remain optional and never expand installation closure;
-- `stage-invokes` preserves workflow order and conditions;
+- ordered stage nodes preserve conditions, approval points and artifacts while
+  `invokes` records their capability calls, including stages with no call;
+- `activates`, `executes` and `configures` trace a request, command or hook event
+  to the behavior, runtime program and individual setting;
 - `exposes` identifies Tool integration capabilities; and
 - `sourced-by` and `resource` lead to validated repository paths.
 
 Every selectable node has three independent fields. `planned` comes only from
 the explicit view selection. `installed` comes only from a validated ownership
 receipt. `observed` comes from current audit evidence and is never used to claim
-a running process. Integration runtime details retain M6's provisioned,
+a running process. Capability- or integration-prefixed audit conflicts affect
+only that node; target-wide lock or receipt failures remain target-wide.
+Integration runtime details retain M6's provisioned,
 configured, invocable, hook-activation and running distinctions.
 
 ## Cost contract
@@ -79,13 +87,16 @@ Graphify node-link output does not preserve lifecycle states, workflow-stage
 conditions or the catalog's relationship-provenance contract. Importing the
 catalog into that format would make declared architecture look like observed
 source execution. The JSON architecture view supplies a future lossless export
-seam; the existing local Graphify HTML remains a linked, regenerable code view.
+seam. The generated overview links the tracked pilot record and M6 regeneration
+contract; the ignored local Graphify HTML is named as a regenerable artifact but
+is not linked as durable repository evidence.
 
 ## Verification and security boundary
 
 Registered tests cover logical paths and typed edges, source links, planned /
-installed / observed separation against a real isolated receipt, invalid module
-and capability selections, relative and control-character target paths, strict
+installed / observed separation against a real isolated receipt, per-capability
+drift isolation, complete Workflow stages, configuration settings and activation
+edges, invalid module and capability selections, relative and control-character target paths, strict
 measurement schemas, preserved measured samples, Graphify separation, and
 byte-for-byte generated views. Existing catalog loaders continue to reject
 missing, linked and unsafe sources; existing lifecycle audits validate receipt

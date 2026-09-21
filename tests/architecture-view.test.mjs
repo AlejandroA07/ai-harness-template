@@ -18,20 +18,31 @@ test('architecture view links modules through platforms and capabilities to vali
   assert.equal(model.nodes.filter((entry) => entry.kind === 'module').length, 7);
   assert.equal(model.nodes.filter((entry) => entry.kind === 'capability').length, 22);
   assert.equal(model.nodes.filter((entry) => entry.kind === 'integration').length, 4);
+  assert.equal(model.nodes.filter((entry) => entry.kind === 'behavior').length, 10);
   assert.equal(model.costs.capabilities.length, 22);
   assert.equal(model.costs.measurements.samples.length, 3);
   assert.equal(node(model, 'capability:implement').state.planned, 'not-evaluated');
   assert.equal(node(model, 'capability:implement').state.installed, 'not-inspected');
   assert.ok(model.edges.some((entry) => entry.from === 'module:workflows' && entry.to === 'module:skills' && entry.type === 'depends-on'));
   assert.ok(model.edges.some((entry) => entry.from === 'platform:global-configuration:codex'
-    && entry.to === 'configuration:global-configuration:codex' && entry.type === 'contains'));
+    && entry.to === 'behavior:codex-machine-guidance' && entry.type === 'contains'));
+  assert.ok(model.edges.some((entry) => entry.from === 'module:installation-core'
+    && entry.to === 'module:workflows' && entry.type === 'installs'));
   assert.ok(model.edges.some((entry) => entry.from === 'capability:implement' && entry.to === 'capability:tdd' && entry.type === 'requires'));
+  assert.ok(model.edges.some((entry) => entry.from === 'trigger:user-request'
+    && entry.to === 'capability:implement' && entry.type === 'activates'));
+  assert.ok(model.edges.some((entry) => entry.from === 'workflow-stage:implement:implement'
+    && entry.to === 'capability:tdd' && entry.type === 'invokes'));
   assert.ok(model.edges.some((entry) => entry.from === 'integration:graphify'
     && entry.to === 'integration-capability:graphify:query' && entry.type === 'exposes'));
   assert.deepEqual(node(model, 'integration:context7').targets, ['claude:project', 'codex:machine', 'codex:project']);
   assert.ok(model.edges.some((entry) => entry.from === 'capability:implement'
     && entry.to === 'source:skills/engineering/implement/SKILL.md'));
+  assert.equal(node(model, 'workflow-stage:implement:scope').order, 1);
+  assert.match(node(model, 'workflow-stage:implement:scope').approval, /approved specification/i);
+  assert.equal(node(model, 'setting:claude-machine-policy:autoMemoryEnabled').value, 'false');
   assert.equal(model.interchange.graphify.decision, 'linked-separate');
+  assert.match(model.interchange.graphify.evidence, /^docs\//);
   assert.match(model.interchange.graphify.rationale, /provenance/);
 });
 
@@ -40,7 +51,7 @@ test('architecture plan keeps planned, installed and observed state separate', a
   const target = path.join(temporary, 'machine home');
   try {
     await fs.mkdir(target);
-    const install = await planInstallation(root, { operation: 'apply', target, platform: 'codex', scope: 'machine', ids: ['research'] });
+    const install = await planInstallation(root, { operation: 'apply', target, platform: 'codex', scope: 'machine', ids: ['research', 'code-review'] });
     assert.equal(install.applicable, true, install.conflicts.join('; '));
     await applyInstallation(install);
     const model = await buildArchitectureModel(root, { platform: 'codex', scope: 'machine', target, selections: ['tdd', 'graphify'] });
@@ -50,6 +61,12 @@ test('architecture plan keeps planned, installed and observed state separate', a
     assert.equal(model.audits.skills.applicable, true);
     assert.equal(model.audits.skills.installed, true);
     assert.equal(model.audits.integrations.installed, false);
+    const receipt = JSON.parse(await fs.readFile(path.join(target, '.ai-harness/installations/codex/receipt.json')));
+    const research = receipt.entries.find((entry) => entry.id === 'research');
+    await fs.writeFile(path.join(target, '.ai-harness/installations/codex/payloads/research', research.hash, 'SKILL.md'), 'edited');
+    const drift = await buildArchitectureModel(root, { platform: 'codex', scope: 'machine', target });
+    assert.equal(node(drift, 'capability:research').state.observed, 'conflict');
+    assert.equal(node(drift, 'capability:code-review').state.observed, 'consistent');
   } finally { await fs.rm(temporary, { recursive: true, force: true }); }
 });
 
@@ -66,9 +83,16 @@ test('architecture Markdown exposes navigation, relationship provenance, costs a
   assert.match(markdown, /Global → platform → capability → source navigation/);
   assert.match(markdown, /planned \/ installed \/ observed/i);
   assert.match(markdown, /\[`skills\/engineering\/implement\/SKILL\.md`\]/);
-  assert.match(markdown, /stage-invokes/);
+  assert.match(markdown, /Individual configuration settings/);
+  assert.match(markdown, /autoMemoryEnabled/);
+  assert.match(markdown, /Ordered workflow stages/);
+  assert.match(markdown, /approved specification or ticket/i);
+  assert.match(markdown, /\| installs \|/);
+  assert.match(markdown, /\| activates \|/);
+  assert.match(markdown, /\| invokes \|/);
   assert.match(markdown, /Graphify interchange decision/);
   assert.match(markdown, /linked but separate/);
+  assert.doesNotMatch(markdown, /\]\(\.scratch\//);
 });
 
 test('measured token samples use a strict separate ledger', () => {

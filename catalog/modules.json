@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "modules": [
     {
       "id": "global-configuration",
@@ -15,6 +15,72 @@
       "requires": [
         "installation-core",
         "shared-policy-runtime"
+      ],
+      "behaviors": [
+        {
+          "id": "claude-machine-guidance",
+          "label": "Claude machine guidance",
+          "purpose": "Load durable machine-wide operating policy into Claude sessions.",
+          "platforms": ["claude"],
+          "scopes": ["machine"],
+          "source": "global/CLAUDE.md",
+          "activation": {
+            "kind": "session",
+            "event": "Claude session startup loads the installed ~/.claude/CLAUDE.md"
+          },
+          "settings": []
+        },
+        {
+          "id": "codex-machine-guidance",
+          "label": "Codex machine guidance",
+          "purpose": "Load durable machine-wide operating policy into Codex sessions.",
+          "platforms": ["codex"],
+          "scopes": ["machine"],
+          "source": "global/AGENTS.md",
+          "activation": {
+            "kind": "session",
+            "event": "Codex session startup loads the installed ~/.codex/AGENTS.md"
+          },
+          "settings": []
+        },
+        {
+          "id": "claude-machine-policy",
+          "label": "Claude machine policy",
+          "purpose": "Deny secret reads, disable automatic memory and run the command guard.",
+          "platforms": ["claude"],
+          "scopes": ["machine"],
+          "source": "global/claude-settings.json",
+          "activation": {
+            "kind": "hook",
+            "event": "Claude PreToolUse for Bash, PowerShell or Read",
+            "program": "components/guard-git.mjs"
+          },
+          "settings": [
+            { "path": "includeCoAuthoredBy", "value": "false" },
+            { "path": "autoMemoryEnabled", "value": "false" },
+            { "path": "permissions.disableBypassPermissionsMode", "value": "disable" },
+            { "path": "permissions.deny", "value": "canonical secret paths plus reviewed built-in tool denials" },
+            { "path": "hooks.PreToolUse", "value": "one harness-owned guard" }
+          ]
+        },
+        {
+          "id": "codex-machine-policy",
+          "label": "Codex machine policy",
+          "purpose": "Enable the command guard and keep automatic memory disabled.",
+          "platforms": ["codex"],
+          "scopes": ["machine"],
+          "source": "scripts/global-installation.mjs",
+          "activation": {
+            "kind": "hook",
+            "event": "Codex PreToolUse for Bash or Read after interactive hook trust",
+            "program": "components/guard-git.mjs"
+          },
+          "settings": [
+            { "path": "features.hooks", "value": "true" },
+            { "path": "features.memories", "value": "false" },
+            { "path": "hooks.PreToolUse", "value": "one harness-owned guard" }
+          ]
+        }
       ],
       "sources": [
         "global",
@@ -37,6 +103,101 @@
       "requires": [
         "installation-core",
         "shared-policy-runtime"
+      ],
+      "behaviors": [
+        {
+          "id": "claude-project-guidance",
+          "label": "Claude project guidance",
+          "purpose": "Load repository-owned guidance into Claude sessions.",
+          "platforms": ["claude"],
+          "scopes": ["project"],
+          "source": "project/CLAUDE.md",
+          "activation": {
+            "kind": "session",
+            "event": "Claude opens the repository and loads CLAUDE.md"
+          },
+          "settings": []
+        },
+        {
+          "id": "codex-project-guidance",
+          "label": "Codex project guidance",
+          "purpose": "Load repository-owned guidance into Codex sessions.",
+          "platforms": ["codex"],
+          "scopes": ["project"],
+          "source": "project/AGENTS.selected.md",
+          "activation": {
+            "kind": "session",
+            "event": "Codex opens the repository and loads AGENTS.md"
+          },
+          "settings": []
+        },
+        {
+          "id": "claude-project-policy",
+          "label": "Claude project policy",
+          "purpose": "Run repository-owned command and secret-path checks.",
+          "platforms": ["claude"],
+          "scopes": ["project"],
+          "source": "project/.claude/settings.json",
+          "activation": {
+            "kind": "hook",
+            "event": "Claude PreToolUse for Bash, PowerShell or Read",
+            "program": "components/guard-git.mjs"
+          },
+          "settings": [
+            { "path": "includeCoAuthoredBy", "value": "false" },
+            { "path": "autoMemoryEnabled", "value": "false" },
+            { "path": "permissions.deny", "value": "project and nested secret paths" },
+            { "path": "hooks.PreToolUse", "value": "one harness-owned project guard" }
+          ]
+        },
+        {
+          "id": "codex-project-policy",
+          "label": "Codex project policy",
+          "purpose": "Run repository-owned command and secret-path checks.",
+          "platforms": ["codex"],
+          "scopes": ["project"],
+          "source": "project/.codex/hooks.json",
+          "activation": {
+            "kind": "hook",
+            "event": "Codex PreToolUse for Bash or Read after interactive hook trust",
+            "program": "components/guard-git.mjs"
+          },
+          "settings": [
+            { "path": "features.hooks", "value": "true" },
+            { "path": "features.memories", "value": "false" },
+            { "path": "hooks.PreToolUse", "value": "one harness-owned project guard" }
+          ]
+        },
+        {
+          "id": "project-verification",
+          "label": "Project verification",
+          "purpose": "Run the repository's selected deterministic completion gate.",
+          "platforms": ["claude", "codex"],
+          "scopes": ["project"],
+          "source": "project/scripts/verify-harness.mjs",
+          "activation": {
+            "kind": "command",
+            "event": "node scripts/verify-harness.mjs"
+          },
+          "settings": [
+            { "path": "verification", "value": "existing or generated" }
+          ]
+        },
+        {
+          "id": "project-ci",
+          "label": "Project CI",
+          "purpose": "Run the generated project verification gate in GitHub Actions when selected.",
+          "platforms": ["claude", "codex"],
+          "scopes": ["project"],
+          "source": "project/.github/workflows/verify.yml",
+          "activation": {
+            "kind": "ci",
+            "event": "GitHub push to main or pull_request when --ci github is selected"
+          },
+          "settings": [
+            { "path": "ci", "value": "none or github" }
+          ]
+        }
       ],
       "sources": [
         "project",
@@ -68,6 +229,7 @@
       "requires": [
         "installation-core"
       ],
+      "behaviors": [],
       "sources": [
         "skills"
       ],
@@ -89,6 +251,7 @@
         "skills",
         "installation-core"
       ],
+      "behaviors": [],
       "sources": [
         "skills"
       ],
@@ -109,6 +272,7 @@
       "requires": [
         "installation-core"
       ],
+      "behaviors": [],
       "sources": [
         "components/mcp",
         "catalog/integrations.json",
@@ -134,12 +298,14 @@
       "requires": [
         "shared-policy-runtime"
       ],
+      "behaviors": [],
       "sources": [
         "catalog",
         "scripts/module-catalog.mjs",
         "scripts/catalog-loader.mjs",
         "scripts/architecture-view.mjs",
         "scripts/cost-inventory.mjs",
+        "scripts/markdown-table.mjs",
         "scripts/token-costs.mjs",
         "scripts/setup.mjs",
         "scripts/installation-core.mjs",
@@ -169,6 +335,7 @@
         "project"
       ],
       "requires": [],
+      "behaviors": [],
       "sources": [
         "components/guard-policy.mjs",
         "components/guard-git.mjs",
