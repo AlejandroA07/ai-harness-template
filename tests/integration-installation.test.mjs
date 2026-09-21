@@ -7,7 +7,7 @@ import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { applyIntegrationInstallation, planIntegrationAction, planIntegrationInstallation, renderMcpConfiguration, verifyIntegrationArtifact } from '../scripts/integration-installation.mjs';
 import { payloadHash } from '../scripts/installation-core.mjs';
-import { extractZip, materializeIntegrationRuntime } from '../scripts/integration-runtime.mjs';
+import { extractZip, materializeIntegrationRuntime, npmInvocation } from '../scripts/integration-runtime.mjs';
 import { snapshot } from './helpers/filesystem-snapshot.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
@@ -111,6 +111,13 @@ const options = (fixture, extra = {}) => ({ operation: 'apply', ids: ['graphify'
   platform: 'codex', scope: 'project', target: fixture.target,
   artifacts: { graphify: fixture.artifacts.graphify }, ...extra });
 
+test('npm materialization resolves Windows shims without a command shell', () => {
+  const resolved = { command: 'C:\\node.exe', prefix: ['C:\\node_modules\\npm\\bin\\npm-cli.js'] };
+  assert.deepEqual(npmInvocation('win32', (name) => name === 'npm' ? resolved : null), resolved);
+  assert.throws(() => npmInvocation('win32', () => null), /resolve the Windows npm shim safely/);
+  assert.deepEqual(npmInvocation('darwin'), { command: 'npm', prefix: [] });
+});
+
 test('artifact acquisition accepts only the exact approved bytes', async () => fixture(async (f) => {
   const graphify = f.catalog.integrations.find((entry) => entry.id === 'graphify');
   assert.deepEqual(verifyIntegrationArtifact(graphify, Buffer.from('fixture graphify wheel')), {
@@ -143,13 +150,15 @@ test('Graphify install, query planning, explicit activation, audit and removal r
   assert.equal(preview.applicable, true, preview.conflicts.join('; '));
   assert.deepEqual(preview.integrations[0], {
     id: 'graphify',
-    enabled: ['build-code', 'cluster', 'explain', 'export', 'merge-graphs', 'path', 'query', 'refresh'],
+    enabled: ['affected', 'benchmark', 'build-code', 'cluster', 'diagnose-multigraph', 'explain', 'export',
+      'god-nodes', 'merge-graphs', 'path', 'query', 'refresh', 'tree'],
     provisioned: true,
     configured: true,
     invocable: false,
     plannedInvocable: false,
     running: false,
     hooksActivated: false,
+    plannedHooksActivated: false,
     runtime: null,
   });
   assert.throws(() => planIntegrationAction(preview, { id: 'graphify', capability: 'query', operands: ['auth flow'] }), /not materialized/);
@@ -160,7 +169,7 @@ test('Graphify install, query planning, explicit activation, audit and removal r
   }));
   assert.equal(materialized.integrations[0].plannedInvocable, true);
   await applyIntegrationInstallation(materialized, {
-    materializer: async ({ integration }) => fakeRuntime(integration, '/fixture/python'),
+    materializer: async ({ integration }) => fakeRuntime(integration, process.execPath),
   });
   assert.equal(await fs.readFile(path.join(f.target, 'unrelated.txt'), 'utf8'), 'preserve');
   assert.match(await fs.readFile(path.join(f.target, '.agents/skills/graphify/SKILL.md'), 'utf8'), /name: graphify/);
@@ -180,13 +189,18 @@ test('Graphify install, query planning, explicit activation, audit and removal r
   }));
   assert.equal(insufficient.applicable, false);
   assert.match(insufficient.conflicts.join('; '), /require --materialize/);
-  await fs.mkdir(path.join(f.target, '.git/hooks'), { recursive: true });
+  assert.equal(spawnSync('git', ['init', '-q', f.target]).status, 0);
+  assert.equal(spawnSync('git', ['-C', f.target, 'config', 'core.hooksPath', '.githooks']).status, 0);
   const activation = await planIntegrationInstallation(f.repository, options(f, {
-    enabled: ['graphify:watch', 'graphify:query-logging', 'graphify:mcp', 'graphify:hooks'], artifacts: {},
+    enabled: ['graphify:watch', 'graphify:query-logging', 'graphify:mcp', 'graphify:hooks',
+      'graphify:semantic-media', 'graphify:database-connectors', 'graphify:provider-management',
+      'graphify:remote-ingest', 'graphify:repository-clone', 'graphify:memory', 'graphify:reflection'], artifacts: {},
     materialize: true, allowNetwork: true, python: '/fixture/python',
   }));
+  assert.equal(activation.integrations[0].hooksActivated, false);
+  assert.equal(activation.integrations[0].plannedHooksActivated, true);
   await applyIntegrationInstallation(activation, {
-    materializer: async ({ integration }) => fakeRuntime(integration, '/fixture/python', 'all'),
+    materializer: async ({ integration }) => fakeRuntime(integration, process.execPath, 'all'),
   });
   const activated = await planIntegrationInstallation(f.repository, options(f, { operation: 'audit', ids: [], artifacts: {} }));
   assert.equal(activated.applicable, true, activated.conflicts.join('; '));
@@ -196,9 +210,47 @@ test('Graphify install, query planning, explicit activation, audit and removal r
   assert.deepEqual(planIntegrationAction(activated, { id: 'graphify', capability: 'mcp' }).args,
     ['-B', '-m', 'graphify.serve']);
   assert.equal(planIntegrationAction(activated, { id: 'graphify', capability: 'hooks' }).command, null);
-  const hook = path.join(f.target, '.git/hooks/post-commit');
+  assert.equal(activated.integrations[0].hooksActivated, true);
+  const hook = path.join(f.target, '.githooks/post-commit');
   assert.match(await fs.readFile(hook, 'utf8'), /GRAPHIFY_QUERY_LOG_DISABLE=1/);
   assert.equal((await fs.stat(hook)).mode & 0o777, 0o700);
+  assert.deepEqual(planIntegrationAction(activated, { id: 'graphify', capability: 'affected', operands: ['Checkout'] }).args,
+    ['-B', '-m', 'graphify', 'affected', 'Checkout']);
+  assert.deepEqual(planIntegrationAction(activated, { id: 'graphify', capability: 'god-nodes' }).args,
+    ['-B', '-m', 'graphify', 'god-nodes']);
+  assert.deepEqual(planIntegrationAction(activated, { id: 'graphify', capability: 'diagnose-multigraph' }).args,
+    ['-B', '-m', 'graphify', 'diagnose', 'multigraph']);
+  assert.deepEqual(planIntegrationAction(activated, { id: 'graphify', capability: 'tree', operands: ['--output', 'tree.html'] }).args,
+    ['-B', '-m', 'graphify', 'tree', '--output', 'tree.html']);
+  assert.deepEqual(planIntegrationAction(activated, { id: 'graphify', capability: 'benchmark' }).args,
+    ['-B', '-m', 'graphify', 'benchmark']);
+  assert.deepEqual(planIntegrationAction(activated, { id: 'graphify', capability: 'semantic-media', operands: ['--backend', 'openai'] }).args,
+    ['-B', '-m', 'graphify', 'extract', await fs.realpath(f.target), '--backend', 'openai']);
+  assert.deepEqual(planIntegrationAction(activated, { id: 'graphify', capability: 'database-connectors', operands: ['neo4j', '--graph', 'graph.json'] }).args,
+    ['-B', '-m', 'graphify', 'export', 'neo4j', '--graph', 'graph.json']);
+  const provider = planIntegrationAction(activated, { id: 'graphify', capability: 'provider-management', operands: ['list'] });
+  assert.equal(provider.mode, 'configure');
+  assert.deepEqual(provider.args,
+    ['-B', '-m', 'graphify', 'provider', 'list']);
+  assert.deepEqual(planIntegrationAction(activated, { id: 'graphify', capability: 'remote-ingest', operands: ['https://example.com/guide'] }).args,
+    ['-B', '-m', 'graphify', 'add', 'https://example.com/guide']);
+  assert.throws(() => planIntegrationAction(activated, { id: 'graphify', capability: 'remote-ingest', operands: ['file:///etc/passwd'] }), /HTTPS URL/);
+  const cloneTarget = path.join(f.target, 'clones', 'project');
+  assert.deepEqual(planIntegrationAction(activated, { id: 'graphify', capability: 'repository-clone',
+    operands: ['https://github.com/example/project', '--out', cloneTarget] }).args,
+  ['-B', '-m', 'graphify', 'clone', 'https://github.com/example/project', '--out', cloneTarget]);
+  assert.throws(() => planIntegrationAction(activated, { id: 'graphify', capability: 'repository-clone',
+    operands: ['https://github.com/example/project'] }), /requires --out/);
+  assert.deepEqual(planIntegrationAction(activated, { id: 'graphify', capability: 'memory', operands: ['--question', 'why', '--answer', 'because'] }).args,
+    ['-B', '-m', 'graphify', 'save-result', '--question', 'why', '--answer', 'because']);
+  assert.deepEqual(planIntegrationAction(activated, { id: 'graphify', capability: 'reflection', operands: ['--out', 'LESSONS.md'] }).args,
+    ['-B', '-m', 'graphify', 'reflect', '--out', 'LESSONS.md']);
+  assert.equal(spawnSync('git', ['-C', f.target, 'config', 'core.hooksPath', '.alternate-hooks']).status, 0);
+  const redirected = await planIntegrationInstallation(f.repository, options(f, { operation: 'audit', ids: [], artifacts: {} }));
+  assert.equal(redirected.applicable, false);
+  assert.equal(redirected.integrations[0].hooksActivated, false);
+  assert.match(redirected.conflicts.join('; '), /hooks path changed/);
+  assert.equal(spawnSync('git', ['-C', f.target, 'config', 'core.hooksPath', '.githooks']).status, 0);
   const logging = planIntegrationAction(activated, { id: 'graphify', capability: 'query-logging',
     operands: [path.join(f.target, '.scratch/queries.jsonl')] });
   assert.deepEqual(logging.environment, { GRAPHIFY_QUERY_LOG: path.join(f.target, '.scratch/queries.jsonl') });
@@ -221,9 +273,11 @@ test('Graphify hook activation refuses to overwrite an unowned project hook', as
     materialize: true, allowNetwork: true, python: '/fixture/python',
   }));
   await applyIntegrationInstallation(installation, {
-    materializer: async ({ integration }) => fakeRuntime(integration, '/fixture/python'),
+    materializer: async ({ integration }) => fakeRuntime(integration, process.execPath),
   });
-  const hook = path.join(f.target, '.git/hooks/post-commit');
+  assert.equal(spawnSync('git', ['init', '-q', f.target]).status, 0);
+  assert.equal(spawnSync('git', ['-C', f.target, 'config', 'core.hooksPath', '.']).status, 0);
+  const hook = path.join(f.target, 'post-commit');
   await fs.mkdir(path.dirname(hook), { recursive: true });
   await fs.writeFile(hook, '#!/bin/sh\necho existing\n');
   const activation = await planIntegrationInstallation(f.repository, options(f, {
@@ -273,7 +327,7 @@ test('runtime ownership rejects edited materialized files before audit or remova
     materialize: true, allowNetwork: true, python: '/fixture/python',
   }));
   await applyIntegrationInstallation(plan, {
-    materializer: async ({ integration }) => fakeRuntime(integration, '/fixture/python'),
+    materializer: async ({ integration }) => fakeRuntime(integration, process.execPath),
   });
   const runtimeFile = path.join(f.target, '.harness/installations/codex/integrations/runtime/graphify/site-packages/graphify/__main__.py');
   await fs.writeFile(runtimeFile, 'edited');
@@ -282,6 +336,22 @@ test('runtime ownership rejects edited materialized files before audit or remova
   assert.match(audit.conflicts.join('; '), /owned runtime is missing or edited/);
   const removal = await planIntegrationInstallation(f.repository, options(f, { operation: 'remove', artifacts: {} }));
   assert.equal(removal.applicable, false);
+}));
+
+test('runtime state stops claiming invocability when its interpreter disappears', async () => fixture(async (f) => {
+  const command = path.join(f.temporary, process.platform === 'win32' ? 'python.exe' : 'python');
+  await fs.writeFile(command, process.platform === 'win32' ? '' : '#!/bin/sh\n', { mode: 0o700 });
+  const plan = await planIntegrationInstallation(f.repository, options(f, {
+    materialize: true, allowNetwork: true, python: command,
+  }));
+  await applyIntegrationInstallation(plan, {
+    materializer: async ({ integration }) => fakeRuntime(integration, command),
+  });
+  await fs.unlink(command);
+  const audit = await planIntegrationInstallation(f.repository, options(f, { operation: 'audit', ids: [], artifacts: {} }));
+  assert.equal(audit.applicable, false);
+  assert.equal(audit.integrations[0].invocable, false);
+  assert.match(audit.conflicts.join('; '), /runtime interpreter is missing or not executable/);
 }));
 
 test('MCP configuration invokes only the owned materialized runtime', async () => fixture(async (f) => {

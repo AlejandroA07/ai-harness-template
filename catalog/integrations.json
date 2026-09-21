@@ -38,8 +38,7 @@
         { "id": "validate", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
         { "id": "render", "mode": "invoke", "default": "enabled", "network": "none", "model": "agent-authored-input", "writes": ["explicit output path"] },
         { "id": "deliver", "mode": "invoke", "default": "enabled", "network": "none", "model": "agent-authored-input", "writes": ["explicit HTML output path"] },
-        { "id": "preview", "mode": "invoke", "default": "disabled", "network": "none", "model": "none", "writes": ["explicit output path", "local preview process"] },
-        { "id": "update-check", "mode": "invoke", "default": "disabled", "network": "vendor-release", "model": "none", "writes": [] }
+        { "id": "preview", "mode": "invoke", "default": "disabled", "network": "none", "model": "none", "writes": ["explicit output path", "local preview process"] }
       ],
       "safeguards": {
         "automaticHooks": false,
@@ -83,7 +82,7 @@
         "artifact": {
           "url": "https://registry.npmjs.org/@upstash/context7-mcp/-/context7-mcp-3.2.5.tgz",
           "integrity": "sha512-m+GIwQKBx2yCnLN7Et3wqkuTk1iPkMySQH2i6KiUf4B9wVI0tgtjeXRcDfFZPf5rnRA3gjYhr1FqQqMb9aSRnw==",
-          "size": 98579,
+          "size": 28837,
           "format": "npm"
         }
       },
@@ -139,24 +138,31 @@
         { "id": "refresh", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": ["project graph output"] },
         { "id": "cluster", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": ["project graph output"] },
         { "id": "query", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
+        { "id": "affected", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
+        { "id": "god-nodes", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
         { "id": "path", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
         { "id": "explain", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
+        { "id": "diagnose-multigraph", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
         { "id": "export", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": ["explicit export path"] },
+        { "id": "tree", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": ["explicit HTML output path"] },
+        { "id": "benchmark", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": [] },
         { "id": "merge-graphs", "mode": "invoke", "default": "enabled", "network": "none", "model": "none", "writes": ["explicit merged graph path"] },
         { "id": "semantic-media", "mode": "invoke", "default": "disabled", "network": "selected-model-provider", "model": "required", "writes": ["project graph output", "converted media"] },
-        { "id": "remote-ingest", "mode": "invoke", "default": "disabled", "network": "user-selected-source", "model": "required", "writes": ["project graph output", "downloaded or converted source"] },
+        { "id": "remote-ingest", "mode": "invoke", "default": "disabled", "network": "user-selected-source", "model": "none", "writes": ["downloaded source"] },
         { "id": "database-connectors", "mode": "invoke", "default": "disabled", "network": "user-selected-destination", "model": "none", "writes": ["project graph output", "selected database"] },
         { "id": "community-labeling", "mode": "invoke", "default": "disabled", "network": "selected-model-provider", "model": "required", "writes": ["project graph output"] },
+        { "id": "provider-management", "mode": "configure", "default": "disabled", "network": "none", "model": "none", "writes": ["Graphify provider configuration"] },
         { "id": "repository-clone", "mode": "invoke", "default": "disabled", "network": "user-selected-source", "model": "none", "writes": ["explicit clone path", "project graph output"] },
         { "id": "pr-dashboard", "mode": "invoke", "default": "disabled", "network": "github", "model": "none", "writes": [] },
         { "id": "pr-triage", "mode": "invoke", "default": "disabled", "network": "selected-model-provider", "model": "required", "writes": [] },
         { "id": "query-logging", "mode": "configure", "default": "disabled", "network": "none", "model": "none", "writes": ["explicit query log path"] },
-        { "id": "update-check", "mode": "invoke", "default": "disabled", "network": "vendor-release", "model": "none", "writes": [] },
+        { "id": "semantic-update-check", "mode": "invoke", "default": "disabled", "network": "none", "model": "none", "writes": [] },
         { "id": "watch", "mode": "activate", "default": "disabled", "network": "none", "model": "none", "writes": ["project graph output", "background process"] },
         { "id": "hooks", "mode": "activate", "default": "disabled", "network": "none", "model": "none", "writes": ["Git hooks", "Git configuration"] },
         { "id": "mcp", "mode": "activate", "default": "disabled", "network": "none", "model": "none", "writes": ["selected platform MCP configuration", "stdio process"] },
         { "id": "global-graph", "mode": "invoke", "default": "disabled", "network": "none", "model": "none", "writes": ["cross-project user graph"] },
-        { "id": "memory", "mode": "invoke", "default": "disabled", "network": "none", "model": "none", "writes": ["work-memory records"] }
+        { "id": "memory", "mode": "invoke", "default": "disabled", "network": "none", "model": "none", "writes": ["work-memory records"] },
+        { "id": "reflection", "mode": "invoke", "default": "disabled", "network": "none", "model": "none", "writes": ["explicit lessons output path"] }
       ],
       "safeguards": {
         "automaticHooks": false,
@@ -200,7 +206,7 @@
         "artifact": {
           "url": "https://registry.npmjs.org/@playwright/mcp/-/mcp-0.0.78.tgz",
           "integrity": "sha512-XLTUeA6mEN9sQ+hJ4dfG8EIkDbxS0K3Trc2RBkUJuf02TgE2FQRNTMtq/aJfhyRMINsRl/Ybc4sxcWLtFn4/TQ==",
-          "size": 84517,
+          "size": 22503,
           "format": "npm"
         }
       },

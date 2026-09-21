@@ -55,6 +55,8 @@ Plans report these fields independently:
   the enabled capabilities;
 - `plannedInvocable`: explicit materialization will make the selected runtime
   invocable when apply succeeds;
+- `hooksActivated` and `plannedHooksActivated`: distinguish hooks Git currently
+  resolves from hooks that a successful apply will publish;
 - `running`: always false in installation receipts because a receipt is not
   process evidence.
 
@@ -66,24 +68,29 @@ under the target lock before publication; failure leaves no claimed runtime.
 `planIntegrationAction` emits bounded literal argument arrays and never invokes
 a shell. Installation and audit never infer that a watcher or server is running.
 
-Graphify 0.9.58 exposes local code build, refresh, clustering, query, path,
-explain, export and graph merge by default. Semantic/remote ingestion, database
-connections, model-authored labels, repository cloning, PR/network features,
-query logging, update checks, watch mode, Git hooks, MCP, cross-project graphs
-and work memory are present but disabled. They require an explicit
+Graphify 0.9.58 exposes local code build, refresh, clustering, query, affected
+nodes, architectural hubs, path, explain, multigraph diagnosis, export, tree,
+benchmark and graph merge by default. Semantic/remote ingestion, database
+connections, model-authored labels, provider configuration, repository cloning,
+PR/network features, query logging, semantic-update checks, watch mode, Git
+hooks, MCP, cross-project graphs, work memory and reflection are present but
+disabled. They require an explicit
 `--enable graphify:<capability>` on apply. Capabilities needing optional Python
 packages require an `all`-profile rematerialization. Enabling never starts a
 watcher/server, contacts a model provider, or creates memory. Project-scoped
-hook activation writes two exact harness-owned hooks with executable modes; the
-vendor hook installer is never called, edited or colliding hooks fail closed,
-and removal deletes only the recorded bytes. Query planning remains separate
-from rebuild planning.
+hook activation writes two exact harness-owned hooks at Git's effective
+`core.hooksPath`, with executable modes; paths outside the selected project are
+rejected. The vendor hook installer is never called, edited or colliding hooks
+fail closed, a later hooks-path change makes audit fail and reports hooks as
+inactive, and removal deletes only the recorded bytes. Query planning remains
+separate from rebuild planning.
 
 Archify 2.16.0 uses the same acquisition and removal contract for doctor,
-validation, render and HTML delivery. Preview and update/network awareness stay
-disabled unless explicitly selected. Its adapter labels authored, extracted and
-inferred evidence separately and treats its output as a visualization, not proof
-of source completeness.
+validation, render and HTML delivery. Preview stays disabled unless explicitly
+selected. The pinned CLI has no vendor-update command, so M6 does not advertise
+one; version changes happen only through a reviewed catalog update. Its adapter
+labels authored, extracted and inferred evidence separately and treats its
+output as a visualization, not proof of source completeness.
 
 ## Provenance and resource policy
 
@@ -108,10 +115,11 @@ Registered tests cover exact and altered artifacts, linked inputs, unsafe
 catalog URLs and paths, default-off memory/network/background features, both
 platform MCP merge formats, edited owned settings, unowned collisions, receipt
 audit, safe archive extraction, explicit network denial, dependency-lock drift,
-runtime tampering, a real installed Archify invocation, Graphify query/watch/MCP
-argument contracts, lifecycle-owned hooks, removal, and the shared CLI. Tests
+runtime/interpreter tampering, a real installed Archify invocation, every
+cataloged Graphify command family, safe Windows npm-shim resolution,
+lifecycle-owned effective-path hooks, removal, and the shared CLI. Tests
 use temporary targets and fixture artifacts and write no developer profile.
-The repository gate passes with 180 tests (178 passed and two Windows-only
+The repository gate passes with 182 tests (180 passed and two Windows-only
 resolution cases skipped on macOS), the full-history secret scan, the GitHub
 Actions audit, whitespace checks and syntax checks. Separate release validation
 materialized the exact Context7 and Playwright packages, Graphify's base and
@@ -127,15 +135,17 @@ Security checklist verdicts:
   sizes, formats, digests, receipt fields and action operands.
 - Injection and navigation — **Pass**: target paths are constrained, linked and
   hard-linked files are rejected, and action commands are literal arrays with no
-  shell interpolation.
+  shell interpolation. Windows npm shims resolve to their JavaScript entry point
+  instead of passing arguments through `cmd.exe`.
 - Browser and network boundaries — **Pass**: planning and archive-only apply are
   offline. Dependency acquisition requires both `--materialize` and
   `--allow-network`, uses fixed public registries, ignores user package-manager
   configuration and does not inherit credential-bearing environment variables.
 - Files and abuse — **Pass**: caller-supplied artifacts have a 20 MB catalog cap,
   server-controlled target names, exact digest checks, bounded expansion, CRC
-  checks, and traversal/link rejection. Rate limiting is not applicable to this
-  local lifecycle.
+  checks, traversal/link rejection, effective Git-hook-path validation, and
+  HTTPS/credential checks for remote actions. Rate limiting is not applicable
+  to this local lifecycle.
 - Dependencies and delivery — **Pass**: top-level distributions and transitive
   runtime dependencies are exact-version and integrity/hash locked. npm scripts
   and Python source builds are disabled. Runtime trees and executable hooks are

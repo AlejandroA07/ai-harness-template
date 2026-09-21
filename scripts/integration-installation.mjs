@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
+import { constants } from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual as equal } from 'node:util';
 import { loadIntegrationCatalog, planIntegrations } from './integration-catalog.mjs';
@@ -7,6 +8,7 @@ import { acquireTargetLock, digest, encode, payloadHash, publishFiles, readRegul
 import { ownershipHeadBytes, sealReceipt, storeReceiptEvidence, verifyOwnershipHead, verifyReceiptEvidence } from './installation-evidence.mjs';
 import { assertSafeDirectory, isPathWithin, parseSkill, renderSkillDocuments } from './skill-lib.mjs';
 import { materializeIntegrationRuntime, renderRuntimeCommand, requiredRuntimeProfile } from './integration-runtime.mjs';
+import { runTool } from './windows-cli.mjs';
 
 const plans = new WeakMap();
 const sameBytes = (left, right) => left === null ? right === null : right !== null && left.equals(right);
@@ -73,11 +75,14 @@ function validateRuntime(runtime) {
 function validateHooks(hooks) {
   if (hooks === null) return;
   if (!Array.isArray(hooks) || hooks.length !== 2) fail('Malformed integration hook receipt');
-  const expected = ['.git/hooks/post-checkout', '.git/hooks/post-commit'];
-  if (!equal(hooks.map((entry) => entry.path).sort(), expected)) fail('Malformed integration hook inventory');
+  const names = hooks.map((entry) => path.posix.basename(entry.path)).sort();
+  const directories = new Set(hooks.map((entry) => path.posix.dirname(entry.path)));
+  if (!equal(names, ['post-checkout', 'post-commit']) || directories.size !== 1) fail('Malformed integration hook inventory');
   for (const hook of hooks) {
     if (!hook || typeof hook !== 'object' || Array.isArray(hook)
       || !equal(Object.keys(hook).sort(), ['mode', 'path', 'sha256'])
+      || typeof hook.path !== 'string' || !/^[A-Za-z0-9._/-]+$/.test(hook.path)
+      || hook.path.split('/').some((part) => !part || part === '.' || part === '..')
       || hook.mode !== 0o700 || !/^[a-f0-9]{64}$/.test(hook.sha256)) fail('Malformed integration hook receipt');
   }
 }
@@ -166,6 +171,18 @@ function renderGraphifyHooks(target, runtimeRoot, runtime) {
   return { 'post-checkout': body, 'post-commit': body };
 }
 
+async function graphifyHooksDirectory(target) {
+  const result = runTool('git', ['rev-parse', '--git-path', 'hooks'], { cwd: target });
+  const output = result.status === 0 ? result.stdout.trim() : '';
+  if (!output || output.length > 4096 || /[\x00-\x1f\x7f]/.test(output)) {
+    fail('Graphify hooks require a valid Git repository and resolvable hooks path');
+  }
+  const directory = path.resolve(target, output);
+  if (!(await isPathWithin(directory, target))) fail('Graphify hooks path must stay inside the selected project');
+  await assertSafeDirectory(target, directory);
+  return directory;
+}
+
 export function renderMcpConfiguration(platform, integration, source, runtimeRoot, runtime = null) {
   if (adapterType(integration) !== 'mcp' && integration.id !== 'graphify') return null;
   const version = `${integration.runtime.package}@${integration.runtime.version}`;
@@ -217,10 +234,19 @@ function renderConfiguration(platform, before, previous, desired, conflicts) {
   return value ? Buffer.from(value) : null;
 }
 
-function integrationState(entry, invocable = entry.runtime !== null, plannedInvocable = false) {
+function integrationState(entry, invocable = entry.runtime !== null, plannedInvocable = false,
+  hooksActivated = false, plannedHooksActivated = entry.hooks !== null) {
   return { provisioned: true, configured: entry.adapterFiles.length > 0 || entry.configuration !== null || entry.hooks !== null,
     invocable, plannedInvocable: invocable || plannedInvocable, running: false,
-    hooksActivated: entry.hooks !== null, runtime: entry.runtime ? structuredClone(entry.runtime) : null };
+    hooksActivated, plannedHooksActivated, runtime: entry.runtime ? structuredClone(entry.runtime) : null };
+}
+
+async function runtimeCommandAvailable(runtime) {
+  try {
+    const info = await fs.stat(runtime.command);
+    await fs.access(runtime.command, constants.X_OK);
+    return info.isFile();
+  } catch { return false; }
 }
 
 export async function planIntegrationInstallation(repository, options, internal = {}) {
@@ -257,6 +283,8 @@ export async function planIntegrationInstallation(repository, options, internal 
   const artifactBytes = {};
   const integrationsById = {};
   const runtimeReadiness = {};
+  const hookReadiness = {};
+  const plannedHookReadiness = {};
   const hookPayloads = {};
   if (operation === 'remove') ids.forEach((id) => desired.delete(id));
   if (operation === 'apply') for (const integration of selected) {
@@ -302,12 +330,19 @@ export async function planIntegrationInstallation(repository, options, internal 
     let hooks = null;
     if (integration.id === 'graphify' && active.includes('hooks')) {
       if (scope !== 'project') conflicts.push('graphify: hooks require project scope');
-      else if (runtimeReady) {
-        const payload = renderGraphifyHooks(target, runtimeRoot, runtime);
-        hookPayloads[integration.id] = payload;
-        hooks = Object.entries(payload).map(([name, contents]) => ({
-          path: `.git/hooks/${name}`, sha256: digest(contents), mode: 0o700,
-        })).sort((a, b) => a.path.localeCompare(b.path));
+      else {
+        try {
+          const directory = await graphifyHooksDirectory(target);
+          plannedHookReadiness[integration.id] = true;
+          if (runtimeReady) {
+            const relative = path.relative(target, directory).split(path.sep).join('/');
+            const payload = renderGraphifyHooks(target, runtimeRoot, runtime);
+            hookPayloads[integration.id] = payload;
+            hooks = Object.entries(payload).map(([name, contents]) => ({
+              path: path.posix.join(relative, name), sha256: digest(contents), mode: 0o700,
+            })).sort((a, b) => a.path.localeCompare(b.path));
+          }
+        } catch (error) { conflicts.push(`graphify: ${error.message}`); }
       }
     }
     desired.set(integration.id, {
@@ -348,14 +383,21 @@ export async function planIntegrationInstallation(repository, options, internal 
     }
     if (entry.runtime) {
       const directory = path.join(locations.runtimes, entry.id);
+      let ready = true;
       try {
         const runtime = await treeFiles(directory);
         runtimeTrees[entry.id] = runtime;
         if (Object.keys(runtime).length !== entry.runtime.fileCount || payloadHash(runtime) !== entry.runtime.hash) {
           conflicts.push(`${entry.id}: owned runtime is missing or edited`);
+          ready = false;
         }
         for (const [file, contents] of Object.entries(runtime)) observed[path.join(directory, file)] = contents;
-      } catch { conflicts.push(`${entry.id}: owned runtime is missing or edited`); }
+      } catch { conflicts.push(`${entry.id}: owned runtime is missing or edited`); ready = false; }
+      if (!(await runtimeCommandAvailable(entry.runtime))) {
+        conflicts.push(`${entry.id}: runtime interpreter is missing or not executable`);
+        ready = false;
+      }
+      runtimeReadiness[entry.id] = (runtimeReadiness[entry.id] ?? true) && ready;
     }
     for (const hook of entry.hooks ?? []) {
       const file = path.join(target, ...hook.path.split('/'));
@@ -364,8 +406,22 @@ export async function planIntegrationInstallation(repository, options, internal 
         const info = await stat(file);
         if (contents === null || digest(contents) !== hook.sha256 || !info?.isFile() || (info.mode & 0o777) !== hook.mode) {
           conflicts.push(`${entry.id}: owned Git hook is missing or edited`);
+          hookReadiness[entry.id] = false;
         }
-      } catch { conflicts.push(`${entry.id}: owned Git hook is missing or edited`); }
+      } catch { conflicts.push(`${entry.id}: owned Git hook is missing or edited`); hookReadiness[entry.id] = false; }
+    }
+    if (entry.hooks) {
+      try {
+        const effective = await graphifyHooksDirectory(target);
+        const recorded = path.dirname(path.join(target, ...entry.hooks[0].path.split('/')));
+        if (effective !== recorded) {
+          conflicts.push(`${entry.id}: Git hooks path changed after activation`);
+          hookReadiness[entry.id] = false;
+        } else if (hookReadiness[entry.id] !== false) hookReadiness[entry.id] = true;
+      } catch (error) {
+        conflicts.push(`${entry.id}: ${error.message}`);
+        hookReadiness[entry.id] = false;
+      }
     }
   }
   for (const entry of entries) if (!previous.some((item) => item.id === entry.id)) {
@@ -382,8 +438,6 @@ export async function planIntegrationInstallation(repository, options, internal 
   for (const entry of entries) if (entry.hooks) {
     const before = previous.find((item) => item.id === entry.id);
     const previouslyOwned = new Set((before?.hooks ?? []).map((hook) => hook.path));
-    const git = await stat(path.join(target, '.git'));
-    if (!git?.isDirectory() || git.isSymbolicLink()) conflicts.push(`${entry.id}: owned hooks require a regular project .git directory`);
     for (const hook of entry.hooks) if (!previouslyOwned.has(hook.path)
       && await observe(path.join(target, ...hook.path.split('/'))) !== null) conflicts.push(`${entry.id}: unowned Git hook collision`);
   }
@@ -432,8 +486,13 @@ export async function planIntegrationInstallation(repository, options, internal 
   await add('receipt', locations.receipt, nextReceipt ? Buffer.from(encode(nextReceipt)) : null, true);
   const changes = operations.map(({ id, before, after }) => ({ id, action: after === null ? 'remove' : before === null ? 'create' : 'update' }));
   const selectedIds = new Set(selected.map((entry) => entry.id));
-  const states = entries.map((entry) => ({ id: entry.id, enabled: [...entry.enabled],
-    ...integrationState(entry, runtimeReadiness[entry.id] ?? (entry.runtime !== null), materialize && selectedIds.has(entry.id)) }));
+  const states = entries.map((entry) => {
+    const current = previous.find((item) => item.id === entry.id);
+    return { id: entry.id, enabled: [...entry.enabled],
+      ...integrationState(entry, runtimeReadiness[entry.id] ?? (entry.runtime !== null), materialize && selectedIds.has(entry.id),
+        current?.hooks !== null && current?.hooks !== undefined && hookReadiness[entry.id] === true,
+        entry.hooks !== null || (materialize && plannedHookReadiness[entry.id] === true)) };
+  });
   const plan = { version: 1, module: 'tool-integrations', operation, target, platform, scope, profile: 'coexistence',
     installed: previous.length > 0, integrations: states, changes: operation === 'audit' ? [] : changes,
     conflicts, applicable: conflicts.length === 0, activation: 'Installation never starts a process, installs a hook, enables memory, or performs network access.',
@@ -502,6 +561,19 @@ export async function applyIntegrationInstallation(candidate, { checkpoint = asy
   }
 }
 
+function validateNetworkAction(id, capability, operands) {
+  if (id === 'graphify' && ['remote-ingest', 'repository-clone'].includes(capability)) {
+    let url;
+    try { url = new URL(operands[0]); } catch { fail(`${capability} requires an explicit HTTPS URL`); }
+    if (url.protocol !== 'https:' || url.username || url.password) fail(`${capability} requires an explicit HTTPS URL without credentials`);
+    if (capability === 'repository-clone') {
+      if (url.hostname !== 'github.com') fail('repository-clone accepts only github.com URLs');
+      const out = operands.indexOf('--out');
+      if (out < 0 || !path.isAbsolute(operands[out + 1] ?? '')) fail('repository-clone requires --out <absolute-path>');
+    }
+  }
+}
+
 export function planIntegrationAction(installationPlan, { id, capability, operands = [] }) {
   if (!installationPlan || installationPlan.module !== 'tool-integrations' || !installationPlan.target) fail('Action requires a target integration plan');
   if (!Array.isArray(operands) || operands.length > 32
@@ -511,6 +583,7 @@ export function planIntegrationAction(installationPlan, { id, capability, operan
   if (!entry.enabled.includes(capability)) fail(`Integration capability is not enabled: ${id}:${capability}`);
   const locations = layout(installationPlan.target, installationPlan.platform, installationPlan.scope);
   if (!entry.runtime || !entry.invocable) fail(`Integration runtime is not materialized for its enabled capabilities: ${id}`);
+  validateNetworkAction(id, capability, operands);
   if (id === 'graphify' && capability === 'query-logging') {
     if (operands.length !== 1 || !path.isAbsolute(operands[0])) fail('Query logging requires one explicit absolute log path');
     return { id, capability, command: null, args: [], cwd: installationPlan.target, environment: { GRAPHIFY_QUERY_LOG: operands[0] },
@@ -522,6 +595,7 @@ export function planIntegrationAction(installationPlan, { id, capability, operan
     note: 'Graphify hooks are already lifecycle-owned; vendor hook installation is never invoked.' };
   const invocation = renderRuntimeCommand(entry, path.join(locations.runtimes, id), capability, operands, installationPlan.target);
   return { id, capability, ...invocation, cwd: installationPlan.target, invocable: true,
-    mode: ['watch', 'hooks', 'mcp'].includes(capability) ? 'activate' : 'invoke', authorized: true, running: false,
+    mode: capability === 'provider-management' ? 'configure'
+      : ['watch', 'hooks', 'mcp'].includes(capability) ? 'activate' : 'invoke', authorized: true, running: false,
     note: 'This plan contains a literal argument array; execution is a separate explicit user action.' };
 }

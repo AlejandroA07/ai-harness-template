@@ -24,16 +24,19 @@ unless the user deliberately chooses checked-in graph artifacts.
   does not authorize a rebuild.
 - Use `query`, `path`, or `explain` for bounded navigation. Verify important edges
   in source; extracted, inferred, and ambiguous edges are not equally strong.
+- Use `affected`, `god-nodes`, `diagnose multigraph`, `tree`, or `benchmark`
+  only for the corresponding explicit local analysis request.
 - Query logging is off by default in the pinned release. Enable it only when the
   user chooses an explicit log path and retention policy.
 - Semantic documents/media require a separately chosen model backend, disclosed
   network/data boundary, and the user's explicit approval.
 - Remote ingestion, database connections, repository cloning, PR/network
   features, model-authored labels, watchers, Git hooks, MCP, cross-project
-  graphs, and vendor update checks are separate opt-ins. Do not enable them
+  graphs, and semantic-update checks are separate opt-ins. Do not enable them
   during ordinary installation.
-- Never enable or invoke Graphify work memory automatically. Do not call
-  `save-result` or `reflect` unless a later reviewed policy explicitly permits it.
+- Never enable or invoke Graphify work memory automatically. Call `save-result`
+  or `reflect` only after the user explicitly enables and requests that exact
+  capability, with an explicit storage or output path and retention decision.
 - Do not print, persist, or pass through provider credentials except by the
   selected tool's documented environment-variable mechanism.
 

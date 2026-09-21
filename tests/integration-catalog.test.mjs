@@ -26,21 +26,25 @@ test('integration catalog pins artifacts, provenance, adapters and inactive defa
   assert.equal(graphify.provenance.reviewedCommit, '23f2ffaa43fd12f25d9eabe91e6d184b5d89b474');
   assert.equal(graphify.provenance.artifact.sha256, 'e239803288e91c723d6e30540860bd6d5a1dc3f0914b9fc1104b0233e98aaeb8');
   assert.deepEqual(graphify.capabilities.map((entry) => entry.id), [
-    'build-code', 'refresh', 'cluster', 'query', 'path', 'explain', 'export', 'merge-graphs', 'semantic-media',
-    'remote-ingest', 'database-connectors', 'community-labeling', 'repository-clone', 'pr-dashboard', 'pr-triage',
-    'query-logging', 'update-check', 'watch', 'hooks', 'mcp', 'global-graph', 'memory',
+    'build-code', 'refresh', 'cluster', 'query', 'affected', 'god-nodes', 'path', 'explain', 'diagnose-multigraph',
+    'export', 'tree', 'benchmark', 'merge-graphs', 'semantic-media', 'remote-ingest', 'database-connectors',
+    'community-labeling', 'provider-management', 'repository-clone', 'pr-dashboard', 'pr-triage', 'query-logging',
+    'semantic-update-check', 'watch', 'hooks', 'mcp', 'global-graph', 'memory', 'reflection',
   ]);
   assert.deepEqual(graphify.capabilities.filter((entry) => entry.default === 'disabled').map((entry) => entry.id),
-    ['semantic-media', 'remote-ingest', 'database-connectors', 'community-labeling', 'repository-clone',
-      'pr-dashboard', 'pr-triage', 'query-logging', 'update-check', 'watch', 'hooks', 'mcp', 'global-graph', 'memory']);
+    ['semantic-media', 'remote-ingest', 'database-connectors', 'community-labeling', 'provider-management',
+      'repository-clone', 'pr-dashboard', 'pr-triage', 'query-logging', 'semantic-update-check', 'watch', 'hooks', 'mcp',
+      'global-graph', 'memory', 'reflection']);
   assert.deepEqual(graphify.capabilities.find((entry) => entry.id === 'query').writes, []);
   assert.equal(graphify.capabilities.find((entry) => entry.id === 'query-logging').default, 'disabled');
   assert.deepEqual(graphify.runtime.resources.map((entry) => entry.profile), ['base', 'all']);
   assert.ok(graphify.runtime.resources.every((entry) => /^[a-f0-9]{64}$/.test(entry.sha256)));
   for (const id of ['context7', 'playwright']) {
-    const runtime = catalog.integrations.find((entry) => entry.id === id).runtime;
+    const integration = catalog.integrations.find((entry) => entry.id === id);
+    const runtime = integration.runtime;
     assert.equal(runtime.kind, 'npm-package');
     assert.deepEqual(runtime.resources.map((entry) => path.basename(entry.path)).sort(), ['package-lock.json', 'package.json']);
+    assert.equal(integration.provenance.artifact.size, id === 'context7' ? 28_837 : 22_503);
   }
   assert.equal(catalog.integrations.find((entry) => entry.id === 'archify').provenance.artifact.sha256,
     '4c59fa6557a2385beaaef8c7219cc414573acc9f0c30a932d5053b0b20689a46');
@@ -53,8 +57,9 @@ test('integration plans expose all capabilities without activating optional beha
   assert.equal(plan.targetPreflight, 'not-performed');
   assert.equal(plan.integrations[0].adapter, 'integrations/graphify/SKILL.md');
   assert.equal(plan.integrations[0].capabilities.find((entry) => entry.id === 'build-code').enabled, true);
-  for (const id of ['semantic-media', 'remote-ingest', 'database-connectors', 'community-labeling', 'repository-clone',
-    'pr-dashboard', 'pr-triage', 'query-logging', 'update-check', 'watch', 'hooks', 'mcp', 'global-graph', 'memory']) {
+  for (const id of ['semantic-media', 'remote-ingest', 'database-connectors', 'community-labeling', 'provider-management',
+    'repository-clone', 'pr-dashboard', 'pr-triage', 'query-logging', 'semantic-update-check', 'watch', 'hooks', 'mcp',
+    'global-graph', 'memory', 'reflection']) {
     assert.deepEqual(plan.integrations[0].capabilities.find((entry) => entry.id === id),
       { ...catalog.integrations.find((entry) => entry.id === 'graphify').capabilities.find((entry) => entry.id === id), enabled: false, activation: 'disabled' });
   }

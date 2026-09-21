@@ -5,6 +5,7 @@ import { promisify } from 'node:util';
 import zlib from 'node:zlib';
 import { digest, encode, payloadHash, readRegular, treeFiles } from './installation-core.mjs';
 import { assertSafeDirectory } from './skill-lib.mjs';
+import { resolveWindowsCli } from './windows-cli.mjs';
 
 const execute = promisify(execFile);
 const fail = (message) => { throw new Error(message); };
@@ -127,6 +128,13 @@ async function run(command, args, options) {
   }
 }
 
+export function npmInvocation(hostPlatform = process.platform, resolver = resolveWindowsCli) {
+  if (hostPlatform !== 'win32') return { command: 'npm', prefix: [] };
+  const resolved = resolver('npm');
+  if (!resolved) fail('Unable to resolve the Windows npm shim safely');
+  return resolved;
+}
+
 function minimumVersion(minimumRuntime) {
   const match = minimumRuntime.match(/>=(\d+)(?:\.(\d+))?(?:\.(\d+))?$/);
   if (!match) fail('Invalid minimum integration runtime');
@@ -199,8 +207,8 @@ async function materializeNpm({ repository, integration, artifact, staging, allo
   await fs.writeFile(path.join(staging, 'package.json'), encode(manifest), { flag: 'wx', mode: 0o600 });
   await fs.writeFile(path.join(staging, 'package-lock.json'), encode(lock), { flag: 'wx', mode: 0o600 });
   await fs.writeFile(path.join(staging, vendorName), artifact, { flag: 'wx', mode: 0o600 });
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  await run(npm, ['ci', '--ignore-scripts', '--no-bin-links', '--omit=dev', '--no-audit', '--no-fund', '--cache', cache], {
+  const npm = npmInvocation();
+  await run(npm.command, [...npm.prefix, 'ci', '--ignore-scripts', '--no-bin-links', '--omit=dev', '--no-audit', '--no-fund', '--cache', cache], {
     cwd: staging,
     env: cleanEnvironment(home, { NPM_CONFIG_REGISTRY: 'https://registry.npmjs.org', NPM_CONFIG_USERCONFIG: path.join(home, '.npmrc') }),
   });
@@ -236,27 +244,35 @@ export function renderRuntimeCommand(entry, runtimeRoot, capability, operands, t
       refresh: () => ['update', target],
       cluster: () => ['cluster-only', target],
       query: () => ['query', operands[0]],
+      affected: () => ['affected', operands[0], ...operands.slice(1)],
+      'god-nodes': () => ['god-nodes', ...operands],
       path: () => ['path', operands[0], operands[1]],
       explain: () => ['explain', operands[0]],
+      'diagnose-multigraph': () => ['diagnose', 'multigraph', ...operands],
       export: () => ['export', ...operands],
+      tree: () => ['tree', ...operands],
+      benchmark: () => ['benchmark', ...operands],
       'merge-graphs': () => ['merge-graphs', ...operands],
+      'semantic-media': () => ['extract', target, ...operands],
       'remote-ingest': () => ['add', ...operands],
-      'database-connectors': () => ['extract', target, ...operands],
+      'database-connectors': () => ['neo4j', 'falkordb'].includes(operands[0])
+        ? ['export', ...operands] : ['extract', target, ...operands],
       'community-labeling': () => ['label', target, ...operands],
+      'provider-management': () => ['provider', ...operands],
       'repository-clone': () => ['clone', ...operands],
       'pr-dashboard': () => ['prs', ...operands],
       'pr-triage': () => ['prs', '--triage', ...operands],
-      'update-check': () => ['check-update', target],
+      'semantic-update-check': () => ['check-update', target],
       watch: () => ['watch', target],
       hooks: () => ['hook', 'install'],
       mcp: () => [],
       'global-graph': () => ['global', ...operands],
       memory: () => ['save-result', ...operands],
-      'semantic-media': () => ['add', ...operands],
+      reflection: () => ['reflect', ...operands],
     },
     archify: {
       doctor: () => ['doctor'], validate: () => ['validate', ...operands], render: () => ['render', ...operands],
-      deliver: () => ['deliver', ...operands], preview: () => ['preview', ...operands], 'update-check': () => ['doctor'],
+      deliver: () => ['deliver', ...operands], preview: () => ['preview', ...operands],
     },
   };
   const builder = actions[entry.id]?.[capability];
