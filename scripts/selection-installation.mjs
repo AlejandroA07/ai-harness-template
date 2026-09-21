@@ -161,14 +161,21 @@ async function parentIdentity(context) {
 // Plans are read-only. Only an in-process plan can be applied, and it is rebuilt
 // under the target lock; serialized JSON is never accepted as write authority.
 export async function planInstallation(root, options) {
-  const { operation = 'apply', platform, scope, ids: requested = [], target: suppliedTarget } = options;
+  const { operation = 'apply', platform, scope, ids: requested = [], target: suppliedTarget,
+    legacyRoot: suppliedLegacyRoot = null } = options;
   if (!['apply', 'remove', 'audit'].includes(operation) || !['claude', 'codex'].includes(platform)
     || !['machine', 'project'].includes(scope) || typeof suppliedTarget !== 'string' || !path.isAbsolute(suppliedTarget)) {
     fail('Lifecycle requires an absolute --target, one --platform and --scope machine or project');
   }
+  if (suppliedLegacyRoot !== null && (operation !== 'apply' || scope !== 'machine'
+    || typeof suppliedLegacyRoot !== 'string' || !path.isAbsolute(suppliedLegacyRoot)
+    || /[\x00-\x1f]/.test(suppliedLegacyRoot))) {
+    fail('Legacy skill migration requires an absolute legacy root for a machine apply');
+  }
   if (operation !== 'audit' && !requested.length) fail('Select at least one capability');
   if (operation === 'audit' && requested.length) fail('Audit inspects the whole platform receipt; omit --select');
   const unresolved = path.resolve(suppliedTarget);
+  const legacyRoot = suppliedLegacyRoot === null ? null : path.resolve(suppliedLegacyRoot);
   await assertSafeDirectory(unresolved, unresolved);
   // Canonicalize OS aliases above the explicit target, but reject a linked target.
   const target = await fs.realpath(unresolved).catch(async (error) => {
@@ -240,13 +247,24 @@ export async function planInstallation(root, options) {
   const nextReceipt = sealReceipt({ version: 2, target, platform, scope, profile: 'coexistence', selected: nextSelected,
     entries: entries.map(({ id, hash, consumers }) => ({ id, hash, consumers })) });
   const changes = [];
+  const migrated = [];
   for (const id of [...new Set([...previous.map((entry) => entry.id), ...desired.keys()])].sort()) {
     const before = previous.find((entry) => entry.id === id);
     const after = desired.get(id);
     const discovery = path.join(locations.discovery, id);
     if (!Object.hasOwn(states, id)) states[id] = await linkState(discovery);
     const names = await fs.readdir(locations.discovery).catch((error) => { if (error.code === 'ENOENT') return []; throw error; });
-    if (!before && (states[id] || names.some((name) => name.toLowerCase() === id.toLowerCase()))) conflicts.push(`${id}: unowned discovery collision (legacy adoption requires review)`);
+    let legacyFrom = null;
+    if (!before && states[id] && legacyRoot) {
+      const expectedLegacy = path.join(legacyRoot, '.generated', 'skills', platform, id);
+      if (same(states[id], { link: expectedLegacy })) {
+        legacyFrom = expectedLegacy;
+        migrated.push(id);
+      }
+    }
+    if (!before && (states[id] || names.some((name) => name.toLowerCase() === id.toLowerCase())) && !legacyFrom) {
+      conflicts.push(`${id}: unowned discovery collision (legacy adoption requires review)`);
+    }
     if (after?.files) {
       const payload = payloadPath(locations, after);
       await assertSafeDirectory(target, payload);
@@ -254,8 +272,8 @@ export async function planInstallation(root, options) {
         if (payloadHash(await treeFiles(payload)) !== after.hash) conflicts.push(`${id}: payload store collision`);
       }
     }
-    if (before?.hash !== after?.hash) changes.push({ id, action: !after ? 'remove' : before ? 'update' : 'install',
-      discovery, from: before ? payloadPath(locations, before) : null, to: after ? payloadPath(locations, after) : null });
+    if (before?.hash !== after?.hash) changes.push({ id, action: !after ? 'remove' : before ? 'update' : legacyFrom ? 'migrate' : 'install',
+      discovery, from: before ? payloadPath(locations, before) : legacyFrom, to: after ? payloadPath(locations, after) : null });
   }
   const receiptChanged = operation !== 'audit' && !same(old.receipt, nextReceipt)
     && (old.receipt !== null || entries.length > 0);
@@ -264,6 +282,7 @@ export async function planInstallation(root, options) {
     installed: old.receipt !== null && previous.length > 0,
     selected: [...nextSelected], entries: structuredClone(nextReceipt.entries), capabilities,
     changes: operation === 'audit' ? [] : changes,
+    migrated,
     receiptChanged, receiptPath: locations.receipt, evidence, conflicts, applicable: conflicts.length === 0, tools: [],
     activation: `${scope === 'project' ? 'Project' : 'Machine'} discovery only; no hooks, settings, processes or network activation`,
     retainedPayloads: 'Immutable payload revisions are retained on update/removal; no recursive garbage collection' };

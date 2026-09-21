@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: "22"
       - name: Portable installation and process tests
-        run: node --test tests/windows-cli.test.mjs tests/filesystem-snapshot.test.mjs tests/selection-installation.test.mjs tests/global-installation.test.mjs tests/project-installation.test.mjs tests/receipt-migration.test.mjs
+        run: node --test tests/windows-cli.test.mjs tests/filesystem-snapshot.test.mjs tests/selection-installation.test.mjs tests/global-installation.test.mjs tests/full-profile-migration.test.mjs tests/project-installation.test.mjs tests/receipt-migration.test.mjs
   verify:
     runs-on: ubuntu-latest
     steps:
