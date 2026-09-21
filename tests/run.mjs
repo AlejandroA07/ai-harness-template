@@ -7,6 +7,7 @@ await import('./integration-installation.test.mjs');
 await import('./architecture-view.test.mjs');
 await import('./selection-installation.test.mjs');
 await import('./global-installation.test.mjs');
+await import('./full-profile-migration.test.mjs');
 await import('./project-installation.test.mjs');
 await import('./receipt-migration.test.mjs');
 await import('./filesystem-snapshot.test.mjs');

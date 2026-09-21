@@ -2,7 +2,7 @@ import { sealReceipt, verifyReceiptEvidence, storeReceiptEvidence, planReceiptEv
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { isDeepStrictEqual as equal } from 'node:util';
-import { assertSafeDirectory, isPathWithin } from './skill-lib.mjs';
+import { assertSafeDirectory, isPathWithin, isAbsolutePathInput } from './skill-lib.mjs';
 import { digest, encode, stat, readRegular, payloadHash, treeFiles, acquireTargetLock, releaseTargetLock, publishFiles } from './installation-core.mjs';
 import { object, parseSettings, getSetting, setSetting, pruneContainers, hookCount, removeExactHook, hookGroups, inspectFeatures, editFeatures } from './global-settings.mjs';
 import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
@@ -55,6 +55,16 @@ async function sourceBundle(root) {
   files['policy.json'] = Buffer.from(encode({ version: 1, executable: process.execPath, denials }));
   return { files, hash: payloadHash(files), denials };
 }
+async function legacyState(sourceRoot, legacyRoot, platform) {
+  const guidanceName = platform === 'codex' ? 'AGENTS.md' : 'CLAUDE.md';
+  const guidance = Buffer.from((await readRegular(path.join(sourceRoot, 'global', guidanceName))).toString('utf8')
+    .replaceAll('{{HARNESS_ROOT}}', legacyRoot));
+  const templatePath = platform === 'codex' ? 'global/codex-hooks/hooks.json.template' : 'global/claude-settings.json';
+  const template = JSON.parse((await readRegular(path.join(sourceRoot, templatePath))).toString('utf8')
+    .replaceAll('{{HARNESS_ROOT}}', legacyRoot.replaceAll('\\', '/'))
+    .replaceAll('{{HARNESS_ROOT_WINDOWS}}', legacyRoot.replaceAll('\\', '\\\\')));
+  return { guidance, hook: template.hooks.PreToolUse[0] };
+}
 function validateReceipt(receipt, { target, platform }) {
   shape(receipt, ['version', 'evidence', 'target', 'platform', 'module', 'profile', 'runtime', 'guidanceHash', 'scalars', 'addedDenials', 'hookOwned',
     'createdContainers', 'settingsExisted', 'hookArrayExisted', 'denyArrayExisted', 'configExisted', 'features', 'createdFeatureTable']);
@@ -95,10 +105,13 @@ async function parents(target, locations) {
 }
 
 export async function planGlobalInstallation(repository, options) {
-  const { operation = 'apply', target: inputTarget, platform, scope } = options;
+  const { operation = 'apply', target: inputTarget, platform, scope, legacyRoot: inputLegacyRoot = null } = options;
   if (!['apply', 'audit', 'remove'].includes(operation) || !['codex', 'claude'].includes(platform) || scope !== 'machine'
     || typeof inputTarget !== 'string' || !path.isAbsolute(inputTarget) || /[\x00-\x1f]/.test(inputTarget)) {
     fail('Global lifecycle requires an absolute --target, one --platform and --scope machine');
+  }
+  if (inputLegacyRoot !== null && (operation !== 'apply' || !isAbsolutePathInput(inputLegacyRoot))) {
+    fail('Legacy global migration requires an absolute legacy root for apply');
   }
   const unresolved = path.resolve(inputTarget);
   await assertSafeDirectory(unresolved, unresolved);
@@ -107,6 +120,7 @@ export async function planGlobalInstallation(repository, options) {
     return path.join(await fs.realpath(path.dirname(unresolved)), path.basename(unresolved));
   });
   const root = await fs.realpath(repository);
+  const legacyRoot = inputLegacyRoot === null ? null : path.resolve(inputLegacyRoot);
   if (await isPathWithin(target, root)) fail('Installation target must be outside the source checkout');
   const platformRoot = path.join(target, platform === 'codex' ? '.codex' : '.claude');
   const locations = { store: path.join(target, '.ai-harness/installations', platform), runtimes: path.join(target, '.ai-harness/runtime'),
@@ -149,7 +163,12 @@ export async function planGlobalInstallation(repository, options) {
         || previous.addedDenials.some((entry) => !previousPolicy.denials.includes(entry))) fail('Invalid runtime policy');
       if (input.guidance === null || !input.guidance.equals(ownedFiles[`guidance/${platform}.md`])) conflicts.push('guidance: owned content is missing or edited');
     } catch { conflicts.push('runtime: owned payload is missing, edited or unsafe'); }
-  } else if (operation === 'apply' && input.guidance !== null) conflicts.push('guidance: unowned or legacy content requires a reviewed migration');
+  }
+  const legacy = !previous && operation === 'apply' && legacyRoot ? await legacyState(root, legacyRoot, platform) : null;
+  const adoptingLegacyGuidance = legacy && input.guidance !== null && input.guidance.equals(legacy.guidance);
+  if (!previous && operation === 'apply' && input.guidance !== null && !adoptingLegacyGuidance) {
+    conflicts.push('guidance: unowned or legacy content requires a reviewed migration');
+  }
   if (operation === 'apply') {
     await assertSafeDirectory(target, runtime);
     if (await stat(runtime)) {
@@ -158,13 +177,13 @@ export async function planGlobalInstallation(repository, options) {
   }
   const settings = parseSettings(input.settings);
   const modified = structuredClone(settings);
-  const groups = hookGroups(settings);
+  let groups = hookGroups(settings);
   if (settings.disableAllHooks === true && operation !== 'remove') conflicts.push('hooks: all hooks are disabled; reconcile the local setting before activation');
   const expected = hook(platform, runtime ?? previousRuntime ?? locations.runtimes, operation === 'apply' ? process.execPath : previousPolicy?.executable ?? process.execPath);
   const oldHook = previous ? hook(platform, previousRuntime, previousPolicy?.executable ?? process.execPath) : null;
   if (previous && hookCount(groups, oldHook) !== 1) conflicts.push('hooks: owned or required hook is missing, duplicated or edited');
   // A known checkout hook is migration evidence, not permission to remove it.
-  if (!previous && operation === 'apply') {
+  if (!previous && operation === 'apply' && !legacy) {
     const legacyCommands = [root, path.resolve(repository)].flatMap((directory) => {
       const forward = directory.replaceAll('\\', '/');
       const backward = forward.replaceAll('/', '\\');
@@ -172,6 +191,16 @@ export async function planGlobalInstallation(repository, options) {
         .map((program) => `node "${program}"`);
     });
     if (groups.some((group) => group.hooks.some((entry) => legacyCommands.includes(entry.command)))) conflicts.push('hooks: legacy checkout hook requires a reviewed migration');
+  }
+  let migratedLegacyHook = false;
+  if (legacy) {
+    const count = hookCount(groups, legacy.hook);
+    if (count !== 1) conflicts.push('hooks: exact legacy checkout hook is missing, duplicated or edited');
+    else {
+      groups = removeExactHook(groups, legacy.hook);
+      setSetting(modified, ['hooks', 'PreToolUse'], scalarState(groups));
+      migratedLegacyHook = true;
+    }
   }
   const features = platform === 'codex' ? inspectFeatures(input.config?.toString('utf8') ?? '') : null;
   const receipt = previous ? structuredClone(previous) : { version: 2, target, platform, module: 'global-configuration', profile: 'coexistence',
@@ -236,14 +265,17 @@ export async function planGlobalInstallation(repository, options) {
   const plan = { version: 1, stage: 'target-preflight', operation, target, platform, scope, module: 'global-configuration', profile: 'coexistence',
     installed: previous !== null, selected: ['global-configuration'], dependencies: ['shared-policy-runtime'],
     changes: operations.map(({ id, file, before, after }) => ({ id, path: file, action: after === null ? 'remove' : before === null ? 'create' : 'update' })),
-    receiptChanged: operations.some((entry) => entry.receipt), evidence, applicable: conflicts.length === 0, conflicts,
+    receiptChanged: operations.some((entry) => entry.receipt), currentReceiptEvidence: previous?.evidence ?? null,
+    plannedReceiptEvidence: operation === 'apply' ? sealedReceipt.evidence : null,
+    evidence, applicable: conflicts.length === 0, conflicts,
     activation: settings.disableAllHooks === true && operation !== 'remove' ? 'Guard activation is blocked: local settings disable all hooks.' : operation === 'remove' ? 'Removal restores prior owned settings; shared runtime is retained.'
       : operation === 'audit' && !previous ? 'No global installation receipt is present.'
         : platform === 'codex' ? 'Configuration enables hooks and disables memories; review/trust through /hooks remains interactive.' : 'Configuration enables the PreToolUse guard and disables automatic memory.',
     tools: [process.execPath, 'git (when checking push commands)'], runtime: operation === 'apply' ? runtime : previousRuntime,
     retainedRuntime: 'Shared immutable runtime revisions are retained on removal.' };
+  plan.migrated = { guidance: Boolean(adoptingLegacyGuidance), hook: migratedLegacyHook };
   const parentState = await parents(target, locations);
-  plans.set(plan, { root: path.resolve(repository), options: { operation, target, platform, scope }, locations, bundle, previous, receipt: sealedReceipt, operations, input,
+  plans.set(plan, { root: path.resolve(repository), options: { operation, target, platform, scope, legacyRoot }, locations, bundle, previous, receipt: sealedReceipt, operations, input,
     fingerprint: encode({ plan, input: Object.fromEntries(Object.entries(input).map(([key, bytes]) => [key, bytes === null ? null : digest(bytes)])),
       source: bundle.hash, owned: ownedFiles ? payloadHash(ownedFiles) : null, parents: parentState }) });
   return plan;

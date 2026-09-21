@@ -2,8 +2,8 @@
 
 - **Kind:** living progress tracker
 - **Last updated:** 2026-09-21
-- **Current position:** learning, the harness Graphify pilot, and the repository modularity review are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M0–M7 are implemented and locally verified; M8 remains pending. Westcoast Cars remains selected with its baseline pending.
-- **Next action:** rehearse the full-profile migration and complete compatibility cleanup in M8, retaining the [M7 generated architecture and cost contract](modularity-m7-architecture-cost.md) and the earlier lifecycle contracts. Westcoast Cars evaluation can proceed independently.
+- **Current position:** learning, the harness Graphify pilot, the repository modularity review, and M0–M8 are complete locally. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M8 Windows CI and CodeQL remain release checks. Westcoast Cars remains selected with its baseline pending.
+- **Next action:** check M8 Windows CI and CodeQL, then continue the independent Westcoast Cars evaluation.
 
 This file is the durable checklist for the graph-engineering, Graphify, architecture-viewer, CRAP, and hardening work. Update it after every completed step so progress does not depend on remembering a conversation.
 
@@ -16,8 +16,8 @@ This file is the durable checklist for the graph-engineering, Graphify, architec
 | See what is done and what is next | This roadmap |
 | Implement the five-module organization and selective setup | [Harness modularity plan](harness-modularity-plan.md) |
 | Inspect the repository-wide ownership map and migration risks | [Modularity review](harness-modularity-review.md) |
-| Inspect the current harness relationship graph | [Graphify relationship view](../../.scratch/graphify-harness-2026-09-10/graph.html) |
-| Browse the current harness by directory and symbol | [Graphify tree view](../../.scratch/graphify-harness-2026-09-10/GRAPH_TREE.html) |
+| Inspect the current harness relationship graph | Regenerate the local `.scratch/graphify-harness-2026-09-10/graph.html` artifact. |
+| Browse the current harness by directory and symbol | Regenerate the local `.scratch/graphify-harness-2026-09-10/GRAPH_TREE.html` artifact. |
 | Understand model-context and token accounting | [Token-cost ledger](../../TOKEN-COSTS.md) |
 
 The Graphify artifacts are local, Git-ignored, and regenerable. The Markdown guides and roadmap are the durable source of truth.
@@ -48,6 +48,7 @@ Modularity comes first for permanent integration because it establishes ownershi
 - [x] Add workflow dependency composition, optional routing status and invocation prerequisite reporting at both scopes (M5b).
 - [x] Integrate Graphify with all capabilities and documented invocation/configuration choices (M6).
 - [x] Generate the logical architecture overview and evaluate its connection to Graphify.
+- [x] Rehearse full-profile migration, block mixed legacy/receipt ownership and verify documentation links (M8).
 
 ### Implementation slice tracker
 
@@ -65,7 +66,7 @@ the repair record tracks the new regression cases and remaining remote checks.
 | M5 — Workflow composition and discovery | Complete locally | [Project-skill and workflow lifecycle evidence](modularity-m5-workflows.md); dependency closure, optional route status, prerequisite reporting and unchanged invocation metadata covered |
 | M6 — Provenance and tool integrations | Complete locally | [Pinned acquisition, lifecycle and state evidence](modularity-m6-tool-integrations.md); Graphify full-capability boundary, Archify trial and existing MCP adapters covered |
 | M7 — Architecture overview and cost reporting | Complete locally | [Catalog-derived navigation, receipt-backed states, preserved runtime measurements and Graphify interchange decision](modularity-m7-architecture-cost.md); 188 tests, 186 passed and two Windows-only skips; full local verification gate passed |
-| M8 — Full-profile migration and compatibility | Pending | Rehearsal, cross-platform evidence, final documentation and verification |
+| M8 — Full-profile migration and compatibility | Complete locally; remote checks pending | [Exact legacy migration, compatibility, security and local verification evidence](modularity-m8-migration.md); Windows CI and CodeQL remain release checks |
 
 See the plan for exact prerequisites. Mark a slice complete only after its acceptance evidence and the repository gate pass. The review identified implementation risks; it did not fix them.
 

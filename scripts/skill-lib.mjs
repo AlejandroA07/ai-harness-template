@@ -2,6 +2,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
+export function isAbsolutePathInput(value) {
+  return typeof value === 'string' && path.isAbsolute(value) && !/[\x00-\x1f]/.test(value);
+}
+
 function yamlValue(value) {
   return JSON.stringify(value);
 }

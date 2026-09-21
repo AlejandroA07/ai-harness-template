@@ -385,12 +385,10 @@ The first bounded pilot was completed on 2026-09-10.
 | Generated size | Approximately 499 KB across the retained report, manifest, JSON, graph viewer, and tree viewer |
 | Graphify benchmark | 13,650 code words, estimated as 18,200 naive tokens versus about 3,016 average query tokens: a vendor-estimated 6.0× reduction |
 
-The regenerable, Git-ignored local artifacts are:
-
-- [dependency/relationship graph](../../.scratch/graphify-harness-2026-09-10/graph.html)
-- [directory and symbol tree](../../.scratch/graphify-harness-2026-09-10/GRAPH_TREE.html)
-- [machine-readable graph](../../.scratch/graphify-harness-2026-09-10/graph.json)
-- [generated report](../../.scratch/graphify-harness-2026-09-10/GRAPH_REPORT.md)
+The regenerable pilot artifacts were kept locally under the Git-ignored
+`.scratch/graphify-harness-2026-09-10/` directory and are not available from a
+clean checkout. The generated filenames were `graph.html`, `GRAPH_TREE.html`,
+`graph.json`, and `GRAPH_REPORT.md`.
 
 The pilot is a **qualified pass** for further integration work:
 

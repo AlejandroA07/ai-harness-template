@@ -51,6 +51,14 @@ The [M5 guide](docs/dev/modularity-m5-workflows.md) explains canonical project-s
 ownership, workflow composition, routing and the coexistence boundary with
 project-local adapters.
 
+For the complete managed machine profile on both platforms, use
+`node scripts/setup.mjs plan --profile full --platform both --scope machine --target <absolute-home-path>`.
+To migrate the older checkout-bound profile, add
+`--legacy-root <absolute-old-checkout>` to the plan and apply. The
+[M8 migration guide](docs/dev/modularity-m8-migration.md) defines exact legacy
+recognition, compatibility boundaries, recovery and verification. After migration,
+do not run the legacy skill synchronizer against that target.
+
 ## Active structure
 
 | Path | Purpose |

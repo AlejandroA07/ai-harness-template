@@ -96,8 +96,10 @@ To migrate a legacy target, review the conflicting paths reported by the plan,
 compare its guidance with the current template, and preserve the original in a
 user-chosen backup. Reconcile user additions explicitly and retire only a reviewed
 legacy hook before planning again. Do not manufacture a receipt to bypass this
-review. A full-profile migration command/rehearsal remains M8 work. M3 provides
-safe refusal for ambiguous legacy state and reversible upgrades for owned state.
+review. The [M8 full-profile lifecycle](modularity-m8-migration.md) automates only
+exact legacy state with an explicit old checkout root; ambiguous state still
+requires this reviewed recovery. M3 provides safe refusal for ambiguous legacy
+state and reversible upgrades for owned state.
 
 Codex requires review and trust of each new or changed non-managed hook definition
 through `/hooks`; setup does not transfer or bypass trust. A configuration audit

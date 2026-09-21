@@ -1,10 +1,10 @@
 # Plan: make the harness understandable and selectively adoptable
 
-- **Status:** five-module direction agreed; M0–M7 implemented and locally verified; M8 migration rehearsal and compatibility cleanup are next
+- **Status:** five-module direction agreed; M0–M8 implemented and locally verified; Windows CI and CodeQL remain M8 release checks
 - **Scope:** repository organization, selective installation, and a readable architecture map
 - **Graphify decision:** adopt with all capabilities in Tool integrations, available across projects and invoked by the user. Watchers, Git hooks, semantic document processing, and MCP are supported configuration choices; availability does not automatically activate them everywhere.
 - **Review baseline:** `a31e26aa1a9d6fdec2f61ca33c50ba32187b307c`; see the [whole-repository review](harness-modularity-review.md) for the ownership map, 22-capability classification, and findings R1–R10.
-- **Current delivery:** M0 safety corrections and isolated fixtures complete; see [M0 evidence and limits](modularity-m0-safety.md). M1 catalog and read-only planning are complete; see [M1 contract and evidence](modularity-m1-catalog.md). M2 selective machine-skill installation is complete; see [M2 lifecycle and evidence](modularity-m2-installation.md). M3 selected global configuration is complete; see [M3 ownership, recovery and activation limits](modularity-m3-global-configuration.md). M4 selected project configuration is complete; see [M4 lifecycle, verification and limits](modularity-m4-project-configuration.md). M5 project Skills and workflow composition are complete; see [M5 lifecycle, routing and prerequisite contract](modularity-m5-workflows.md). M6 pinned acquisition and Tool integrations are complete; see [M6 provenance, state and activation contract](modularity-m6-tool-integrations.md). M7 logical architecture and cost views are complete; see [M7 state, cost and interchange contract](modularity-m7-architecture-cost.md). The M0–M3 review led to [foundation repairs](modularity-foundation-follow-up-plan.md): verified ownership metadata, historical removal and truthful activation reporting. M8 follows the repaired lifecycle gate and generated-view contract. The detailed contract and slices below supersede the earlier high-level sequence wherever more specific.
+- **Current delivery:** M0 safety corrections and isolated fixtures complete; see [M0 evidence and limits](modularity-m0-safety.md). M1 catalog and read-only planning are complete; see [M1 contract and evidence](modularity-m1-catalog.md). M2 selective machine-skill installation is complete; see [M2 lifecycle and evidence](modularity-m2-installation.md). M3 selected global configuration is complete; see [M3 ownership, recovery and activation limits](modularity-m3-global-configuration.md). M4 selected project configuration is complete; see [M4 lifecycle, verification and limits](modularity-m4-project-configuration.md). M5 project Skills and workflow composition are complete; see [M5 lifecycle, routing and prerequisite contract](modularity-m5-workflows.md). M6 pinned acquisition and Tool integrations are complete; see [M6 provenance, state and activation contract](modularity-m6-tool-integrations.md). M7 logical architecture and cost views are complete; see [M7 state, cost and interchange contract](modularity-m7-architecture-cost.md). M8 full-profile migration and compatibility cleanup are complete locally; see [M8 migration and evidence](modularity-m8-migration.md). The M0–M3 review led to [foundation repairs](modularity-foundation-follow-up-plan.md): verified ownership metadata, historical removal and truthful activation reporting. The detailed contract and slices below supersede the earlier high-level sequence wherever more specific.
 
 ## Review gate before M5
 
@@ -196,20 +196,23 @@ M3, M4 and M5 can progress independently after M2 if implementation work is inte
 - Paths: spaces, case variants, symlink/junction roots, stale links, filesystem aliases, traversal, and target changed after planning.
 - Ownership: two consumers of one payload, overlapping platform/scopes, existing hooks and settings, prior `core.hooksPath`, legacy copies/links without receipts.
 - Behavior: denied Git/secret/attribution paths remain denied; untouched selections remain usable; tools receive literal argument arrays and no accidental shell expansion.
-- Platforms: run the portable process/installation tests on Windows and macOS/Linux; current Linux-only CI is not evidence of Windows execution.
+- Platforms: run the portable process/installation tests on Windows and macOS/Linux; the Windows job is registered, but its result must be checked on the exact candidate revision.
 - Verification: new tests are registered in the actual test runner; retain CI template scanning; generated project adapter checks run when selected; ignored tool caches are not mistaken for harness source.
 - Isolation: use explicit fixture targets, fake tool commands and temporary directories; no developer-home writes or live skill relinking during tests.
 
 Do not exhaustively test every Cartesian combination. Cover the listed risks at meaningful interfaces, with representative combinations and failure injection. Preserve existing security behavior and useful tests while replacing brittle path/source-string assertions where a behavior test is stronger.
 
-## Remaining implementation choices
+## Post-M8 decisions
 
-These are design tasks within the agreed scope, not missing product decisions: exact manifest schema and CLI syntax, stable installation-store layout, representation of per-setting ownership, and the minimal renderer/interchange format. Resolve them in the appropriate slice and document the chosen contract. Escalate only if evidence requires a product change such as another public module, changed default policy, or unavoidable loss of existing user configuration.
+The manifest schemas, CLI, installation-store layouts, setting ownership and
+architecture interchange are now recorded in the M1–M8 implementation guides.
+No physical source folders moved: the installed runtime boundary removed the
+checkout dependency without introducing path churn. A later source reorganization
+needs its own evidence and is not unfinished M8 work.
 
-Physical source moves are optional and come last. Avoid a package-manager framework, plugin marketplace, remote service, custom-agent module or graph-execution framework unless a later requirement justifies one. Preserve the single canonical source of each skill/workflow.
-
-## Fresh-task handoff
-
-Copy this request into a fresh task attached to this repository:
-
-> Implement the modular harness in `/Users/manuelalmeida/dev/ai-harness-template`. Read `docs/dev/harness-modularity-plan.md` in full, then `docs/dev/harness-modularity-review.md` and the living adoption checklist. The review baseline is `a31e26aa1a9d6fdec2f61ca33c50ba32187b307c`; inspect the current branch and changes because the planning commits are later than that baseline. The five agreed public modules are Global configuration, Project configuration, Skills, Workflows and Tool integrations, backed by an Installation core and Shared policy/runtime. Keep one repository, explicit dependencies, one canonical source per capability, user-selectable platform/scope, and the existing full managed profile. Graphify is adopted with all capabilities and user invocation; Archify is an agreed user-invoked trial. Westcoast Cars is selected for separate C# evaluation, but its location/commit/coverage are still unconfirmed. Follow slices M0–M8, beginning with the safety corrections and isolated fixtures before selective installation. Keep each completed slice verified and locally committed. Do not move source folders first, use a temporary worktree as the installed runtime, or apply test operations to the real user profile. Work on a human-named `feature/<topic>` branch, preserve unrelated changes, run `node scripts/verify.mjs` to completion, and never push a feature branch. Update the checklist with evidence after each slice. Carry unresolved details in these documents so the task needs no previous conversation context.
+Avoid a package-manager framework, plugin marketplace, remote service,
+custom-agent module or graph-execution framework unless a later requirement
+justifies one. Preserve the single canonical source of each skill/workflow. The
+next tracked product work is the independent Westcoast Cars evaluation in the
+[living roadmap](graph-and-quality-adoption-roadmap.md), after checking Windows CI
+and CodeQL for the exact M8 candidate revision.
