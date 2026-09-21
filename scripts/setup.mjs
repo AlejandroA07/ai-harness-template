@@ -112,7 +112,7 @@ try {
     if (options.operation === 'list') {
       if (options.json) console.log(JSON.stringify({ ...catalog, integrations: integrationCatalog.integrations }, null, 2));
       else {
-        console.log('Catalog v1 — declared capabilities; installed state is not inspected.');
+        console.log(`Catalog v${catalog.version} — declared capabilities; installed state is not inspected.`);
         for (const module of catalog.modules) {
           console.log(`${module.label} (${module.id}; ${module.visibility})`);
           const members = catalog.capabilities.filter((entry) => entry.module === module.id);

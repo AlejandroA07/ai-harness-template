@@ -47,7 +47,15 @@ export async function loadCatalog(repositoryRoot) {
       throw new Error('Descriptions, activation and provenance must come from canonical sources');
     }
   }
-  for (const module of catalog.modules) for (const source of module.sources) await inspectPath(root, source);
+  for (const module of catalog.modules) {
+    for (const source of module.sources) await inspectPath(root, source);
+    for (const behavior of module.behaviors) {
+      if (!(await inspectPath(root, behavior.source)).isFile()) throw new Error(`Expected module behavior source file: ${behavior.source}`);
+      if (behavior.activation.program && !(await inspectPath(root, behavior.activation.program)).isFile()) {
+        throw new Error(`Expected module behavior program file: ${behavior.activation.program}`);
+      }
+    }
+  }
   const policy = JSON.parse(await readFile(root, 'skills/invocation-policy.json'));
   if (!policy || Object.keys(policy).some((key) => key !== 'userOnly') || !Array.isArray(policy.userOnly)
     || policy.userOnly.some((name) => typeof name !== 'string')

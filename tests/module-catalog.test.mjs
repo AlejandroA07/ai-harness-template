@@ -22,7 +22,7 @@ function freeze(value) {
 test('catalog retains all 22 capabilities, resources, provenance and canonical activation settings', async () => {
   const skills = await discoverSkills(path.join(root, 'skills'));
   const policy = await readInvocationPolicy(path.join(root, 'skills'));
-  assert.equal(catalog.version, 1);
+  assert.equal(catalog.version, 2);
   assert.equal(catalog.modules.filter((module) => module.visibility === 'public').length, 5);
   assert.equal(catalog.modules.filter((module) => module.visibility === 'internal').length, 2);
   assert.equal(catalog.capabilities.length, 22);
@@ -122,10 +122,17 @@ test('module selection expands members and resolves dependencies without changin
 
 test('invalid IDs, cycles, schema, discovery collisions and unsafe catalog paths are rejected', () => {
   const cases = [
-    (value) => { value.version = 2; },
+    (value) => { value.version = 3; },
     (value) => { value.unexpected = true; },
     (value) => { value.modules[0].scopes = ['unknown']; },
     (value) => { value.modules[0].sources = ['../outside']; },
+    (value) => { value.modules[0].requires = ['unknown']; },
+    (value) => { value.modules[0].requires = [value.modules[0].id]; },
+    (value) => { value.modules[0].behaviors[0].source = 'project/AGENTS.selected.md'; },
+    (value) => { value.modules[0].behaviors[0].activation.kind = 'automatic'; },
+    (value) => { value.modules[0].behaviors[0].activation.program = '../outside'; },
+    (value) => { value.modules[0].behaviors[0].settings = [{ path: '../setting', value: 'bad' }]; },
+    (value) => { value.modules[1].behaviors[0].id = value.modules[0].behaviors[0].id; },
     (value) => { value.capabilities[0].id = '../escape'; },
     (value) => { value.capabilities[1].id = value.capabilities[0].id; },
     (value) => { value.capabilities[1].source = value.capabilities[0].source; },
@@ -213,7 +220,8 @@ test('list, plan and rejected CLI operations write nothing or invoke external to
 });
 
 test('catalog loading detects missing classification, omitted resources, changed names and linked source roots', async () => {
-  for (const kind of ['missing-capability', 'omitted-resource', 'name-drift', 'linked-root', 'linked-resource', 'missing-module-source']) {
+  for (const kind of ['missing-capability', 'omitted-resource', 'name-drift', 'linked-root', 'linked-resource', 'missing-module-source',
+    'missing-behavior-source', 'directory-behavior-source', 'directory-behavior-program']) {
     const { temporary, repository } = await fixtureRepository();
     try {
       const manifestPath = path.join(repository, 'catalog/modules.json');
@@ -221,6 +229,9 @@ test('catalog loading detects missing classification, omitted resources, changed
       if (kind === 'missing-capability') definition.capabilities.pop();
       if (kind === 'omitted-resource') definition.capabilities.find((entry) => entry.id === 'teach').resources.pop();
       if (kind === 'missing-module-source') definition.modules[0].sources = ['global/missing'];
+      if (kind === 'missing-behavior-source') definition.modules[0].behaviors[0].source = 'global/missing';
+      if (kind === 'directory-behavior-source') definition.modules[0].behaviors[0].source = 'global';
+      if (kind === 'directory-behavior-program') definition.modules[0].behaviors[2].activation.program = 'components';
       await fs.writeFile(manifestPath, JSON.stringify(definition));
       if (kind === 'name-drift') {
         const file = path.join(repository, 'skills/engineering/research/SKILL.md');
