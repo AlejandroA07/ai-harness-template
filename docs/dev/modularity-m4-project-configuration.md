@@ -154,8 +154,9 @@ reconciliation, then audit. There is no automatic expiry or force/adopt mode.
 
 This is recoverable multi-file publication, not a crash-atomic transaction or
 isolation against another process with the same filesystem authority. The target
-must be under the user's control. Whole-profile migration and broader platform
-rehearsal remain M8 work.
+must be under the user's control. The M8 full profile composes machine Skills and
+Global configuration only; project configuration remains an explicit per-project
+selection because a machine migration cannot infer its verification and CI choices.
 
 ## Evidence
 

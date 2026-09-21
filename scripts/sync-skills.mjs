@@ -20,6 +20,17 @@ const platforms = [
   { name: 'Codex', archiveName: 'codex', source: path.join(generatedRoot, 'codex'), target: path.join(home, '.agents', 'skills') },
 ];
 
+for (const platform of platforms) {
+  const receipt = path.join(home, '.ai-harness', 'installations', platform.archiveName, 'receipt.json');
+  try {
+    await fs.lstat(receipt);
+    console.error(`Skill sync stopped: ${platform.name} uses the receipt-backed lifecycle. Use setup.mjs --profile full or the matching selective lifecycle; legacy sync would invalidate ownership.`);
+    process.exit(1);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+}
+
 const actionShapes = {
   'archive-and-link': { archive: ['source', 'entryName'], remove: [], link: ['source', 'target'] },
   'archive-obsolete': { archive: ['source', 'entryName'], remove: [], link: [] },

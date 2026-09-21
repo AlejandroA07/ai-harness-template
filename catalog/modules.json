@@ -312,6 +312,7 @@
         "scripts/installation-evidence.mjs",
         "scripts/assess-receipt-migration.mjs",
         "scripts/selection-installation.mjs",
+        "scripts/full-profile-installation.mjs",
         "scripts/machine-setup.mjs",
         "scripts/config-merge.mjs",
         "scripts/skill-lib.mjs",

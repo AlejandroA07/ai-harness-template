@@ -73,4 +73,6 @@ cannot authorize recovery writes. There is deliberately no `--apply`/force mode.
 The automated tests exercise assessment and a recovery rehearsal with a known
 pre-install fixture baseline. They also check ambiguous/tampered/unsupported
 states remain unchanged. They do not make unknown real-world prior values
-recoverable. Full managed-profile migration remains M8.
+recoverable. Exact checkout-bound full profiles can use the
+[M8 migration lifecycle](modularity-m8-migration.md); ambiguous older receipts
+still require the reviewed procedure above.

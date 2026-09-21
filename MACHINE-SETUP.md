@@ -2,7 +2,15 @@
 
 The setup is Windows-first on this machine and portable to macOS/Linux. It never installs missing tools silently and never changes configuration in dry-run mode.
 
-This page describes the full managed profile. To select only one platform's
+This page describes the full managed profile. New installs and migrations should
+use the receipt-backed [M8 lifecycle](docs/dev/modularity-m8-migration.md):
+
+```powershell
+node scripts/setup.mjs plan --profile full --platform both --scope machine --target <absolute-home-path>
+```
+
+Add `--legacy-root <absolute-old-checkout>` only when migrating the exact layout
+created by the compatibility command below. To select only one platform's
 global guidance and settings, follow the [global lifecycle guide](docs/dev/modularity-m3-global-configuration.md).
 It uses an explicit target and preserves unrelated configuration. Do not run
 the full-profile audit to judge a selective installation; use the matching
@@ -26,7 +34,12 @@ Run the inventory:
 node scripts/machine-setup.mjs
 ```
 
-The command first preflights skill reconciliation, before any machine configuration can be written, and then reports each tool as `FOUND`, `MISSING`, or `OPTIONAL`. Install anything marked `MISSING`, then rerun. On Windows, prefer `winget`; on macOS, prefer Homebrew; on Linux, use the vendor's supported package path.
+This is the compatibility entry point for an unmigrated checkout-bound profile.
+It first preflights skill reconciliation, before any machine configuration can be
+written, and then reports each tool as `FOUND`, `MISSING`, or `OPTIONAL`. Install
+anything marked `MISSING`, then rerun. On Windows, prefer `winget`; on macOS,
+prefer Homebrew; on Linux, use the vendor's supported package path. It refuses a
+receipt-backed skill target; manage that target with `setup.mjs` instead.
 
 ## 2. Apply
 

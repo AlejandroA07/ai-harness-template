@@ -80,37 +80,37 @@ Required installation dependencies must be acyclic. Workflow execution may later
 
 ### R1 — Selected installation conflicts with current reconciliation and audit (blocking)
 
-[Machine setup](../../scripts/machine-setup.mjs:19) preflights all skills, requires both CLIs and GitHub/security tools, configures both platforms, and enables this repository's Git hooks. [Skill synchronization](../../scripts/sync-skills.mjs:145) archives visible directories outside the full inventory. [Audit](../../scripts/audit.mjs:57) requires 22 canonical skills, both platforms, and no custom Claude agents. The [test](../../tests/skills.test.mjs:15) also hard-codes 22.
+[Machine setup](../../scripts/machine-setup.mjs) preflights all skills, requires both CLIs and GitHub/security tools, configures both platforms, and enables this repository's Git hooks. [Skill synchronization](../../scripts/sync-skills.mjs) archives visible directories outside the full inventory. [Audit](../../scripts/audit.mjs) requires 22 canonical skills, both platforms, and no custom Claude agents. The [test](../../tests/skills.test.mjs) also hard-codes 22.
 
 These are deliberate current full-profile rules, but incompatible with installing one skill or only Codex configuration. Make requirements, mutation scope, and audit derive from the same selection. Preserve the legacy managed profile explicitly. A tool-only selection must not alter unrelated skills or global policy.
 
 ### R2 — Regeneration can invalidate installed links before preflight completes (blocking)
 
-[generateSkillTree](../../scripts/skill-lib.mjs:195) deletes the whole output root; [sync --apply](../../scripts/sync-skills.mjs:15) calls it before validating target conflicts. Machine skills link into this shared tree. Generating a subset into the same root would erase unselected payloads, and changing branches or moving the source checkout can affect live installations.
+[generateSkillTree](../../scripts/skill-lib.mjs) deletes the whole output root; [sync --apply](../../scripts/sync-skills.mjs) calls it before validating target conflicts. Machine skills link into this shared tree. Generating a subset into the same root would erase unselected payloads, and changing branches or moving the source checkout can affect live installations.
 
 Generate to a staging location, validate, then publish owned payloads without deleting files used by other selections. Keep live installation paths stable or explicitly migrate them using receipts. Do not repoint the user's installation to a temporary refactor worktree.
 
 ### R3 — Saved project manifest can select removal paths outside the skill directory (blocking)
 
-[Project generation](../../scripts/generate-project-skills.mjs:29) parses `previous.generated` and passes its members into recursive removal paths at lines 87–95 without validating names or containment. A pure path check demonstrated that joining `/fixture/.agents/skills` with `../../outside` resolves to `/fixture/outside`. No deletion was executed.
+[Project generation](../../scripts/generate-project-skills.mjs) parses `previous.generated` and passes its members into recursive removal paths at lines 87–95 without validating names or containment. A pure path check demonstrated that joining `/fixture/.agents/skills` with `../../outside` resolves to `/fixture/outside`. No deletion was executed.
 
 Treat receipts and manifests as untrusted input: validate schema, IDs, platform/scope, normalized containment and links before mutation. A name in a manifest is not sufficient evidence of ownership. Add an isolated sentinel test proving malformed manifests cannot delete outside the owned tree, and tests preserving edited generated adapters.
 
 ### R4 — Hook ownership is inferred from a filename substring (blocking)
 
-[replaceHarnessHook](../../scripts/config-merge.mjs:17) filters any command containing `guard-git.mjs`. A direct pure-function check using `/company/guard-git.mjs` confirmed that this unrelated hook is removed when adding `/harness/guard-git.mjs`. Existing tests cover different filenames, not this collision.
+[replaceHarnessHook](../../scripts/config-merge.mjs) filters any command containing `guard-git.mjs`. A direct pure-function check using `/company/guard-git.mjs` confirmed that this unrelated hook is removed when adding `/harness/guard-git.mjs`. Existing tests cover different filenames, not this collision.
 
 Track the exact installed hook entry and target identity. Migrate known legacy entries conservatively. Preserve unknown hooks; do not use an ID or filename alone as permission to overwrite user content. Audit should verify the expected hook configuration and runtime, not just search for the filename.
 
 ### R5 — Bootstrap mixes preservation and unconditional overwrites (blocking for lifecycle work)
 
-[Bootstrap](../../scripts/bootstrap.mjs:131) preserves guidance and an existing verifier, but overwrites Git hook files, Gitleaks configuration, copied runtime and CI payloads, and sets `core.hooksPath` at lines 180–214. It writes some files before validating later settings/commands. There is no general installation receipt, uninstall contract, or complete rollback.
+[Bootstrap](../../scripts/bootstrap.mjs) preserves guidance and an existing verifier, but overwrites Git hook files, Gitleaks configuration, copied runtime and CI payloads, and sets `core.hooksPath` at lines 180–214. It writes some files before validating later settings/commands. There is no general installation receipt, uninstall contract, or complete rollback.
 
 Plan all changes first, validate targets, then apply with owned receipts and recoverable backups. Retain human-tailored guidance and verifier behavior. On upgrade, distinguish unchanged owned content, user-edited owned content, and unowned collisions. Restore a previous Git setting only if its current value is still the value this installation wrote. Do not blindly overwrite an existing hooks directory or chain unknown executable hooks.
 
 ### R6 — New vendors and source moves do not fit the upstream updater (blocking before vendor integration)
 
-[Upstream validation](../../scripts/upstream-skills.mjs:17) permits one repository and specific source-path shapes. Local destinations are derived from the upstream engineering/productivity bucket at lines 166 and 181. Exact updates allow only flat Markdown resources. This is suitable for the existing reviewed inventory, not a generic Graphify/Archify acquisition path.
+[Upstream validation](../../scripts/upstream-skills.mjs) permits one repository and specific source-path shapes. Local destinations are derived from the upstream engineering/productivity bucket at lines 166 and 181. Exact updates allow only flat Markdown resources. This is suitable for the existing reviewed inventory, not a generic Graphify/Archify acquisition path.
 
 Separate local capability IDs/paths from upstream repository/path/revision. Preserve exact/adapted/local modes. Define a reviewed resource policy for executable vendor packages, hashes and notices rather than weakening the existing Markdown-only updater globally. Test resource-only changes and retain invocation policy across updates.
 
@@ -128,7 +128,7 @@ Classify capabilities first while retaining physical paths. Reuse policy and pla
 
 ### R9 — Cost measurement and verification discovery need migration coverage (required)
 
-[token-costs --write](../../scripts/token-costs.mjs:106) replaces the entire ledger from a template containing fixed historical measurements. New manually recorded samples could be lost. [Repository verification](../../scripts/verify.mjs) scans all `.mjs` files outside `.git` and `.generated`, including `.scratch` or future vendor runtime directories; tests are also explicitly enumerated in [tests/run.mjs](../../tests/run.mjs).
+[token-costs --write](../../scripts/token-costs.mjs) replaces the entire ledger from a template containing fixed historical measurements. New manually recorded samples could be lost. [Repository verification](../../scripts/verify.mjs) scans all `.mjs` files outside `.git` and `.generated`, including `.scratch` or future vendor runtime directories; tests are also explicitly enumerated in [tests/run.mjs](../../tests/run.mjs).
 
 Separate measured data from generated inventories, and make new tests run through the actual gate. Define owned source/resource validation rather than accidentally syntax-checking every downloaded tool or ignored experiment. Preserve scanning of shipped CI templates. Reconcile the documented Node minimum with the runtime features used by tests and the Node version exercised in CI.
 

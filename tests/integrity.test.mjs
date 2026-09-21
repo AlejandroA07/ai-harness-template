@@ -6,6 +6,18 @@ import test from 'node:test';
 const root = path.resolve(import.meta.dirname, '..');
 const read = (relative) => fs.readFile(path.join(root, relative), 'utf8');
 
+async function markdownFiles(entry) {
+  const absolute = path.join(root, entry);
+  const info = await fs.stat(absolute);
+  if (info.isFile()) return [absolute];
+  const files = [];
+  for (const child of await fs.readdir(absolute, { withFileTypes: true })) {
+    if (child.isDirectory()) files.push(...await markdownFiles(path.join(entry, child.name)));
+    else if (child.isFile() && child.name.endsWith('.md')) files.push(path.join(absolute, child.name));
+  }
+  return files;
+}
+
 function actionPins(workflow) {
   return new Map(
     [...workflow.matchAll(/^\s*-\s+uses:\s+([^@\s]+)@([0-9a-f]{40})/gm)]
@@ -116,4 +128,21 @@ test('machine audit rejects custom Claude agents', async () => {
   const audit = await read('scripts/audit.mjs');
   assert.match(audit, /\.claude', 'agents'/);
   assert.match(audit, /custom-agent discovery contains/);
+});
+
+test('maintainer documentation has no broken relative Markdown links', async () => {
+  const files = (await Promise.all(['README.md', 'MACHINE-SETUP.md', 'BOOTSTRAP.md', 'docs/dev'].map(markdownFiles))).flat();
+  const broken = [];
+  for (const file of files) {
+    const source = await fs.readFile(file, 'utf8');
+    for (const match of source.matchAll(/!?\[[^\]]*\]\(([^)]+)\)/g)) {
+      let destination = match[1].trim().replace(/^<|>$/g, '');
+      if (!destination || destination.startsWith('#') || /^[a-z][a-z0-9+.-]*:/i.test(destination)) continue;
+      destination = decodeURIComponent(destination.split('#')[0]);
+      if (!destination) continue;
+      try { await fs.access(path.resolve(path.dirname(file), destination)); }
+      catch { broken.push(`${path.relative(root, file)} -> ${match[1]}`); }
+    }
+  }
+  assert.deepEqual(broken, []);
 });

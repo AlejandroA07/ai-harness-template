@@ -23,6 +23,7 @@ separate from the macOS fixture evidence.
 Continue with M4 project-only setup or M5 workflow lifecycle according to the
 [modularity plan](harness-modularity-plan.md) and
 [living roadmap](graph-and-quality-adoption-roadmap.md). Full-profile migration
-rehearsal remains M8. Inspect branch/status before beginning the next slice;
+and compatibility were completed in the [M8 lifecycle](modularity-m8-migration.md).
+Inspect branch/status before beginning later work;
 preserve existing work, use isolated targets, run `node scripts/verify.mjs` before
 claiming completion and never push a feature branch.

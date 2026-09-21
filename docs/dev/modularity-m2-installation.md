@@ -19,7 +19,7 @@ node scripts/setup.mjs remove --select research --platform codex --scope machine
 
 `audit` checks the entire receipt for the chosen platform, reports whether an installation is recorded, and exits nonzero for conflicts. It checks installed integrity, not whether a newer source revision exists; an apply preview shows available updates. Unknown options, absent target/platform/scope, project scope, `both`, modules and workflow selections are rejected by lifecycle commands. The original target-free `list` and `plan` retain their M1 behavior, including previews of workflows and both scopes/platforms.
 
-No external tool, network request, platform CLI, settings merge, hook change, full-tree generation or real-home default is involved. Existing machine setup, bootstrap, synchronization and audit commands retain their full-profile behavior. Do not run the legacy exact-inventory profile over a selected installation unless deliberately migrating: ownership-aware full-profile migration remains M8.
+No external tool, network request, platform CLI, settings merge, hook change, full-tree generation or real-home default is involved. Existing machine setup, bootstrap, synchronization and audit commands retain their compatibility behavior. Do not run the legacy exact-inventory profile over a selected installation. The [M8 full-profile lifecycle](modularity-m8-migration.md) is the explicit ownership-aware migration path and blocks mixed legacy/receipt skill synchronization afterward.
 
 ## Store and receipt
 

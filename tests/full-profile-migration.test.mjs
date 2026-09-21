@@ -59,6 +59,12 @@ function run(args) {
   return spawnSync(process.execPath, [setup, ...args], { cwd: repository, encoding: 'utf8' });
 }
 
+function runWithHome(script, target, args = []) {
+  return spawnSync(process.execPath, [path.join(repository, script), ...args], {
+    cwd: repository, encoding: 'utf8', env: { ...process.env, HOME: target, USERPROFILE: target },
+  });
+}
+
 test('full managed profile migrates both legacy platforms off a moved checkout and audits cleanly', async () => {
   const fixture = await legacyFixture();
   try {
@@ -102,6 +108,10 @@ test('full managed profile migrates both legacy platforms off a moved checkout a
     const repeat = run(['apply', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target, '--json', '--apply']);
     assert.equal(repeat.status, 0, repeat.stderr || repeat.stdout);
     assert.equal(JSON.parse(repeat.stdout).noOp, true);
+    const legacySync = runWithHome('scripts/sync-skills.mjs', fixture.target, ['--apply']);
+    assert.notEqual(legacySync.status, 0);
+    assert.match(`${legacySync.stdout}\n${legacySync.stderr}`, /receipt-backed lifecycle/);
+    assert.equal(run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target]).status, 0);
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });
   }
