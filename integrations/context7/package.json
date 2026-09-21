@@ -1,0 +1,7 @@
+{
+  "name": "ai-harness-context7-runtime",
+  "private": true,
+  "dependencies": {
+    "@upstash/context7-mcp": "3.2.5"
+  }
+}

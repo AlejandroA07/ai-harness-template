@@ -1,0 +1,7 @@
+{
+  "name": "ai-harness-playwright-runtime",
+  "private": true,
+  "dependencies": {
+    "@playwright/mcp": "0.0.78"
+  }
+}

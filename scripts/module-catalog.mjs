@@ -41,7 +41,7 @@ export function validateCatalog(catalog) {
     choices(module.scopes, scopes, 'scope');
     array(module.sources, (source) => {
       localPath(source);
-      if (!['global', 'project', 'skills', 'components', 'scripts', 'catalog'].includes(source.split('/')[0])) fail('Unsupported module source root');
+      if (!['global', 'project', 'skills', 'components', 'integrations', 'scripts', 'catalog'].includes(source.split('/')[0])) fail('Unsupported module source root');
     }, 'module sources', true);
   }, 'modules', true);
   const capabilities = new Map();

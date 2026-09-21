@@ -1,6 +1,6 @@
 # Development documentation
 
-Current state: M0–M5 are implemented; M6 provenance and tool integrations are next.
+Current state: M0–M6 are implemented; M7 architecture and cost views are next.
 
 | File | What it contains | Kind |
 |---|---|---|
@@ -8,6 +8,7 @@ Current state: M0–M5 are implemented; M6 provenance and tool integrations are 
 | `harness-modularity-plan.md` | Agreed five-module direction: global configuration, project configuration, separate skills and workflows, and tool integrations; selective setup and architecture catalog plan. | implementation plan |
 | `modularity-m2-installation.md` | Selective machine-skill commands, store and receipt ownership, update/removal, recovery and acceptance evidence. | implementation contract |
 | `modularity-m5-workflows.md` | Canonical project Skills, workflow composition, routing status, prerequisites and M4 coexistence. | implementation contract |
+| `modularity-m6-tool-integrations.md` | Pinned integration acquisition, executable runtime materialization, activation, ownership and removal. | implementation contract |
 | `modularity-foundation-review.md` | M0–M3 completion review, reproduced ownership/removal/activation defects and M4 receipt compatibility explanation. | source review |
 | `receipt-migration.md` | Read-only receipt assessment and reviewed recovery without trusting older ownership claims. | recovery procedure |
 | `modularity-foundation-follow-up-plan.md` | Prioritized foundation repairs and acceptance checks required before M5. | implementation plan |

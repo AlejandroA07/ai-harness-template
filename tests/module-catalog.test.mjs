@@ -173,7 +173,7 @@ test('unsupported selections and unsupported required dependencies fail closed',
 async function fixtureRepository() {
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'catalog-selection-'));
   const repository = path.join(temporary, 'repository with spaces');
-  for (const directory of ['catalog', 'skills', 'scripts', 'global', 'project', 'components']) {
+  for (const directory of ['catalog', 'skills', 'integrations', 'scripts', 'global', 'project', 'components']) {
     await fs.cp(path.join(root, directory), path.join(repository, directory), { recursive: true });
   }
   return { temporary, repository };

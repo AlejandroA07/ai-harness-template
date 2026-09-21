@@ -92,9 +92,14 @@
         "project"
       ],
       "sources": [
-        "components/mcp"
+        "components/mcp",
+        "catalog/integrations.json",
+        "integrations",
+        "scripts/integration-catalog.mjs",
+        "scripts/integration-installation.mjs",
+        "scripts/integration-runtime.mjs"
       ],
-      "description": "Optional tool configurations; installation definitions arrive in M6."
+      "description": "Optional pinned programs and MCP adapters with explicit acquisition and activation definitions."
     },
     {
       "id": "installation-core",
