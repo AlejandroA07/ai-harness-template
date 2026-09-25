@@ -270,7 +270,7 @@ export async function applyFullProfileInstallation(candidate, { checkpoint = asy
     if (locked.operation === 'remove') return { ...locked, installed: false, applied: true,
       noOp: locked.changes.length === 0 && !locked.receiptChanged, completed };
     const audit = await planFullProfileInstallation(prepared.root, { operation: 'audit', target: locked.target,
-      platform: 'both', scope: 'machine', targetLockLease });
+      platform: 'both', scope: 'machine', targetLockLease, runTool: activePrepared.options.runTool });
     if (!audit.applicable) fail(`Full-profile post-apply audit failed: ${audit.conflicts.join('; ')}`);
     return { ...audit, operation: 'apply', applied: true,
       noOp: locked.changes.length === 0 && !locked.receiptChanged, completed };

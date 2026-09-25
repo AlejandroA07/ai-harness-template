@@ -171,7 +171,7 @@ test('full-profile application holds the target lock across every component', as
       assert.match(`${competing.stdout}\n${competing.stderr}`, /Target is locked/);
     } });
     assert.equal(competingAttempted, true);
-    assert.equal(toolChecks > 9, true);
+    assert.equal(toolChecks > 36, true);
     assert.equal(result.installed, true);
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });
