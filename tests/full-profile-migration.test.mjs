@@ -154,9 +154,14 @@ test('full managed profile migrates both legacy platforms off a moved checkout a
 test('full-profile application holds the target lock across every component', async () => {
   const fixture = await legacyFixture();
   let competingAttempted = false;
+  let toolChecks = 0;
+  const runTool = () => {
+    toolChecks++;
+    return { status: 0, stdout: 'test\n' };
+  };
   try {
     const plan = await planFullProfileInstallation(repository, { operation: 'apply', platform: 'both',
-      scope: 'machine', target: fixture.target, legacyRoot: fixture.legacyRoot });
+      scope: 'machine', target: fixture.target, legacyRoot: fixture.legacyRoot, runTool });
     const result = await applyFullProfileInstallation(plan, { checkpoint: async (phase, component) => {
       if (phase !== 'component' || component !== 'claude skills' || competingAttempted) return;
       competingAttempted = true;
@@ -166,6 +171,7 @@ test('full-profile application holds the target lock across every component', as
       assert.match(`${competing.stdout}\n${competing.stderr}`, /Target is locked/);
     } });
     assert.equal(competingAttempted, true);
+    assert.equal(toolChecks > 9, true);
     assert.equal(result.installed, true);
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });

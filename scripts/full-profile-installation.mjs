@@ -142,7 +142,7 @@ function componentSummary(kind, plan) {
 
 export async function planFullProfileInstallation(repository, options) {
   const { operation = 'apply', target: suppliedTarget, scope, platform, legacyRoot: suppliedLegacyRoot = null,
-    targetLockLease = null } = options;
+    targetLockLease = null, runTool } = options;
   if (!['apply', 'audit', 'remove'].includes(operation) || scope !== 'machine' || platform !== 'both'
     || typeof suppliedTarget !== 'string' || !path.isAbsolute(suppliedTarget) || /[\x00-\x1f]/.test(suppliedTarget)) {
     fail('Full managed profile requires plan/apply/audit/remove, --platform both, --scope machine and an absolute --target');
@@ -164,7 +164,7 @@ export async function planFullProfileInstallation(repository, options) {
 
   const conflicts = operation === 'remove' ? [] : await customAgentConflicts(target);
   const controlsPlan = await planFullProfileControls(root, { operation, target,
-    previous: previousProfile.receipt?.controls ?? null });
+    previous: previousProfile.receipt?.controls ?? null, runTool });
   conflicts.push(...controlsPlan.conflicts.map((message) => `machine controls: ${message}`));
   const components = [];
   for (const name of platforms) {
@@ -212,7 +212,7 @@ export async function planFullProfileInstallation(repository, options) {
     activation: controlsPlan.active
       ? 'Both platform configurations, the exact canonical skill inventory, repository hooks and the Windows memory lock where applicable; hook trust remains interactive.'
       : 'Both platform configurations and the exact canonical skill inventory; live machine controls are reported but not changed for an isolated target.' };
-  plans.set(result, { root, options: { operation, target, platform: 'both', scope: 'machine', legacyRoot },
+  plans.set(result, { root, options: { operation, target, platform: 'both', scope: 'machine', legacyRoot, runTool },
     previousProfile, nextReceipt, controlsPlan, targetLockLease, fingerprint: JSON.stringify(result) });
   return result;
 }
@@ -279,7 +279,7 @@ export async function applyFullProfileInstallation(candidate, { checkpoint = asy
     if (controlsApplied && checked.operation === 'apply' && !activePrepared.previousProfile.receipt) {
       try {
         const rollback = await planFullProfileControls(prepared.root, { operation: 'remove', target: checked.target,
-          previous: activePrepared.controlsPlan.ownership });
+          previous: activePrepared.controlsPlan.ownership, runTool: activePrepared.options.runTool });
         await applyFullProfileControls(rollback);
       } catch {
         completed.push('machine controls require reviewed recovery');
