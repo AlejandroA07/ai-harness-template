@@ -72,11 +72,12 @@ lifecycle for a deliberate selective change. Full-profile removal previews and
 then removes the four bound component ownership shares and aggregate receipt;
 each component still applies its own restoration and conflict rules.
 
-The four component publishers share a target lock but publish sequentially rather
-than as one cross-module transaction. Each component rechecks preconditions and
-rolls back its own failed publication. If a later component stops, the error lists
-completed components; preserve any recovery state and rerun the read-only plan.
-Repeated apply converges and is a no-op once all four components are current.
+The four component publishers hold one target lock across the complete aggregate
+operation but publish sequentially rather than as one cross-module transaction.
+Each component rechecks preconditions under that lock and rolls back its own
+failed publication. If a later component stops, the error lists completed
+components; preserve any recovery state and rerun the read-only plan. Repeated
+apply converges and is a no-op once all four components are current.
 
 No physical source folders moved in M8. The catalog, generators and existing
 source paths already have clear ownership, and moving them would add compatibility
@@ -90,17 +91,20 @@ The registered full-profile fixtures create the complete legacy layout for both
 platforms in temporary targets, including a checkout path containing a space.
 They prove read-only planning, exact adoption, preservation of unrelated settings
 and hidden entries, deletion of the old checkout, sealed full-profile audit,
-idempotent apply, combined removal, machine-control restoration, required-tool
-denial, stale-state rejection and fail-closed handling of changed links, extra
-skills, custom agents and altered ownership evidence. They also prove the legacy
-synchronizer cannot overwrite a migrated profile.
+idempotent apply, combined removal from retained ownership after catalog changes,
+machine-control restoration, required-tool denial, stale-state rejection and
+fail-closed handling of changed links, edited legacy payloads, linked legacy roots,
+extra skills, custom agents and altered ownership evidence. A competing selective
+operation is rejected while the aggregate target lock is held. The fixtures also
+prove the legacy synchronizer cannot overwrite a migrated profile.
 
 The Windows portability job runs the full-profile fixture alongside the existing
-process and lifecycle suites. Local M8 verification on 2026-09-22 ran on macOS:
-`node scripts/verify.mjs` exited 0 with 195 tests, 193 passed and two Windows-only
-shim tests skipped; whitespace, Gitleaks, Zizmor and syntax checks passed. A
-successful GitHub Windows run and CodeQL result remain release evidence to check
-before merging. No real user profile or live platform trust state was changed.
+process and lifecycle suites. PR #31 head `6503a3d` passed Windows portability,
+repository verification, security and CodeQL before merge. Local M8.1 verification
+on 2026-09-25 ran on macOS: `node scripts/verify.mjs` exited 0 with 197 tests,
+195 passed and two Windows-only shim tests skipped; whitespace, Gitleaks, Zizmor
+and syntax checks passed. No real user profile or live platform trust state was
+changed. Future candidate revisions still require their own remote checks.
 
 Security-checklist verdicts:
 
@@ -112,4 +116,4 @@ Security-checklist verdicts:
 | Browser and network | Not applicable: migration performs no browser, server or network operation. |
 | Files and abuse | Pass: preflight covers all four payload/configuration components plus machine controls, ambiguous ownership is preserved, publishers stage and roll back owned writes, and legacy mode is blocked after receipts exist. Upload and rate-limit controls are not applicable. |
 | Dependencies and delivery | Pass: no dependency was added; the existing immutable CI action pins and least-privilege workflow remain intact. |
-| Regression evidence | Pass locally: happy path, moved checkout, repeat apply, removal, tool denial, external-state restoration and denied ownership paths are registered in the repository and Windows CI suites. Remote Windows and CodeQL results remain explicit release checks. |
+| Regression evidence | Pass locally: happy path, moved checkout, repeat apply, historical removal, aggregate serialization, legacy content/path denial, tool denial, external-state restoration and denied ownership paths are registered in the repository and Windows CI suites. PR #31 Windows and CodeQL checks passed; future candidate revisions still require their own remote checks. |

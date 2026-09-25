@@ -4,6 +4,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { assertSafeDirectory } from './skill-lib.mjs';
 
+const targetLockLeases = new WeakMap();
+
 export const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
 export const encode = (value) => JSON.stringify(value, null, 2) + '\n';
 export async function stat(file) {
@@ -44,6 +46,25 @@ export async function acquireTargetLock(target) {
   return lock;
 }
 export async function releaseTargetLock(lock) { await fs.rmdir(lock); }
+export async function acquireTargetLockLease(target) {
+  const lock = await acquireTargetLock(target);
+  const lease = {};
+  targetLockLeases.set(lease, lock);
+  return lease;
+}
+export function targetLockPath(lease, target) {
+  const lock = targetLockLeases.get(lease);
+  if (!lock || lock !== path.join(target, '.ai-harness-install.lock')) {
+    throw new Error('Invalid target-lock lease');
+  }
+  return lock;
+}
+export async function releaseTargetLockLease(lease) {
+  const lock = targetLockLeases.get(lease);
+  if (!lock) throw new Error('Invalid target-lock lease');
+  await releaseTargetLock(lock);
+  targetLockLeases.delete(lease);
+}
 
 // Caller holds the shared target lock and supplies fully preflighted, private
 // operations. Only hashes and owned metadata belong in the durable journal.

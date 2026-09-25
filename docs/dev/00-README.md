@@ -1,7 +1,9 @@
 # Development documentation
 
-Current state: M0–M8 are implemented and locally verified. Windows CI and CodeQL
-remain release evidence to check before merging M8.
+Current state: M0–M8 are implemented and verified. PR #31 head `6503a3d`
+passed the Windows portability, repository verification, security and CodeQL
+checks before merge. The 2026-09-25 M8.1 hardening follow-up adds retained-state
+removal, exact legacy-payload validation and aggregate target serialization.
 
 | File | What it contains | Kind |
 |---|---|---|
