@@ -18,6 +18,6 @@ Implement only the approved specification or ticket. If the requested behavior, 
 9. Run `node scripts/verify.mjs`. Exit code `0` is the only definition of done, then inspect the final staged diff.
 10. Create one clean local commit with a concise human-style message and no model/tool self-attribution. Report the commit SHA.
 
-Never push a feature branch. A `research/*` branch may be pushed only to `origin`, only after the user explicitly approves that individual push, and never with force, tags, deletion, mirrors, or extra refspecs.
+Publishing is optional. When the task calls for it and the verification gate has passed, push only the current `feature/*` branch explicitly to `origin`; force, deletion, tags, mirrors, alternate repositories, compound commands, and extra refspecs remain blocked. Use `gh` for normal issue and pull-request collaboration, not repository deletion/settings, merges, releases, workflow execution/control, authentication/secrets, or arbitrary mutating API calls.
 
 Write a PR title or description only when the user explicitly requests it.

@@ -360,7 +360,7 @@ Containment, installation, activation, dependencies, conditional uses, routes an
 
 ## Cost inventory
 
-Static discovery metadata is approximately 974 tokens across the 22 canonical skills/workflows, with 24548 tokens loaded only when their bodies are invoked. Skill-based tool adapters add approximately 67 discovery tokens. MCP configuration bytes are inventoried, but runtime tool-schema tokens stay explicitly unmeasured until a client loads them. See [`TOKEN-COSTS.md`](TOKEN-COSTS.md); measured samples live separately in [`catalog/token-measurements.json`](catalog/token-measurements.json) and survive regeneration.
+Static discovery metadata is approximately 974 tokens across the 22 canonical skills/workflows, with 24610 tokens loaded only when their bodies are invoked. Skill-based tool adapters add approximately 67 discovery tokens. MCP configuration bytes are inventoried, but runtime tool-schema tokens stay explicitly unmeasured until a client loads them. See [`TOKEN-COSTS.md`](TOKEN-COSTS.md); measured samples live separately in [`catalog/token-measurements.json`](catalog/token-measurements.json) and survive regeneration.
 
 ## Graphify interchange decision
 

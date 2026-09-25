@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import process from 'node:process';
-import { evaluateHook, parseHookInput } from './guard-policy.mjs';
+import { commandNeedsCurrentBranch, evaluateHook, parseHookInput } from './guard-policy.mjs';
 
 function deny(reason) {
   process.stdout.write(`${JSON.stringify({
@@ -30,7 +30,7 @@ const input = parsed.input;
 
 const command = input.tool_input?.command ?? input.arguments?.command ?? '';
 let currentBranch = '';
-if (/\bgit(?:\.exe)?\b[\s\S]*?\bpush\b/i.test(command)) {
+if (commandNeedsCurrentBranch(command)) {
   try {
     currentBranch = execFileSync('git', ['branch', '--show-current'], { encoding: 'utf8' }).trim();
   } catch {
