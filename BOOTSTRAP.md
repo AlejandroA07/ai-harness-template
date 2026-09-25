@@ -92,4 +92,4 @@ node <harness-path>/scripts/audit.mjs --project <project-path>
 node scripts/verify.mjs
 ```
 
-Exercise the application where relevant. Only then stage the intended portable files and create the local feature-branch commit. Never push a feature branch.
+Exercise the application where relevant. Only then stage the intended portable files and create the local feature-branch commit. When the task calls for remote publication, push only that current branch explicitly to `origin`; destructive or high-impact Git and GitHub operations remain blocked.

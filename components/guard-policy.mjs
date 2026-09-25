@@ -14,25 +14,140 @@ function containsSensitivePath(value) {
     || /(?:^|[\/\s"'])(?:service[-_.]?account(?:[-_.]key)?|application_default_credentials)\.json(?=$|[\s"';&|<>()])/i.test(normalized);
 }
 
-function shellWords(value) {
-  const words = [];
-  const pattern = /"((?:\\.|[^"\\])*)"|'([^']*)'|([^\s]+)/g;
-  for (const match of value.matchAll(pattern)) words.push(match[1] ?? match[2] ?? match[3]);
-  return words;
+function shellCommands(value) {
+  const commands = [];
+  let words = [];
+  let token = '';
+  let quote = '';
+  let redirect = false;
+
+  function pushToken() {
+    if (token) words.push(token);
+    token = '';
+  }
+  function pushCommand() {
+    pushToken();
+    if (words.length) commands.push(words);
+    words = [];
+  }
+
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (redirect) {
+      if (quote) {
+        if (character === quote) quote = '';
+        else if (character === '\\' && quote === '"' && index + 1 < value.length) index += 1;
+        continue;
+      }
+      if (character === '"' || character === "'") { quote = character; continue; }
+      if (/\s/.test(character)) { redirect = false; continue; }
+      if (';&|()'.includes(character)) {
+        redirect = false;
+        pushCommand();
+      }
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = '';
+      else if (character === '\\' && quote === '"' && index + 1 < value.length) token += value[index += 1];
+      else token += character;
+      continue;
+    }
+    if (character === '"' || character === "'") { quote = character; continue; }
+    if (character === '\\' && index + 1 < value.length) { token += value[index += 1]; continue; }
+    if (/\s/.test(character)) {
+      if (character === '\n' || character === '\r') pushCommand();
+      else pushToken();
+      continue;
+    }
+    if (character === '>' || character === '<' || (character === '&' && value[index + 1] === '>')) {
+      pushToken();
+      redirect = true;
+      if (value[index + 1] === character || character === '&') index += 1;
+      continue;
+    }
+    if (';&|()'.includes(character)) {
+      pushCommand();
+      if ((character === '&' || character === '|') && value[index + 1] === character) index += 1;
+      continue;
+    }
+    token += character;
+  }
+  pushCommand();
+  return commands;
+}
+
+function commandInvocations(command, depth = 0) {
+  if (depth > 2) return [];
+  const invocations = [];
+  for (const words of shellCommands(command)) {
+    let index = 0;
+    while (index < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index])) index += 1;
+    if (words[index]?.toLowerCase() === 'env') {
+      index += 1;
+      while (index < words.length && (words[index].startsWith('-') || /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]))) {
+        if (['-u', '--unset', '-c', '--chdir'].includes(words[index].toLowerCase())) index += 1;
+        index += 1;
+      }
+    }
+    while (['command', 'builtin'].includes(words[index]?.toLowerCase())) index += 1;
+    if (index >= words.length) continue;
+    const executable = words[index].replaceAll('\\', '/').split('/').at(-1).toLowerCase();
+    const args = words.slice(index + 1);
+    if (['sh', 'bash', 'zsh'].includes(executable)) {
+      const commandIndex = args.findIndex((arg) => /^-[a-z]*c[a-z]*$/i.test(arg) || arg === '--command');
+      if (commandIndex >= 0 && args[commandIndex + 1]) invocations.push(...commandInvocations(args[commandIndex + 1], depth + 1));
+      continue;
+    }
+    if (['powershell', 'powershell.exe', 'pwsh', 'pwsh.exe'].includes(executable)) {
+      const commandIndex = args.findIndex((arg) => ['-command', '-c'].includes(arg.toLowerCase()));
+      if (commandIndex >= 0 && args[commandIndex + 1]) invocations.push(...commandInvocations(args[commandIndex + 1], depth + 1));
+      continue;
+    }
+    invocations.push({ executable, args });
+  }
+  return invocations;
 }
 
 function gitInvocations(command) {
   const invocations = [];
-  const pattern = /\bgit(?:\.exe)?\b([^\r\n;&|<>]*)/gi;
-  for (const match of command.matchAll(pattern)) {
-    const words = shellWords(match[1]);
+  for (const invocation of commandInvocations(command)) {
+    if (!['git', 'git.exe'].includes(invocation.executable)) continue;
+    const words = invocation.args;
     let index = 0;
+    const prefixArgs = [];
     while (index < words.length && words[index].startsWith('-')) {
-      const option = words[index].toLowerCase();
+      const option = words[index];
+      prefixArgs.push(option);
       index += 1;
-      if (['-c', '--git-dir', '--work-tree', '--namespace', '--exec-path'].includes(option) && !option.includes('=')) index += 1;
+      if (['-c', '-C', '--git-dir', '--work-tree', '--namespace', '--exec-path'].includes(option) && !option.includes('=')) {
+        if (index < words.length) prefixArgs.push(words[index]);
+        index += 1;
+      }
     }
-    if (index < words.length) invocations.push({ subcommand: words[index].toLowerCase(), args: words.slice(index + 1) });
+    if (index < words.length) invocations.push({
+      subcommand: words[index].toLowerCase(),
+      args: words.slice(index + 1),
+      prefixArgs,
+    });
+  }
+  return invocations;
+}
+
+function ghInvocations(command) {
+  const invocations = [];
+  for (const invocation of commandInvocations(command)) {
+    if (!['gh', 'gh.exe'].includes(invocation.executable)) continue;
+    let index = 0;
+    while (index < invocation.args.length && invocation.args[index].startsWith('-')) {
+      const option = invocation.args[index];
+      index += 1;
+      if (['-R', '--repo', '--hostname', '--config-dir'].includes(option) && !option.includes('=')) index += 1;
+    }
+    if (index < invocation.args.length) invocations.push({
+      subcommand: invocation.args[index].toLowerCase(),
+      args: invocation.args.slice(index + 1),
+    });
   }
   return invocations;
 }
@@ -43,7 +158,7 @@ function hasFlag(args, shortName, longName) {
 }
 
 function destructiveGitReason(command) {
-  for (const { subcommand, args } of gitInvocations(command)) {
+  for (const { subcommand, args, prefixArgs } of gitInvocations(command)) {
     const lower = args.map((arg) => arg.toLowerCase());
     if (subcommand === 'reset' && lower.some((arg) => ['--hard', '--merge', '--keep'].includes(arg))) return 'destructive git reset mode';
     if (subcommand === 'clean' && hasFlag(args, 'f', '--force')) return 'git clean --force';
@@ -53,6 +168,65 @@ function destructiveGitReason(command) {
     if (subcommand === 'rm' && lower.includes('.') && hasFlag(args, 'r', '--recursive')) return 'recursive git removal of the whole worktree';
     if (subcommand === 'stash' && lower[0] === 'clear') return 'git stash clear';
     if (subcommand === 'worktree' && lower[0] === 'remove' && hasFlag(args, 'f', '--force')) return 'forced git worktree removal';
+    if (subcommand === 'commit' && hasFlag(args, 'n', '--no-verify')) return 'commit hook bypass';
+    if (subcommand === 'commit' && prefixArgs.some((arg, index) => {
+      const value = arg.toLowerCase();
+      return value.startsWith('-ccore.hookspath=')
+        || (value === '-c' && prefixArgs[index + 1]?.toLowerCase().startsWith('core.hookspath='));
+    })) return 'commit hook-path override';
+    if (subcommand === 'config' && lower.some((arg) => arg === 'core.hookspath' || arg.startsWith('core.hookspath='))) return 'Git hook-path modification';
+  }
+  return null;
+}
+
+function apiRequest(args) {
+  let endpoint = '';
+  let method = 'GET';
+  let body = false;
+  const valueOptions = new Set(['--hostname', '--cache', '--jq', '-q', '--template', '-t', '--preview']);
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    const lower = arg.toLowerCase();
+    if (['--method', '-x'].includes(lower)) { method = (args[index += 1] ?? '').toUpperCase(); continue; }
+    if (lower.startsWith('--method=')) { method = arg.slice(arg.indexOf('=') + 1).toUpperCase(); continue; }
+    if (/^-x.+/i.test(arg)) { method = arg.slice(2).toUpperCase(); continue; }
+    if (['--field', '-f', '--raw-field', '-F'].includes(arg)) { body = true; index += 1; continue; }
+    if (/^(?:--field=|--raw-field=|-f.+|-F.+)/.test(arg)) { body = true; continue; }
+    if (lower === '--input') { body = true; index += 1; continue; }
+    if (lower.startsWith('--input=')) { body = true; continue; }
+    if (valueOptions.has(arg)) { index += 1; continue; }
+    if ([...valueOptions].some((option) => lower.startsWith(`${option}=`))) continue;
+    if (!arg.startsWith('-') && !endpoint) endpoint = arg;
+  }
+  if (method === 'GET' && body) method = 'POST';
+  return { endpoint, method };
+}
+
+function destructiveGhReason(command) {
+  for (const { subcommand, args } of ghInvocations(command)) {
+    const action = args[0]?.toLowerCase() ?? '';
+    const lower = args.map((arg) => arg.toLowerCase());
+    if (['delete', 'remove'].includes(action)) return `GitHub ${subcommand} ${action}`;
+    if (subcommand === 'api') {
+      const { endpoint, method } = apiRequest(args);
+      if (method === 'GET') continue;
+      const trackerRelationship = method === 'POST'
+        && /^repos\/[^/\s]+\/[^/\s]+\/issues\/\d+\/(?:sub_issues|dependencies\/blocked_by)$/.test(endpoint);
+      if (!trackerRelationship) return `GitHub API ${method || 'mutation'}`;
+      continue;
+    }
+    if (subcommand === 'auth' && action !== 'status') return `GitHub authentication ${action || 'change'}`;
+    if (subcommand === 'alias' && action !== 'list') return `GitHub alias ${action || 'change'}`;
+    if (subcommand === 'config' && !['get', 'list'].includes(action)) return `GitHub configuration ${action || 'change'}`;
+    if (subcommand === 'pr' && action === 'merge') return 'GitHub pull request merge';
+    if (subcommand === 'repo' && ['archive', 'edit', 'rename'].includes(action)) return `GitHub repository ${action}`;
+    if (subcommand === 'repo' && action === 'sync' && hasFlag(args.slice(1), 'f', '--force')) return 'forced GitHub repository sync';
+    if (subcommand === 'release' && ['create', 'edit', 'upload'].includes(action)) return `GitHub release ${action}`;
+    if (subcommand === 'workflow' && ['disable', 'enable', 'run'].includes(action)) return `GitHub workflow ${action}`;
+    if (subcommand === 'run' && ['cancel', 'rerun'].includes(action)) return `GitHub Actions run ${action}`;
+    if (['secret', 'variable'].includes(subcommand) && action === 'set') return `GitHub ${subcommand} set`;
+    if (['ssh-key', 'gpg-key'].includes(subcommand) && action === 'add') return `GitHub ${subcommand} add`;
+    if (lower.includes('--force') && ['repo', 'pr', 'release', 'workflow', 'run'].includes(subcommand)) return `forced GitHub ${subcommand} operation`;
   }
   return null;
 }
@@ -88,6 +262,10 @@ export function evaluateCommitBranch(branch) {
   return null;
 }
 
+export function commandNeedsCurrentBranch(command) {
+  return gitInvocations(command).some(({ subcommand }) => subcommand === 'push');
+}
+
 export function evaluateHook(input, currentBranch = '') {
   const toolInput = input.tool_input ?? input.arguments ?? {};
   const command = typeof toolInput.command === 'string' ? toolInput.command.trim() : '';
@@ -105,14 +283,16 @@ export function evaluateHook(input, currentBranch = '') {
   const destructiveReason = destructiveGitReason(command);
   if (destructiveReason) return `${destructiveReason} is permanently blocked for agents because it can destroy user work.`;
 
-  if (/\bgit(?:\.exe)?\b[\s\S]*?\bpush\b/i.test(command)) {
-    const allowed = command.match(/^git(?:\.exe)?\s+push\s+(?:(?:-u|--set-upstream)\s+)?origin\s+((?:research|prototype)\/[a-zA-Z0-9._/-]+)$/i);
+  if (commandNeedsCurrentBranch(command)) {
+    const allowed = command.match(/^git(?:\.exe)?\s+push\s+(?:(?:-u|--set-upstream)\s+)?origin\s+((?:feature|research|prototype)\/[a-zA-Z0-9._/-]+)$/i);
     if (!allowed) {
-      return 'Feature pushes are blocked. Only an explicitly approved `git push origin research/<name>` or `git push origin prototype/<name>` is eligible, with no force, tags, deletion, mirror, or extra refspecs.';
+      return 'Push only the current feature, research, or prototype branch explicitly to origin. Force, deletion, tags, mirrors, alternate repositories, compound commands, and extra refspecs are blocked.';
     }
     if (!currentBranch || currentBranch.toLowerCase() !== allowed[1].toLowerCase()) {
-      return `The pushed research or prototype branch must be the current branch (${currentBranch || 'detached HEAD'}).`;
+      return `The pushed branch must be the current branch (${currentBranch || 'detached HEAD'}).`;
     }
   }
+  const ghReason = destructiveGhReason(command);
+  if (ghReason) return `${ghReason} is blocked because it deletes data, changes credentials or repository controls, publishes a release, runs automation, or bypasses reviewed collaboration.`;
   return null;
 }
