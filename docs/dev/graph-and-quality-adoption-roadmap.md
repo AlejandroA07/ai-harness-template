@@ -1,9 +1,9 @@
 # Graph and quality tooling adoption roadmap
 
 - **Kind:** living progress tracker
-- **Last updated:** 2026-09-21
-- **Current position:** learning, the harness Graphify pilot, the repository modularity review, and M0–M8 are complete locally. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. M8 Windows CI and CodeQL remain release checks. Westcoast Cars remains selected with its baseline pending.
-- **Next action:** check M8 Windows CI and CodeQL, then continue the independent Westcoast Cars evaluation.
+- **Last updated:** 2026-09-25
+- **Current position:** learning, the harness Graphify pilot, the repository modularity review, and M0–M8 are complete. The five public modules fit, with explicit Installation core and Shared policy/runtime ownership. PR #31 passed Windows portability, repository verification, security and CodeQL; the M8.1 hardening follow-up covers retained-state removal, legacy-payload validation and aggregate locking. Westcoast Cars remains selected with its baseline pending.
+- **Next action:** continue the independent Westcoast Cars evaluation.
 
 This file is the durable checklist for the graph-engineering, Graphify, architecture-viewer, CRAP, and hardening work. Update it after every completed step so progress does not depend on remembering a conversation.
 
@@ -60,13 +60,13 @@ the repair record tracks the new regression cases and remaining remote checks.
 |---|---|---|
 | M0 — Safety corrections and isolated fixtures | Complete | [Manifest/path, exact-hook, preflight and baseline-equivalence evidence](modularity-m0-safety.md); local commit containing this update |
 | M1 — Catalog and pure selection planner | Complete | [All 22 classifications, dependency planning and read-only fixture evidence](modularity-m1-catalog.md); local commit containing this update |
-| M2 — Single-capability install/update/remove/audit | Repaired locally; remote checks pending | [Store/receipt ownership, preservation, lifecycle and recovery fixtures](modularity-m2-installation.md); local commit containing this update |
-| M3 — Global-only platform selection | Repaired locally; remote checks pending | [Independent platforms, exact settings/hook ownership, legacy conflicts and interrupted-operation recovery](modularity-m3-global-configuration.md); 123 tests, 121 passed and two Windows-only skips; local verification gate passed |
-| M4 — Project-only configuration and gates | Complete locally | [Self-contained runtime, preserved verifier/settings, optional CI and adapter drift checks](modularity-m4-project-configuration.md); 146 tests, 144 passed and two Windows-only skips after review fixes; PR CodeQL and live Windows validation remain separate |
+| M2 — Single-capability install/update/remove/audit | Complete | [Store/receipt ownership, preservation, lifecycle and recovery fixtures](modularity-m2-installation.md); PR #31 Windows and CodeQL checks passed |
+| M3 — Global-only platform selection | Complete | [Independent platforms, exact settings/hook ownership, legacy conflicts and interrupted-operation recovery](modularity-m3-global-configuration.md); PR #31 Windows and CodeQL checks passed |
+| M4 — Project-only configuration and gates | Complete | [Self-contained runtime, preserved verifier/settings, optional CI and adapter drift checks](modularity-m4-project-configuration.md); PR #31 Windows and CodeQL checks passed |
 | M5 — Workflow composition and discovery | Complete locally | [Project-skill and workflow lifecycle evidence](modularity-m5-workflows.md); dependency closure, optional route status, prerequisite reporting and unchanged invocation metadata covered |
 | M6 — Provenance and tool integrations | Complete locally | [Pinned acquisition, lifecycle and state evidence](modularity-m6-tool-integrations.md); Graphify full-capability boundary, Archify trial and existing MCP adapters covered |
 | M7 — Architecture overview and cost reporting | Complete locally | [Catalog-derived navigation, receipt-backed states, preserved runtime measurements and Graphify interchange decision](modularity-m7-architecture-cost.md); 188 tests, 186 passed and two Windows-only skips; full local verification gate passed |
-| M8 — Full-profile migration and compatibility | Complete locally; remote checks pending | [Exact legacy migration, compatibility, security and local verification evidence](modularity-m8-migration.md); Windows CI and CodeQL remain release checks |
+| M8 — Full-profile migration and compatibility | Complete | [Exact legacy migration, compatibility, security and hardening evidence](modularity-m8-migration.md); PR #31 Windows and CodeQL checks passed; M8.1 adds retained-state removal, legacy-payload validation and aggregate locking |
 
 See the plan for exact prerequisites. Mark a slice complete only after its acceptance evidence and the repository gate pass. The review identified implementation risks; it did not fix them.
 

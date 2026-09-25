@@ -3,7 +3,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { isDeepStrictEqual as equal } from 'node:util';
 import { assertSafeDirectory, isPathWithin, isAbsolutePathInput } from './skill-lib.mjs';
-import { digest, encode, stat, readRegular, payloadHash, treeFiles, acquireTargetLock, releaseTargetLock, publishFiles } from './installation-core.mjs';
+import { digest, encode, stat, readRegular, payloadHash, treeFiles, acquireTargetLock, releaseTargetLock,
+  targetLockPath, publishFiles } from './installation-core.mjs';
 import { object, parseSettings, getSetting, setSetting, pruneContainers, hookCount, removeExactHook, hookGroups, inspectFeatures, editFeatures } from './global-settings.mjs';
 import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
 
@@ -105,7 +106,8 @@ async function parents(target, locations) {
 }
 
 export async function planGlobalInstallation(repository, options) {
-  const { operation = 'apply', target: inputTarget, platform, scope, legacyRoot: inputLegacyRoot = null } = options;
+  const { operation = 'apply', target: inputTarget, platform, scope, legacyRoot: inputLegacyRoot = null,
+    targetLockLease = null } = options;
   if (!['apply', 'audit', 'remove'].includes(operation) || !['codex', 'claude'].includes(platform) || scope !== 'machine'
     || typeof inputTarget !== 'string' || !path.isAbsolute(inputTarget) || /[\x00-\x1f]/.test(inputTarget)) {
     fail('Global lifecycle requires an absolute --target, one --platform and --scope machine');
@@ -144,7 +146,10 @@ export async function planGlobalInstallation(repository, options) {
   }
   input.ownership = await verifyOwnershipHead(target, locations.ownership, previous?.evidence ?? null);
   const conflicts = [];
-  if (await stat(locations.lock)) conflicts.push('Target is locked; inspect the running or interrupted operation');
+  const heldLock = targetLockLease === null ? null : targetLockPath(targetLockLease, target);
+  if (await stat(locations.lock) && heldLock !== locations.lock) {
+    conflicts.push('Target is locked; inspect the running or interrupted operation');
+  }
   const runtime = bundle.hash ? path.join(locations.runtimes, bundle.hash) : null;
   const previousRuntime = previous ? path.join(locations.runtimes, previous.runtime) : null;
   let ownedFiles = null;
@@ -275,7 +280,7 @@ export async function planGlobalInstallation(repository, options) {
     retainedRuntime: 'Shared immutable runtime revisions are retained on removal.' };
   plan.migrated = { guidance: Boolean(adoptingLegacyGuidance), hook: migratedLegacyHook };
   const parentState = await parents(target, locations);
-  plans.set(plan, { root: path.resolve(repository), options: { operation, target, platform, scope, legacyRoot }, locations, bundle, previous, receipt: sealedReceipt, operations, input,
+  plans.set(plan, { root: path.resolve(repository), options: { operation, target, platform, scope, legacyRoot, targetLockLease }, locations, bundle, previous, receipt: sealedReceipt, operations, input,
     fingerprint: encode({ plan, input: Object.fromEntries(Object.entries(input).map(([key, bytes]) => [key, bytes === null ? null : digest(bytes)])),
       source: bundle.hash, owned: ownedFiles ? payloadHash(ownedFiles) : null, parents: parentState }) });
   return plan;
@@ -290,7 +295,9 @@ export async function applyGlobalInstallation(candidate, { checkpoint = async ()
   if (plans.get(plan).fingerprint !== prepared.fingerprint) fail('Global installation preconditions changed');
   if (!prepared.operations.length) return { ...plan, applied: true, noOp: true };
   await fs.mkdir(plan.target).catch((error) => { if (error.code !== 'EEXIST') throw error; });
-  const lock = await acquireTargetLock(plan.target);
+  const ownsLock = prepared.options.targetLockLease === null || prepared.options.targetLockLease === undefined;
+  const lock = ownsLock ? await acquireTargetLock(plan.target)
+    : targetLockPath(prepared.options.targetLockLease, plan.target);
   let staging, retain = false;
   try {
     const locked = await planGlobalInstallation(prepared.root, prepared.options);
@@ -352,7 +359,7 @@ export async function applyGlobalInstallation(candidate, { checkpoint = async ()
     if (!retain) {
       await safePaths(plan.target, prepared.locations);
       if (staging) await fs.rm(staging, { recursive: true, force: true });
-      await releaseTargetLock(lock);
+      if (ownsLock) await releaseTargetLock(lock);
     }
   }
 }

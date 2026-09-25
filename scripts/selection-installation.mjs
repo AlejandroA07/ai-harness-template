@@ -5,7 +5,8 @@ import { loadCatalog } from './catalog-loader.mjs';
 import { planSelection } from './module-catalog.mjs';
 import { assertSafeDirectory, parseSkill, renderSkillDocuments, isPathWithin, isAbsolutePathInput } from './skill-lib.mjs';
 
-import { encode, stat, readRegular, payloadHash, treeFiles, acquireTargetLock, releaseTargetLock, publishFiles } from './installation-core.mjs';
+import { encode, stat, readRegular, payloadHash, treeFiles, acquireTargetLock, releaseTargetLock,
+  targetLockPath, publishFiles } from './installation-core.mjs';
 
 const same = (left, right) => JSON.stringify(left) === JSON.stringify(right);
 const fail = (message) => { throw new Error(message); };
@@ -162,7 +163,7 @@ async function parentIdentity(context) {
 // under the target lock; serialized JSON is never accepted as write authority.
 export async function planInstallation(root, options) {
   const { operation = 'apply', platform, scope, ids: requested = [], target: suppliedTarget,
-    legacyRoot: suppliedLegacyRoot = null } = options;
+    legacyRoot: suppliedLegacyRoot = null, targetLockLease = null } = options;
   if (!['apply', 'remove', 'audit'].includes(operation) || !['claude', 'codex'].includes(platform)
     || !['machine', 'project'].includes(scope) || typeof suppliedTarget !== 'string' || !path.isAbsolute(suppliedTarget)) {
     fail('Lifecycle requires an absolute --target, one --platform and --scope machine or project');
@@ -200,7 +201,10 @@ export async function planInstallation(root, options) {
   const old = await loadReceipt(context);
   const previous = old.receipt?.entries ?? [];
   const conflicts = [];
-  if (await stat(locations.lock)) conflicts.push('Target is locked; inspect the interrupted/running operation before retrying');
+  const heldLock = targetLockLease === null ? null : targetLockPath(targetLockLease, target);
+  if (await stat(locations.lock) && heldLock !== locations.lock) {
+    conflicts.push('Target is locked; inspect the interrupted/running operation before retrying');
+  }
   const states = {};
   const ownedHashes = {};
   for (const entry of previous) {
@@ -257,8 +261,17 @@ export async function planInstallation(root, options) {
     if (!before && states[id] && legacyRoot) {
       const expectedLegacy = path.join(legacyRoot, '.generated', 'skills', platform, id);
       if (same(states[id], { link: expectedLegacy })) {
-        legacyFrom = expectedLegacy;
-        migrated.push(id);
+        try {
+          await assertSafeDirectory(legacyRoot, expectedLegacy);
+          if (!after || payloadHash(await treeFiles(expectedLegacy)) !== after.hash) {
+            conflicts.push(`${id}: legacy payload is edited or unsafe`);
+          } else {
+            legacyFrom = expectedLegacy;
+            migrated.push(id);
+          }
+        } catch {
+          conflicts.push(`${id}: legacy payload is edited or unsafe`);
+        }
       }
     }
     if (!before && (states[id] || names.some((name) => name.toLowerCase() === id.toLowerCase())) && !legacyFrom) {
@@ -304,7 +317,8 @@ export async function applyInstallation(candidate, { checkpoint = async () => {}
   if (!plan.changes.length && !plan.receiptChanged) return { ...plan, applied: true, noOp: true };
   await fs.mkdir(plan.target, { recursive: false }).catch((error) => { if (error.code !== 'EEXIST') throw error; });
   await assertSafeDirectory(plan.target, plan.target);
-  await acquireTargetLock(plan.target);
+  const ownsLock = options.targetLockLease === null || options.targetLockLease === undefined;
+  const lock = ownsLock ? await acquireTargetLock(plan.target) : targetLockPath(options.targetLockLease, plan.target);
   let staging;
   const completed = [];
   let retainStaging = false;
@@ -412,15 +426,17 @@ export async function applyInstallation(candidate, { checkpoint = async () => {}
       } catch { unresolved.push(change.id); }
     }
     retainStaging = unresolved.length > 0;
-    throw new Error(`${error.message}; completed: ${completed.map((entry) => entry.id).join(', ') || 'none'}; ${retainStaging
+    const failure = new Error(`${error.message}; completed: ${completed.map((entry) => entry.id).join(', ') || 'none'}; ${retainStaging
       ? `recovery required for ${unresolved.join(', ')}; retained staging and lock` : 'owned discovery and receipt changes rolled back'}`, { cause: error });
+    failure.recoveryRequired = retainStaging;
+    throw failure;
   } finally {
     if (!retainStaging) {
       if (staging) {
         await safeLayout(context);
         await fs.rm(staging, { recursive: true, force: true });
       }
-      await releaseTargetLock(locations.lock);
+      if (ownsLock) await releaseTargetLock(lock);
     }
   }
 }

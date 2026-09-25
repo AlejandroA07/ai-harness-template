@@ -6,7 +6,8 @@ import { planInstallation, applyInstallation } from './selection-installation.mj
 import { planGlobalInstallation, applyGlobalInstallation } from './global-installation.mjs';
 import { planFullProfileControls, applyFullProfileControls } from './full-profile-controls.mjs';
 import { assertSafeDirectory, isPathWithin, isAbsolutePathInput } from './skill-lib.mjs';
-import { acquireTargetLock, encode, publishFiles, readRegular, releaseTargetLock, stat } from './installation-core.mjs';
+import { acquireTargetLock, acquireTargetLockLease, encode, publishFiles, readRegular, releaseTargetLock,
+  releaseTargetLockLease, stat, targetLockPath } from './installation-core.mjs';
 import { ownershipHeadBytes, planReceiptEvidence, sealReceipt, storeReceiptEvidence,
   verifyOwnershipHead, verifyReceiptEvidence } from './installation-evidence.mjs';
 
@@ -63,10 +64,11 @@ function componentOwnership(components, evidenceKey) {
     .sort((left, right) => `${left.platform}:${left.kind}`.localeCompare(`${right.platform}:${right.kind}`));
 }
 
-async function publishProfileReceipt(target, previous, nextReceipt) {
+async function publishProfileReceipt(target, previous, nextReceipt, targetLockLease = null) {
   const { locations } = await loadProfileReceipt(target);
   await fs.mkdir(target).catch((error) => { if (error.code !== 'EEXIST') throw error; });
-  const lock = await acquireTargetLock(target);
+  const ownsLock = targetLockLease === null;
+  const lock = ownsLock ? await acquireTargetLock(target) : targetLockPath(targetLockLease, target);
   let staging, retain = false;
   try {
     const current = await loadProfileReceipt(target);
@@ -88,7 +90,7 @@ async function publishProfileReceipt(target, previous, nextReceipt) {
   } finally {
     if (!retain) {
       if (staging) await fs.rm(staging, { recursive: true, force: true });
-      await releaseTargetLock(lock);
+      if (ownsLock) await releaseTargetLock(lock);
     }
   }
 }
@@ -139,7 +141,8 @@ function componentSummary(kind, plan) {
 }
 
 export async function planFullProfileInstallation(repository, options) {
-  const { operation = 'apply', target: suppliedTarget, scope, platform, legacyRoot: suppliedLegacyRoot = null } = options;
+  const { operation = 'apply', target: suppliedTarget, scope, platform, legacyRoot: suppliedLegacyRoot = null,
+    targetLockLease = null } = options;
   if (!['apply', 'audit', 'remove'].includes(operation) || scope !== 'machine' || platform !== 'both'
     || typeof suppliedTarget !== 'string' || !path.isAbsolute(suppliedTarget) || /[\x00-\x1f]/.test(suppliedTarget)) {
     fail('Full managed profile requires plan/apply/audit/remove, --platform both, --scope machine and an absolute --target');
@@ -151,13 +154,14 @@ export async function planFullProfileInstallation(repository, options) {
   const target = await canonicalTarget(suppliedTarget);
   const legacyRoot = suppliedLegacyRoot === null ? null : path.resolve(suppliedLegacyRoot);
   if (await isPathWithin(target, root)) fail('Full-profile target must be outside the source checkout');
-  const catalog = await loadCatalog(root);
-  const ids = catalog.capabilities.filter((entry) => ['skills', 'workflows'].includes(entry.module)
-    && entry.scopes.includes('machine') && platforms.every((name) => entry.platforms.includes(name)))
-    .map((entry) => entry.id).sort();
+  const previousProfile = await loadProfileReceipt(target);
+  const ids = operation === 'remove' && previousProfile.receipt
+    ? [...previousProfile.receipt.selected]
+    : (await loadCatalog(root)).capabilities.filter((entry) => ['skills', 'workflows'].includes(entry.module)
+      && entry.scopes.includes('machine') && platforms.every((name) => entry.platforms.includes(name)))
+      .map((entry) => entry.id).sort();
   if (!ids.length) fail('Full managed profile has no machine capabilities');
 
-  const previousProfile = await loadProfileReceipt(target);
   const conflicts = operation === 'remove' ? [] : await customAgentConflicts(target);
   const controlsPlan = await planFullProfileControls(root, { operation, target,
     previous: previousProfile.receipt?.controls ?? null });
@@ -168,10 +172,11 @@ export async function planFullProfileInstallation(repository, options) {
     const extras = operation === 'remove' ? [] : (await visibleEntries(discovery)).filter((entry) => !ids.includes(entry));
     if (extras.length) conflicts.push(`${name}: noncanonical visible skills require review: ${extras.join(', ')}`);
     const skillPlan = await planInstallation(root, { operation, ids: operation === 'audit' ? [] : ids, platform: name,
-      scope: 'machine', target, legacyRoot });
+      scope: 'machine', target, legacyRoot, targetLockLease });
     components.push({ kind: 'skills', plan: skillPlan });
     conflicts.push(...skillPlan.conflicts.map((message) => `${name} skills: ${message}`));
-    const globalPlan = await planGlobalInstallation(root, { operation, platform: name, scope: 'machine', target, legacyRoot });
+    const globalPlan = await planGlobalInstallation(root, { operation, platform: name, scope: 'machine', target, legacyRoot,
+      targetLockLease });
     components.push({ kind: 'global-configuration', plan: globalPlan });
     conflicts.push(...globalPlan.conflicts.map((message) => `${name} global configuration: ${message}`));
   }
@@ -208,11 +213,11 @@ export async function planFullProfileInstallation(repository, options) {
       ? 'Both platform configurations, the exact canonical skill inventory, repository hooks and the Windows memory lock where applicable; hook trust remains interactive.'
       : 'Both platform configurations and the exact canonical skill inventory; live machine controls are reported but not changed for an isolated target.' };
   plans.set(result, { root, options: { operation, target, platform: 'both', scope: 'machine', legacyRoot },
-    previousProfile, nextReceipt, controlsPlan, fingerprint: JSON.stringify(result) });
+    previousProfile, nextReceipt, controlsPlan, targetLockLease, fingerprint: JSON.stringify(result) });
   return result;
 }
 
-export async function applyFullProfileInstallation(candidate) {
+export async function applyFullProfileInstallation(candidate, { checkpoint = async () => {} } = {}) {
   const prepared = plans.get(candidate);
   if (!prepared) fail('Apply requires a fresh in-process full-profile plan');
   const checked = await planFullProfileInstallation(prepared.root, prepared.options);
@@ -220,49 +225,71 @@ export async function applyFullProfileInstallation(candidate) {
   if (checked.operation === 'audit') fail('Audit is read-only');
   if (!equal(JSON.parse(prepared.fingerprint), checked)) fail('Full-profile preconditions changed; plan again');
 
+  await fs.mkdir(checked.target, { recursive: false }).catch((error) => { if (error.code !== 'EEXIST') throw error; });
+  const targetLockLease = await acquireTargetLockLease(checked.target);
   const completed = [];
   let controlsApplied = false;
+  let retainLock = false;
+  let activePrepared = prepared;
   try {
-    for (const name of checked.operation === 'remove' ? [...platforms].reverse() : platforms) {
-      if (checked.operation === 'remove') {
+    const locked = await planFullProfileInstallation(prepared.root, { ...prepared.options, targetLockLease });
+    if (!locked.applicable) fail(`Full-profile conflicts: ${locked.conflicts.join('; ')}`);
+    if (!equal(checked, locked)) fail('Full-profile preconditions changed under lock; plan again');
+    activePrepared = plans.get(locked);
+
+    for (const name of locked.operation === 'remove' ? [...platforms].reverse() : platforms) {
+      if (locked.operation === 'remove') {
         const globalPlan = await planGlobalInstallation(prepared.root, { operation: 'remove', platform: name,
-          scope: 'machine', target: checked.target });
+          scope: 'machine', target: locked.target, targetLockLease });
         await applyGlobalInstallation(globalPlan);
         completed.push(`${name} global configuration`);
+        await checkpoint('component', `${name} global configuration`);
       }
-      const skillPlan = await planInstallation(prepared.root, { operation: checked.operation, ids: checked.selected,
-        platform: name, scope: 'machine', target: checked.target, legacyRoot: checked.legacyRoot });
+      const skillPlan = await planInstallation(prepared.root, { operation: locked.operation, ids: locked.selected,
+        platform: name, scope: 'machine', target: locked.target, legacyRoot: locked.legacyRoot, targetLockLease });
       await applyInstallation(skillPlan);
       completed.push(`${name} skills`);
-      if (checked.operation === 'apply') {
+      await checkpoint('component', `${name} skills`);
+      if (locked.operation === 'apply') {
         const globalPlan = await planGlobalInstallation(prepared.root, { operation: 'apply', platform: name,
-          scope: 'machine', target: checked.target, legacyRoot: checked.legacyRoot });
+          scope: 'machine', target: locked.target, legacyRoot: locked.legacyRoot, targetLockLease });
         await applyGlobalInstallation(globalPlan);
         completed.push(`${name} global configuration`);
+        await checkpoint('component', `${name} global configuration`);
       }
     }
-    await applyFullProfileControls(prepared.controlsPlan);
+    await applyFullProfileControls(activePrepared.controlsPlan);
     controlsApplied = true;
     completed.push('machine controls');
-    await publishProfileReceipt(checked.target, prepared.previousProfile,
-      checked.operation === 'remove' ? null : prepared.nextReceipt);
+    await checkpoint('component', 'machine controls');
+    await publishProfileReceipt(locked.target, activePrepared.previousProfile,
+      locked.operation === 'remove' ? null : activePrepared.nextReceipt, targetLockLease);
     completed.push('full-profile receipt');
+    await checkpoint('component', 'full-profile receipt');
+
+    if (locked.operation === 'remove') return { ...locked, installed: false, applied: true,
+      noOp: locked.changes.length === 0 && !locked.receiptChanged, completed };
+    const audit = await planFullProfileInstallation(prepared.root, { operation: 'audit', target: locked.target,
+      platform: 'both', scope: 'machine', targetLockLease });
+    if (!audit.applicable) fail(`Full-profile post-apply audit failed: ${audit.conflicts.join('; ')}`);
+    return { ...audit, operation: 'apply', applied: true,
+      noOp: locked.changes.length === 0 && !locked.receiptChanged, completed };
   } catch (error) {
-    if (controlsApplied && checked.operation === 'apply' && !prepared.previousProfile.receipt) {
+    retainLock = Boolean(error.recoveryRequired);
+    if (controlsApplied && checked.operation === 'apply' && !activePrepared.previousProfile.receipt) {
       try {
         const rollback = await planFullProfileControls(prepared.root, { operation: 'remove', target: checked.target,
-          previous: prepared.controlsPlan.ownership });
+          previous: activePrepared.controlsPlan.ownership });
         await applyFullProfileControls(rollback);
       } catch {
         completed.push('machine controls require reviewed recovery');
+        retainLock = true;
       }
     }
-    throw new Error(`Full-profile application stopped; completed: ${completed.join(', ') || 'none'}; rerun the read-only plan after resolving the reported state. ${error.message}`, { cause: error });
+    const failure = new Error(`Full-profile application stopped; completed: ${completed.join(', ') || 'none'}; rerun the read-only plan after resolving the reported state. ${error.message}`, { cause: error });
+    failure.recoveryRequired = retainLock;
+    throw failure;
+  } finally {
+    if (!retainLock) await releaseTargetLockLease(targetLockLease);
   }
-  if (checked.operation === 'remove') return { ...checked, installed: false, applied: true,
-    noOp: checked.changes.length === 0 && !checked.receiptChanged, completed };
-  const audit = await planFullProfileInstallation(prepared.root, { operation: 'audit', target: checked.target,
-    platform: 'both', scope: 'machine' });
-  if (!audit.applicable) fail(`Full-profile post-apply audit failed: ${audit.conflicts.join('; ')}`);
-  return { ...audit, operation: 'apply', applied: true, noOp: checked.changes.length === 0 && !checked.receiptChanged, completed };
 }

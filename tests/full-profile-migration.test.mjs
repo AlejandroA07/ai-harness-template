@@ -6,6 +6,7 @@ import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
 import { applyFullProfileControls, planFullProfileControls } from '../scripts/full-profile-controls.mjs';
+import { applyFullProfileInstallation, planFullProfileInstallation } from '../scripts/full-profile-installation.mjs';
 import { discoverSkills, generateSkillTree } from '../scripts/skill-lib.mjs';
 
 const repository = path.resolve(import.meta.dirname, '..');
@@ -150,14 +151,42 @@ test('full managed profile migrates both legacy platforms off a moved checkout a
   }
 });
 
+test('full-profile application holds the target lock across every component', async () => {
+  const fixture = await legacyFixture();
+  let competingAttempted = false;
+  try {
+    const plan = await planFullProfileInstallation(repository, { operation: 'apply', platform: 'both',
+      scope: 'machine', target: fixture.target, legacyRoot: fixture.legacyRoot });
+    const result = await applyFullProfileInstallation(plan, { checkpoint: async (phase, component) => {
+      if (phase !== 'component' || component !== 'claude skills' || competingAttempted) return;
+      competingAttempted = true;
+      const competing = run(['apply', '--select', 'tdd', '--platform', 'claude', '--scope', 'machine',
+        '--target', fixture.target, '--apply', '--json'], fixture.env);
+      assert.notEqual(competing.status, 0);
+      assert.match(`${competing.stdout}\n${competing.stderr}`, /Target is locked/);
+    } });
+    assert.equal(competingAttempted, true);
+    assert.equal(result.installed, true);
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test('full-profile migration rejects ambiguous ownership and noncanonical discovery before writes', async () => {
-  for (const kind of ['changed-link', 'extra-skill', 'custom-agent']) {
+  for (const kind of ['changed-link', 'edited-payload', 'linked-legacy-root', 'extra-skill', 'custom-agent']) {
     const fixture = await legacyFixture();
     try {
       if (kind === 'changed-link') {
         const link = path.join(fixture.target, '.agents', 'skills', fixture.skills[0].name);
         await fs.unlink(link);
         await fs.symlink(path.join(fixture.root, 'unrelated'), link, process.platform === 'win32' ? 'junction' : 'dir');
+      } else if (kind === 'edited-payload') {
+        await fs.appendFile(path.join(fixture.legacyRoot, '.generated', 'skills', 'codex',
+          fixture.skills[0].name, 'SKILL.md'), '\nLocal legacy edit\n');
+      } else if (kind === 'linked-legacy-root') {
+        const realLegacyRoot = path.join(fixture.root, 'real legacy checkout');
+        await fs.rename(fixture.legacyRoot, realLegacyRoot);
+        await fs.symlink(realLegacyRoot, fixture.legacyRoot, process.platform === 'win32' ? 'junction' : 'dir');
       } else if (kind === 'extra-skill') await fs.mkdir(path.join(fixture.target, '.claude', 'skills', 'company-skill'));
       else {
         await fs.mkdir(path.join(fixture.target, '.claude', 'agents'), { recursive: true });
@@ -224,6 +253,27 @@ test('full-profile removal removes owned components and preserves unrelated targ
       for (const skill of fixture.skills) await assert.rejects(fs.lstat(path.join(discovery, skill.name)), { code: 'ENOENT' });
     }
     assert.equal(await fs.readFile(unrelated, 'utf8'), 'unmanaged note\n');
+  } finally {
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('full-profile removal uses retained ownership after the source catalog changes', async () => {
+  const fixture = await legacyFixture();
+  const changedRepository = path.join(fixture.root, 'changed repository');
+  await fs.mkdir(changedRepository);
+  try {
+    const apply = run(['apply', '--profile', 'full', '--platform', 'both', '--scope', 'machine',
+      '--target', fixture.target, '--legacy-root', fixture.legacyRoot, '--apply', '--json'], fixture.env);
+    assert.equal(apply.status, 0, apply.stderr || apply.stdout);
+
+    const removalPlan = await planFullProfileInstallation(changedRepository, { operation: 'remove',
+      platform: 'both', scope: 'machine', target: fixture.target });
+    assert.equal(removalPlan.applicable, true, removalPlan.conflicts.join('\n'));
+    const removal = await applyFullProfileInstallation(removalPlan);
+    assert.equal(removal.installed, false);
+    await assert.rejects(fs.access(path.join(fixture.target, '.ai-harness', 'installations',
+      'full-managed', 'receipt.json')), { code: 'ENOENT' });
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });
   }
