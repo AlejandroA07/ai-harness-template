@@ -160,9 +160,8 @@ function hasFlag(args, shortName, longName) {
 function destructiveGitReason(command) {
   for (const { subcommand, args, prefixArgs } of gitInvocations(command)) {
     const lower = args.map((arg) => arg.toLowerCase());
-    if (subcommand === 'reset' && lower.some((arg) => ['--hard', '--merge', '--keep'].includes(arg))) return 'destructive git reset mode';
+    if (subcommand === 'reset' && lower.includes('--hard')) return 'destructive git reset mode';
     if (subcommand === 'clean' && hasFlag(args, 'f', '--force')) return 'git clean --force';
-    if (subcommand === 'branch' && (args.includes('-D') || (hasFlag(args, 'd', '--delete') && hasFlag(args, 'f', '--force')))) return 'forced git branch deletion';
     if (subcommand === 'checkout' && (hasFlag(args, 'f', '--force') || lower.includes('.'))) return 'destructive whole-worktree checkout';
     if (subcommand === 'restore' && lower.includes('.')) return 'destructive whole-worktree restore';
     if (subcommand === 'rm' && lower.includes('.') && hasFlag(args, 'r', '--recursive')) return 'recursive git removal of the whole worktree';
