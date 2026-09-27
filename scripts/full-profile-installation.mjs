@@ -210,7 +210,7 @@ export async function planFullProfileInstallation(repository, options) {
     controls: structuredClone(controlsPlan), changes, receiptChanged, receiptPath: previousProfile.locations.receipt,
     evidence, conflicts, applicable: conflicts.length === 0,
     activation: controlsPlan.active
-      ? 'Both platform configurations, the exact canonical skill inventory, repository hooks and the Windows memory lock where applicable; hook trust remains interactive.'
+      ? 'Both platform configurations, the exact canonical skill inventory and repository hooks; hook trust remains interactive.'
       : 'Both platform configurations and the exact canonical skill inventory; live machine controls are reported but not changed for an isolated target.' };
   plans.set(result, { root, options: { operation, target, platform: 'both', scope: 'machine', legacyRoot, runTool },
     previousProfile, nextReceipt, controlsPlan, targetLockLease, fingerprint: JSON.stringify(result) });

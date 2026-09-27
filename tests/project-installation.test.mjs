@@ -138,7 +138,7 @@ test('review regression: Claude scalar ownership is independent of matcher text'
   await fs.writeFile(file, JSON.stringify(template));
   await f.apply('claude');
   const settings = JSON.parse(await f.read('.claude/settings.json'));
-  assert.equal(settings.autoMemoryEnabled, false);
+  assert.equal(settings.autoMemoryEnabled, undefined);
   assert.equal(settings.includeCoAuthoredBy, false);
 }));
 
@@ -203,6 +203,7 @@ test('project settings merge exact hooks and restore only their ownership', asyn
   await f.put('.claude/settings.json', JSON.stringify(original));
   await f.apply('claude');
   const current = JSON.parse(await f.read('.claude/settings.json'));
+  assert.equal(current.autoMemoryEnabled, true);
   current.addedLater = 'retained';
   current.hooks.PreToolUse.at(-1).hooks.push({ type: 'command', command: 'another-user-hook' });
   await f.put('.claude/settings.json', JSON.stringify(current));

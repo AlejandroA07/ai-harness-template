@@ -9,7 +9,6 @@
 - Preserve Git safety checks and user work: never bypass hooks, change `core.hooksPath`, run `reset --hard|--merge|--keep`, force clean/branch/worktree removal, checkout/restore/remove the whole worktree, or clear the stash.
 - Treat every external boundary as attacker-reachable: authorize explicitly, validate untrusted input, protect secrets, and test denied paths.
 - Never read, print, hardcode, or commit secrets. Use the project's secret mechanism.
-- Do not use agent auto-memory. Durable knowledge belongs in reviewable `AGENTS.md`, `CONTEXT.md`, ADRs, project documentation, issues, or skills.
 - Each repository's root `AGENTS.md` is its source of truth. Follow its commands and matching skills; `node scripts/verify.mjs` exiting `0` is the only definition of done.
 - Explain unfamiliar agent/tooling concepts plainly. Verify work with actual commands before reporting it complete.
 - The reusable harness lives at `{{HARNESS_ROOT}}`. For a new project, follow its `BOOTSTRAP.md`.

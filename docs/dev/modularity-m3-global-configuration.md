@@ -45,8 +45,8 @@ No platform CLI or external package installation occurs during setup.
 
 | Platform | Files and owned settings |
 |---|---|
-| Codex | `.codex/AGENTS.md`; exact `PreToolUse` entry in `.codex/hooks.json`; `features.hooks = true` and `features.memories = false` in `.codex/config.toml` |
-| Claude | `.claude/CLAUDE.md`; exact `PreToolUse` entry, disabled automatic memory/attribution, disabled bypass mode and canonical permission denials in `.claude/settings.json` |
+| Codex | `.codex/AGENTS.md`; exact `PreToolUse` entry in `.codex/hooks.json`; `features.hooks = true` in `.codex/config.toml` |
+| Claude | `.claude/CLAUDE.md`; exact `PreToolUse` entry, disabled attribution, disabled bypass mode and canonical permission denials in `.claude/settings.json` |
 | Shared | `.ai-harness/runtime/<content-hash>/` with the guard, its policy, both rendered guidance files and a policy manifest |
 | Per platform | `.ai-harness/installations/<platform>/global.json`, separate from M2's `receipt.json` |
 

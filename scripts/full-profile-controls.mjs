@@ -6,7 +6,6 @@ import { runTool as defaultRunTool } from './windows-cli.mjs';
 
 const plans = new WeakMap();
 const expectedHooksPath = '.githooks';
-const memoryVariable = 'CLAUDE_CODE_DISABLE_AUTO_MEMORY';
 const tools = [
   { id: 'node', command: process.execPath, args: ['--version'], required: true },
   { id: 'git', command: 'git', args: ['--version'], required: true },
@@ -30,9 +29,9 @@ function validateState(value, label, allowed = null) {
       || (allowed && !allowed.includes(value.value))))) fail(`Invalid ${label} state`);
 }
 
-function validateOwnership(value, { repository, systemPlatform, active }) {
+function validateOwnership(value, { repository, active }) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
-    || !equal(Object.keys(value).sort(), ['repositoryHooks', 'windowsMemoryLock'])) fail('Invalid full-profile control ownership');
+    || !equal(Object.keys(value).sort(), ['repositoryHooks'])) fail('Invalid full-profile control ownership');
   const hooks = value.repositoryHooks;
   if (!hooks || typeof hooks !== 'object' || Array.isArray(hooks)
     || !equal(Object.keys(hooks).sort(), hooks.applicable
@@ -43,18 +42,6 @@ function validateOwnership(value, { repository, systemPlatform, active }) {
       fail('Repository-hook ownership does not match this checkout');
     }
     validateState(hooks.prior, 'prior repository hook');
-  }
-  const memory = value.windowsMemoryLock;
-  const memoryApplicable = active && systemPlatform === 'win32';
-  if (!memory || typeof memory !== 'object' || Array.isArray(memory)
-    || !equal(Object.keys(memory).sort(), memory.applicable
-      ? ['applicable', 'expected', 'owned', 'prior', 'variable'] : ['applicable'])
-    || memory.applicable !== memoryApplicable) fail('Invalid Windows memory-lock ownership');
-  if (memory.applicable) {
-    if (memory.variable !== memoryVariable || memory.expected !== '1' || typeof memory.owned !== 'boolean') {
-      fail('Windows memory-lock ownership does not match the managed control');
-    }
-    validateState(memory.prior, 'prior Windows memory lock', ['0', '1']);
   }
 }
 
@@ -70,16 +57,6 @@ function inspectRepositoryHooks(runTool, repository) {
   return resultState(runTool('git', ['config', '--local', '--get', 'core.hooksPath'], { cwd: repository }), 'repository hook');
 }
 
-function inspectWindowsMemory(runTool) {
-  const result = runTool('reg.exe', ['query', 'HKCU\\Environment', '/v', memoryVariable]);
-  if (result.error || ![0, 1].includes(result.status)) fail('Unable to inspect Windows memory lock');
-  if (result.status === 1) return state(null);
-  const line = (result.stdout ?? '').split(/\r?\n/).find((entry) => entry.trim().startsWith(memoryVariable));
-  const match = line?.match(/^\s*CLAUDE_CODE_DISABLE_AUTO_MEMORY\s+REG_(?:SZ|EXPAND_SZ)\s+([^\s]+)\s*$/);
-  if (!match || !['0', '1'].includes(match[1])) fail('Invalid Windows memory lock value');
-  return state(match[1]);
-}
-
 function setRepositoryHooks(runTool, repository, desired) {
   const args = desired.present
     ? ['config', '--local', '--', 'core.hooksPath', desired.value]
@@ -87,15 +64,6 @@ function setRepositoryHooks(runTool, repository, desired) {
   const result = runTool('git', args, { cwd: repository });
   if (result.error || (desired.present ? result.status !== 0 : ![0, 5].includes(result.status))) {
     fail('Failed to update repository hook configuration');
-  }
-}
-
-function setWindowsMemory(runTool, desired) {
-  const result = desired.present
-    ? runTool('setx', [memoryVariable, desired.value])
-    : runTool('reg.exe', ['delete', 'HKCU\\Environment', '/v', memoryVariable, '/f']);
-  if (result.error || (desired.present ? result.status !== 0 : ![0, 1].includes(result.status))) {
-    fail('Failed to update Windows memory lock');
   }
 }
 
@@ -108,8 +76,7 @@ async function sameHome(target, suppliedHome) {
 }
 
 export async function planFullProfileControls(repository, options = {}) {
-  const { operation, target, previous = null, runTool = defaultRunTool,
-    systemPlatform = process.platform, home = os.homedir() } = options;
+  const { operation, target, previous = null, runTool = defaultRunTool, home = os.homedir() } = options;
   if (!['apply', 'audit', 'remove'].includes(operation)) fail('Invalid full-profile control operation');
   const active = await sameHome(target, home);
   const inspectedTools = operation === 'remove' ? [] : tools.map(({ id, command, args, required }) => {
@@ -120,16 +87,13 @@ export async function planFullProfileControls(repository, options = {}) {
     .map((tool) => `Required tool is unavailable: ${tool.id}`);
   const current = {
     repositoryHooks: active ? inspectRepositoryHooks(runTool, repository) : null,
-    windowsMemoryLock: active && systemPlatform === 'win32' ? inspectWindowsMemory(runTool) : null,
   };
-  if (previous) validateOwnership(previous, { repository, systemPlatform, active });
+  if (previous) validateOwnership(previous, { repository, active });
   else if (operation !== 'apply' && active) conflicts.push('Full-profile machine-control ownership is missing');
 
   const ownership = previous ?? {
     repositoryHooks: active ? { applicable: true, repository, expected: expectedHooksPath,
       owned: current.repositoryHooks.value !== expectedHooksPath, prior: current.repositoryHooks } : { applicable: false },
-    windowsMemoryLock: active && systemPlatform === 'win32' ? { applicable: true, variable: memoryVariable, expected: '1',
-      owned: current.windowsMemoryLock.value !== '1', prior: current.windowsMemoryLock } : { applicable: false },
   };
   const changes = [];
   if (ownership.repositoryHooks.applicable) {
@@ -140,17 +104,9 @@ export async function planFullProfileControls(repository, options = {}) {
       conflicts.push('Repository hook configuration changed after full-profile ownership');
     }
   }
-  if (ownership.windowsMemoryLock.applicable) {
-    const desired = operation === 'remove' && ownership.windowsMemoryLock.owned
-      ? ownership.windowsMemoryLock.prior : state('1');
-    if (!equal(current.windowsMemoryLock, desired)) changes.push({ id: 'windows-memory-lock', action: operation === 'remove' ? 'restore' : 'activate' });
-    if (previous && !equal(current.windowsMemoryLock, state('1'))) {
-      conflicts.push('Windows memory lock changed after full-profile ownership');
-    }
-  }
   const plan = { version: 1, operation, active, tools: inspectedTools, ownership,
     changes, conflicts, applicable: conflicts.length === 0 };
-  plans.set(plan, { repository, options: { operation, target, previous, runTool, systemPlatform, home }, current });
+  plans.set(plan, { repository, options: { operation, target, previous, runTool, home }, current });
   return plan;
 }
 
@@ -168,12 +124,6 @@ export async function applyFullProfileControls(candidate) {
         ? checked.ownership.repositoryHooks.prior : state(expectedHooksPath);
       setRepositoryHooks(prepared.options.runTool, prepared.repository, desired);
       completed.push('repository-hooks');
-    }
-    if (checked.ownership.windowsMemoryLock.applicable && checked.changes.some(({ id }) => id === 'windows-memory-lock')) {
-      const desired = checked.operation === 'remove' && checked.ownership.windowsMemoryLock.owned
-        ? checked.ownership.windowsMemoryLock.prior : state('1');
-      setWindowsMemory(prepared.options.runTool, desired);
-      completed.push('windows-memory-lock');
     }
   } catch (error) {
     if (completed.includes('repository-hooks')) {

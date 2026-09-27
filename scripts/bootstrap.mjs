@@ -157,7 +157,6 @@ const projectClaude = await readJson(projectClaudePath);
 const claudeTemplate = await readJson(path.join(root, 'project', '.claude', 'settings.json'));
 projectClaude.$schema ??= claudeTemplate.$schema;
 projectClaude.includeCoAuthoredBy = false;
-projectClaude.autoMemoryEnabled = false;
 projectClaude.permissions ??= {};
 projectClaude.permissions.deny = reconcileHarnessDenials(
   projectClaude.permissions.deny,

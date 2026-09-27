@@ -73,7 +73,7 @@ test('global settings preserve unrelated entries and restore prior values and em
   await f.put('claude', 'settings', original);
   await f.apply('claude');
   const installed = await f.json('claude', 'settings');
-  assert.equal(installed.autoMemoryEnabled, false);
+  assert.equal(installed.autoMemoryEnabled, true);
   assert.equal(installed.permissions.disableBypassPermissionsMode, 'disable');
   assert.deepEqual(installed.hooks.PreToolUse[0], unrelated);
   assert.ok(installed.permissions.deny.length > 0);
@@ -91,11 +91,11 @@ test('global settings preserve unrelated entries and restore prior values and em
   assert.equal(removed.additional, 'Added after installation');
 }));
 
-test('Codex restores only feature values and preserves unrelated TOML bytes', async () => fixture(async (f) => {
+test('Codex changes only hooks and preserves unrelated TOML bytes', async () => fixture(async (f) => {
   const config = '# fixture config\nmodel = "fixture"\n[features]\nmemories = true # user preference\nhooks = false\nother = true\n[projects."/work"]\ntrust_level = "trusted"\n';
   await f.put('codex', 'config', config);
   await f.apply();
-  assert.deepEqual(inspectFeatures(await fs.readFile(f.file('codex', 'config'), 'utf8')).values, { hooks: true, memories: false });
+  assert.deepEqual(inspectFeatures(await fs.readFile(f.file('codex', 'config'), 'utf8')).values, { hooks: true, memories: true });
   await fs.appendFile(f.file('codex', 'config'), '# user addition\n');
   await f.apply('codex', 'remove');
   assert.equal(await fs.readFile(f.file('codex', 'config'), 'utf8'), config + '# user addition\n');
@@ -151,7 +151,7 @@ test('unsafe settings, legacy content, edited ownership and malformed receipts f
       settings.hooks.PreToolUse[0].hooks[0].command = 'User replacement';
       await f.put('codex', 'settings', settings);
     }
-    if (kind === 'edited-feature') await f.put('codex', 'config', '[features]\nhooks = true\nmemories = true\n');
+    if (kind === 'edited-feature') await f.put('codex', 'config', '[features]\nhooks = false\nmemories = true\n');
     if (kind === 'edited-runtime') {
       const receipt = await f.json('codex', 'receipt');
       await fs.appendFile(path.join(f.target, '.ai-harness/runtime', receipt.runtime, 'components/guard-policy.mjs'), '\nUser edit');
@@ -398,7 +398,7 @@ test('global ownership rejects semantic edits to every restoration field', async
     const platform = field === 'features' ? 'codex' : 'claude';
     await f.apply(platform);
     const receipt = await f.json(platform, 'receipt');
-    if (field === 'scalars') receipt.scalars.autoMemoryEnabled = { present: true, value: true };
+    if (field === 'scalars') receipt.scalars.unexpected = { present: true, value: true };
     else if (field === 'addedDenials') receipt.addedDenials = [];
     else if (field === 'createdContainers') receipt.createdContainers = [];
     else if (field === 'features') receipt.features.memories = true;
@@ -429,11 +429,11 @@ test('global disabled hooks block readiness but allow owned removal', async () =
 
 
 test('replayed global receipt cannot restore a previous installation’s settings', async () => fixture(async (f) => {
-  await f.put('claude', 'settings', { autoMemoryEnabled: true });
+  await f.put('claude', 'settings', { includeCoAuthoredBy: true });
   await f.apply('claude');
   const historical = await fs.readFile(f.file('claude', 'receipt'));
   await f.apply('claude', 'remove');
-  await f.put('claude', 'settings', { autoMemoryEnabled: false });
+  await f.put('claude', 'settings', { includeCoAuthoredBy: false });
   await f.apply('claude');
   await fs.writeFile(f.file('claude', 'receipt'), historical);
   const before = await snapshot(f.target);

@@ -57,10 +57,9 @@ The full profile preserves the complete-profile tool preflight: Node.js, Git,
 GitHub CLI, Claude, Codex, Gitleaks and Zizmor are required; .NET and Docker are
 reported as optional. Commands use literal argument arrays and never a command
 shell. When `<absolute-home>` resolves to the current user's actual home, the
-profile also owns `core.hooksPath=.githooks` in the source repository and, on
-Windows, `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` in the current user's environment.
+profile also owns `core.hooksPath=.githooks` in the source repository.
 The receipt records prior non-secret state and removal restores it only while the
-managed value is unchanged. Plans for isolated fixture homes report these controls
+managed value is unchanged. Plans for isolated fixture homes report this control
 as inactive and never alter the developer's repository or environment.
 
 The legacy `machine-setup.mjs`, `sync-skills.mjs` and `audit.mjs` commands remain

@@ -1,4 +1,3 @@
-import { isDeepStrictEqual as equal } from 'node:util';
 import { object, inspectFeatures, editFeatures } from './global-settings.mjs';
 
 const block = '# Selected project harness\n.scratch/\n.harness/.project-stage-*/\n.ai-harness-install.lock/\n# End selected project harness\n';
@@ -23,10 +22,10 @@ export function projectFeatures(bytes, prior, remove = false) {
   const parsed = inspectFeatures(text);
   if (prior && (!object(prior) || Object.keys(prior).sort().join(',') !== 'createdTable,existed,values'
     || typeof prior.createdTable !== 'boolean' || typeof prior.existed !== 'boolean' || !object(prior.values)
-    || Object.keys(prior.values).sort().join(',') !== 'hooks,memories'
+    || Object.keys(prior.values).sort().join(',') !== 'hooks'
     || Object.values(prior.values).some((value) => value !== null && typeof value !== 'boolean'))) throw new Error('Invalid project feature ownership');
-  if (prior && !equal(parsed.values, { hooks: true, memories: false })) throw new Error('Owned project features were edited');
-  const state = prior ?? { existed: bytes !== null, createdTable: parsed.featureHeader === null, values: parsed.values };
-  const afterText = editFeatures(text, remove ? state.values : { hooks: true, memories: false }, remove && state.createdTable);
+  if (prior && parsed.values.hooks !== true) throw new Error('Owned project features were edited');
+  const state = prior ?? { existed: bytes !== null, createdTable: parsed.featureHeader === null, values: { hooks: parsed.values.hooks } };
+  const afterText = editFeatures(text, remove ? state.values : { hooks: true }, remove && state.createdTable);
   return { state, after: remove && !state.existed && !afterText.trim() ? null : Buffer.from(afterText) };
 }

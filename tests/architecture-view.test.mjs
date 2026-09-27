@@ -40,7 +40,8 @@ test('architecture view links modules through platforms and capabilities to vali
     && entry.to === 'source:skills/engineering/implement/SKILL.md'));
   assert.equal(node(model, 'workflow-stage:implement:scope').order, 1);
   assert.match(node(model, 'workflow-stage:implement:scope').approval, /approved specification/i);
-  assert.equal(node(model, 'setting:claude-machine-policy:autoMemoryEnabled').value, 'false');
+  assert.equal(node(model, 'setting:claude-machine-policy:autoMemoryEnabled'), undefined);
+  assert.equal(node(model, 'setting:codex-machine-policy:features.memories'), undefined);
   assert.equal(model.interchange.graphify.decision, 'linked-separate');
   assert.match(model.interchange.graphify.evidence, /^docs\//);
   assert.match(model.interchange.graphify.rationale, /provenance/);
@@ -84,7 +85,7 @@ test('architecture Markdown exposes navigation, relationship provenance, costs a
   assert.match(markdown, /planned \/ installed \/ observed/i);
   assert.match(markdown, /\[`skills\/engineering\/implement\/SKILL\.md`\]/);
   assert.match(markdown, /Individual configuration settings/);
-  assert.match(markdown, /autoMemoryEnabled/);
+  assert.doesNotMatch(markdown, /autoMemoryEnabled|features\.memories/);
   assert.match(markdown, /Ordered workflow stages/);
   assert.match(markdown, /approved specification or ticket/i);
   assert.match(markdown, /\| installs \|/);

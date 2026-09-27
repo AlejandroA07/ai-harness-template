@@ -285,7 +285,7 @@ test('full-profile removal uses retained ownership after the source catalog chan
   }
 });
 
-test('full-profile machine controls preflight tools and restore owned Git and Windows state', async () => {
+test('full-profile machine controls preflight tools and restore owned Git state', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-machine-controls-'));
   const target = path.join(root, 'home');
   const repositoryRoot = path.join(root, 'repository');
@@ -293,27 +293,19 @@ test('full-profile machine controls preflight tools and restore owned Git and Wi
   await fs.mkdir(repositoryRoot);
   assert.equal(spawnSync('git', ['init', '--quiet'], { cwd: repositoryRoot }).status, 0);
   assert.equal(spawnSync('git', ['config', '--local', 'core.hooksPath', 'company-hooks'], { cwd: repositoryRoot }).status, 0);
-  const external = { memory: null };
   const runTool = (command, args, options = {}) => {
     if (command === 'git') return spawnSync(command, args, { encoding: 'utf8', ...options });
     if (args.includes('--version') || (command === 'gitleaks' && args[0] === 'version')) return { status: 0, stdout: 'test\n' };
-    if (command === 'reg.exe' && args[0] === 'query') return external.memory === null
-      ? { status: 1, stdout: '' }
-      : { status: 0, stdout: `    CLAUDE_CODE_DISABLE_AUTO_MEMORY    REG_SZ    ${external.memory}\r\n` };
-    if (command === 'reg.exe' && args[0] === 'delete') { external.memory = null; return { status: 0, stdout: '' }; }
-    if (command === 'setx') { external.memory = args[1]; return { status: 0, stdout: '' }; }
     return { status: 0, stdout: 'test\n' };
   };
   try {
     const applyPlan = await planFullProfileControls(repositoryRoot, { operation: 'apply', target,
       home: target, systemPlatform: 'win32', runTool });
     assert.equal(applyPlan.applicable, true);
-    assert.deepEqual(applyPlan.changes.map(({ id }) => id), ['repository-hooks', 'windows-memory-lock']);
+    assert.deepEqual(applyPlan.changes.map(({ id }) => id), ['repository-hooks']);
     assert.deepEqual(applyPlan.ownership.repositoryHooks.prior, { present: true, value: 'company-hooks' });
-    assert.deepEqual(applyPlan.ownership.windowsMemoryLock.prior, { present: false });
     await applyFullProfileControls(applyPlan);
     assert.equal(spawnSync('git', ['config', '--local', '--get', 'core.hooksPath'], { cwd: repositoryRoot, encoding: 'utf8' }).stdout.trim(), '.githooks');
-    assert.equal(external.memory, '1');
 
     const audit = await planFullProfileControls(repositoryRoot, { operation: 'audit', target,
       previous: applyPlan.ownership, home: target, systemPlatform: 'win32', runTool });
@@ -324,7 +316,6 @@ test('full-profile machine controls preflight tools and restore owned Git and Wi
       previous: applyPlan.ownership, home: target, systemPlatform: 'win32', runTool });
     await applyFullProfileControls(removePlan);
     assert.equal(spawnSync('git', ['config', '--local', '--get', 'core.hooksPath'], { cwd: repositoryRoot, encoding: 'utf8' }).stdout.trim(), 'company-hooks');
-    assert.equal(external.memory, null);
   } finally {
     await fs.rm(root, { recursive: true, force: true });
   }
