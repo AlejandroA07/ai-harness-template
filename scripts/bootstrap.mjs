@@ -157,7 +157,6 @@ const projectClaude = await readJson(projectClaudePath);
 const claudeTemplate = await readJson(path.join(root, 'project', '.claude', 'settings.json'));
 projectClaude.$schema ??= claudeTemplate.$schema;
 projectClaude.includeCoAuthoredBy = false;
-projectClaude.autoMemoryEnabled = false;
 projectClaude.permissions ??= {};
 projectClaude.permissions.deny = reconcileHarnessDenials(
   projectClaude.permissions.deny,
@@ -185,7 +184,10 @@ await copyAlways(path.join(root, 'scripts', 'windows-cli.mjs'), path.join(projec
 
 const verifySteps = buildVerificationSteps({ hasDotnet, hasNode, isGithub, packageJson, relativeFiles });
 const verifyTemplate = await fs.readFile(path.join(root, 'project', 'scripts', 'verify.mjs.template'), 'utf8');
-const verifyText = verifyTemplate.replace('__VERIFY_STEPS__', JSON.stringify(verifySteps, null, 2));
+const verificationRunner = await fs.readFile(path.join(root, 'scripts', 'verification-runner.mjs'), 'utf8');
+const verifyText = verifyTemplate
+  .replace('__VERIFICATION_RUNNER_SOURCE__', verificationRunner)
+  .replace('__VERIFY_STEPS__', JSON.stringify(verifySteps, null, 2));
 if (!(await exists(path.join(project, 'scripts', 'verify.mjs')))) {
   await fs.mkdir(path.join(project, 'scripts'), { recursive: true });
   await fs.writeFile(path.join(project, 'scripts', 'verify.mjs'), verifyText);

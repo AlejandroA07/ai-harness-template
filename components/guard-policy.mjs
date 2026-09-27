@@ -254,14 +254,6 @@ export function parseHookInput(raw) {
   return { input };
 }
 
-export function evaluateCommitBranch(branch) {
-  if (!branch) return 'Commits from detached HEAD are blocked. Switch to a feature/<topic>, research/<topic>, or prototype/<topic> branch.';
-  if (!/^(?:feature|research|prototype)\/[a-zA-Z0-9._/-]+$/.test(branch)) {
-    return `Branch '${branch}' is not eligible for agent commits. Use feature/<topic>, research/<topic> for approved Wayfinder research, or prototype/<topic> for a throwaway prototype.`;
-  }
-  return null;
-}
-
 export function commandNeedsCurrentBranch(command) {
   return gitInvocations(command).some(({ subcommand }) => subcommand === 'push');
 }
@@ -284,9 +276,12 @@ export function evaluateHook(input, currentBranch = '') {
   if (destructiveReason) return `${destructiveReason} is permanently blocked for agents because it can destroy user work.`;
 
   if (commandNeedsCurrentBranch(command)) {
-    const allowed = command.match(/^git(?:\.exe)?\s+push\s+(?:(?:-u|--set-upstream)\s+)?origin\s+((?:feature|research|prototype)\/[a-zA-Z0-9._/-]+)$/i);
+    const allowed = command.match(/^git(?:\.exe)?\s+push\s+(?:(?:-u|--set-upstream)\s+)?origin\s+([a-zA-Z0-9._/-]+)$/i);
     if (!allowed) {
-      return 'Push only the current feature, research, or prototype branch explicitly to origin. Force, deletion, tags, mirrors, alternate repositories, compound commands, and extra refspecs are blocked.';
+      return 'Push only the current non-default branch explicitly to origin. Force, deletion, tags, mirrors, alternate repositories, compound commands, and extra refspecs are blocked.';
+    }
+    if (/^(?:main|master)$/i.test(allowed[1])) {
+      return 'Pushing a default branch is blocked.';
     }
     if (!currentBranch || currentBranch.toLowerCase() !== allowed[1].toLowerCase()) {
       return `The pushed branch must be the current branch (${currentBranch || 'detached HEAD'}).`;

@@ -47,8 +47,8 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | --- | --- | --- | --- | --- | --- | --- |
 | global-configuration | Claude machine guidance | Load durable machine-wide operating policy into Claude sessions. | claude | session: Claude session startup loads the installed ~/.claude/CLAUDE.md | not-evaluated / not-inspected / not-inspected | [`global/CLAUDE.md`](global/CLAUDE.md) |
 | global-configuration | Codex machine guidance | Load durable machine-wide operating policy into Codex sessions. | codex | session: Codex session startup loads the installed ~/.codex/AGENTS.md | not-evaluated / not-inspected / not-inspected | [`global/AGENTS.md`](global/AGENTS.md) |
-| global-configuration | Claude machine policy | Deny secret reads, disable automatic memory and run the command guard. | claude | hook: Claude PreToolUse for Bash, PowerShell or Read | not-evaluated / not-inspected / not-inspected | [`global/claude-settings.json`](global/claude-settings.json)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
-| global-configuration | Codex machine policy | Enable the command guard and keep automatic memory disabled. | codex | hook: Codex PreToolUse for Bash or Read after interactive hook trust | not-evaluated / not-inspected / not-inspected | [`scripts/global-installation.mjs`](scripts/global-installation.mjs)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
+| global-configuration | Claude machine policy | Deny secret reads and run the command guard. | claude | hook: Claude PreToolUse for Bash, PowerShell or Read | not-evaluated / not-inspected / not-inspected | [`global/claude-settings.json`](global/claude-settings.json)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
+| global-configuration | Codex machine policy | Enable the command guard. | codex | hook: Codex PreToolUse for Bash or Read after interactive hook trust | not-evaluated / not-inspected / not-inspected | [`scripts/global-installation.mjs`](scripts/global-installation.mjs)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
 | project-configuration | Claude project guidance | Load repository-owned guidance into Claude sessions. | claude | session: Claude opens the repository and loads CLAUDE.md | not-evaluated / not-inspected / not-inspected | [`project/CLAUDE.md`](project/CLAUDE.md) |
 | project-configuration | Codex project guidance | Load repository-owned guidance into Codex sessions. | codex | session: Codex opens the repository and loads AGENTS.md | not-evaluated / not-inspected / not-inspected | [`project/AGENTS.selected.md`](project/AGENTS.selected.md) |
 | project-configuration | Claude project policy | Run repository-owned command and secret-path checks. | claude | hook: Claude PreToolUse for Bash, PowerShell or Read | not-evaluated / not-inspected / not-inspected | [`project/.claude/settings.json`](project/.claude/settings.json)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
@@ -87,19 +87,15 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | Behavior | Setting | Declared value | Source | Activation event or command |
 | --- | --- | --- | --- | --- |
 | Claude machine policy | includeCoAuthoredBy | false | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
-| Claude machine policy | autoMemoryEnabled | false | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
 | Claude machine policy | permissions.disableBypassPermissionsMode | disable | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
 | Claude machine policy | permissions.deny | canonical secret paths plus reviewed built-in tool denials | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
 | Claude machine policy | hooks.PreToolUse | one harness-owned guard | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
 | Codex machine policy | features.hooks | true | [`scripts/global-installation.mjs`](scripts/global-installation.mjs) | Codex PreToolUse for Bash or Read after interactive hook trust |
-| Codex machine policy | features.memories | false | [`scripts/global-installation.mjs`](scripts/global-installation.mjs) | Codex PreToolUse for Bash or Read after interactive hook trust |
 | Codex machine policy | hooks.PreToolUse | one harness-owned guard | [`scripts/global-installation.mjs`](scripts/global-installation.mjs) | Codex PreToolUse for Bash or Read after interactive hook trust |
 | Claude project policy | includeCoAuthoredBy | false | [`project/.claude/settings.json`](project/.claude/settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
-| Claude project policy | autoMemoryEnabled | false | [`project/.claude/settings.json`](project/.claude/settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
 | Claude project policy | permissions.deny | project and nested secret paths | [`project/.claude/settings.json`](project/.claude/settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
 | Claude project policy | hooks.PreToolUse | one harness-owned project guard | [`project/.claude/settings.json`](project/.claude/settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
 | Codex project policy | features.hooks | true | [`project/.codex/hooks.json`](project/.codex/hooks.json) | Codex PreToolUse for Bash or Read after interactive hook trust |
-| Codex project policy | features.memories | false | [`project/.codex/hooks.json`](project/.codex/hooks.json) | Codex PreToolUse for Bash or Read after interactive hook trust |
 | Codex project policy | hooks.PreToolUse | one harness-owned project guard | [`project/.codex/hooks.json`](project/.codex/hooks.json) | Codex PreToolUse for Bash or Read after interactive hook trust |
 | Project verification | verification | existing or generated | [`project/scripts/verify-harness.mjs`](project/scripts/verify-harness.mjs) | node scripts/verify-harness.mjs |
 | Project CI | ci | none or github | [`project/.github/workflows/verify.yml`](project/.github/workflows/verify.yml) | GitHub push to main or pull_request when --ci github is selected |
@@ -162,27 +158,23 @@ Containment, installation, activation, dependencies, conditional uses, routes an
 | Claude PreToolUse for Bash, PowerShell or Read | activates | Claude machine policy | — | declared |
 | Claude machine policy | executes | components/guard-git.mjs | — | declared |
 | Claude machine policy | configures | includeCoAuthoredBy | — | declared |
-| Claude machine policy | configures | autoMemoryEnabled | — | declared |
 | Claude machine policy | configures | permissions.disableBypassPermissionsMode | — | declared |
 | Claude machine policy | configures | permissions.deny | — | declared |
 | Claude machine policy | configures | hooks.PreToolUse | — | declared |
 | Codex PreToolUse for Bash or Read after interactive hook trust | activates | Codex machine policy | — | declared |
 | Codex machine policy | executes | components/guard-git.mjs | — | declared |
 | Codex machine policy | configures | features.hooks | — | declared |
-| Codex machine policy | configures | features.memories | — | declared |
 | Codex machine policy | configures | hooks.PreToolUse | — | declared |
 | Claude opens the repository and loads CLAUDE.md | activates | Claude project guidance | — | declared |
 | Codex opens the repository and loads AGENTS.md | activates | Codex project guidance | — | declared |
 | Claude PreToolUse for Bash, PowerShell or Read | activates | Claude project policy | — | declared |
 | Claude project policy | executes | components/guard-git.mjs | — | declared |
 | Claude project policy | configures | includeCoAuthoredBy | — | declared |
-| Claude project policy | configures | autoMemoryEnabled | — | declared |
 | Claude project policy | configures | permissions.deny | — | declared |
 | Claude project policy | configures | hooks.PreToolUse | — | declared |
 | Codex PreToolUse for Bash or Read after interactive hook trust | activates | Codex project policy | — | declared |
 | Codex project policy | executes | components/guard-git.mjs | — | declared |
 | Codex project policy | configures | features.hooks | — | declared |
-| Codex project policy | configures | features.memories | — | declared |
 | Codex project policy | configures | hooks.PreToolUse | — | declared |
 | node scripts/verify-harness.mjs | activates | Project verification | — | declared |
 | Project verification | configures | verification | — | declared |
@@ -360,7 +352,7 @@ Containment, installation, activation, dependencies, conditional uses, routes an
 
 ## Cost inventory
 
-Static discovery metadata is approximately 974 tokens across the 22 canonical skills/workflows, with 24610 tokens loaded only when their bodies are invoked. Skill-based tool adapters add approximately 67 discovery tokens. MCP configuration bytes are inventoried, but runtime tool-schema tokens stay explicitly unmeasured until a client loads them. See [`TOKEN-COSTS.md`](TOKEN-COSTS.md); measured samples live separately in [`catalog/token-measurements.json`](catalog/token-measurements.json) and survive regeneration.
+Static discovery metadata is approximately 974 tokens across the 22 canonical skills/workflows, with 24466 tokens loaded only when their bodies are invoked. Skill-based tool adapters add approximately 67 discovery tokens. MCP configuration bytes are inventoried, but runtime tool-schema tokens stay explicitly unmeasured until a client loads them. See [`TOKEN-COSTS.md`](TOKEN-COSTS.md); measured samples live separately in [`catalog/token-measurements.json`](catalog/token-measurements.json) and survive regeneration.
 
 ## Graphify interchange decision
 

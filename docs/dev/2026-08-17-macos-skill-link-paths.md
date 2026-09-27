@@ -26,4 +26,4 @@ Containment resolves the deepest existing ancestor instead of calling `realpath`
 
 ## Follow-ups
 
-Codex hook trust remains an intentional interactive confirmation through `/hooks`. The Claude setting disables auto-memory; macOS does not provide an auditable environment-level lock through the setup script.
+Codex hook trust remains an intentional interactive confirmation through `/hooks`. Memory settings remain under each platform's default behavior or the user's own configuration.

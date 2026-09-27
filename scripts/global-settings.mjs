@@ -156,7 +156,11 @@ export function editFeatures(text, desired, removeCreatedTable = false) {
   const info = inspectFeatures(text);
   const edits = [];
   const additions = [];
-  for (const key of ['hooks', 'memories']) {
+  const keys = Object.keys(desired);
+  if (keys.some((key) => !['hooks', 'memories'].includes(key) || (desired[key] !== null && typeof desired[key] !== 'boolean'))) {
+    throw new Error('Invalid desired feature settings');
+  }
+  for (const key of keys) {
     const assignment = info.assignments[key];
     if (assignment) edits.push({ start: assignment.start, end: assignment.end,
       text: desired[key] === null ? '' : `${assignment.prefix}${desired[key]}${assignment.suffix}` });

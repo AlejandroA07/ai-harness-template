@@ -54,7 +54,6 @@ node scripts/machine-setup.mjs --apply --replace-guidance
 The apply step:
 
 - installs the global Claude and Codex guidance;
-- disables Claude and Codex auto-memory;
 - disables Claude's automatic Git attribution;
 - removes the optional Claude built-ins listed in `components/claude-tool-policy.mjs` while retaining Bash and PowerShell;
 - installs the machine-wide command/secret guard;

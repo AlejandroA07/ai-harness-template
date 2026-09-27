@@ -16,5 +16,6 @@ await import('./attribution.test.mjs');
 await import('./configuration.test.mjs');
 await import('./integrity.test.mjs');
 await import('./windows-cli.test.mjs');
+await import('./verification-runner.test.mjs');
 await import('./project-configuration.test.mjs');
 await import('./upstream-skills.test.mjs');

@@ -38,8 +38,6 @@ The script installs or generates:
 - `core.hooksPath=.githooks`;
 - generated project-specific skill adapters when `.harness/skills/` exists.
 
-Stable, portable, secret-free harness files are committed. Keep secrets, approval state, settings overrides, transcripts, caches, auto-memory, temporary handoffs, absolute machine state, and learning workspaces local.
-
 ## 3. Tailor from evidence
 
 The bootstrapping agent must inspect the repository and replace every placeholder in `AGENTS.md`:
@@ -58,11 +56,11 @@ Do not create project skills pre-emptively. Add a canonical `.harness/skills/<na
 node <harness-path>/scripts/generate-project-skills.mjs --project <project-path>
 ```
 
-Commit the generated `.claude/skills/` and `.agents/skills/` adapters. Never edit them by hand; CI/audit checks drift.
+Never edit generated `.claude/skills/` and `.agents/skills/` adapters by hand; CI/audit checks drift.
 
 ## 4. Conditional components
 
-- **Context7 MCP:** enable when current third-party documentation is repeatedly needed. Use the pinned Claude/Codex snippets under `components/mcp/` and commit the resulting project configuration.
+- **Context7 MCP:** enable when current third-party documentation is repeatedly needed. Use the pinned Claude/Codex snippets under `components/mcp/`.
 - **Playwright MCP:** enable for a real browser UI. Use the pinned snippets under `components/mcp/`.
 - **Architecture tests:** add only for a stable boundary whose dependency rule is worth enforcing.
 - **Stricter .NET analyzers:** review built-in analyzers and current Sonar rules for .NET projects; explain dependency/warning impact and ratchet legacy warnings.

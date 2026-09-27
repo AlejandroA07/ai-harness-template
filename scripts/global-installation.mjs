@@ -10,7 +10,7 @@ import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
 
 const plans = new WeakMap();
 const hashPattern = /^[a-f0-9]{64}$/;
-const scalarDefinitions = { includeCoAuthoredBy: false, autoMemoryEnabled: false, 'permissions.disableBypassPermissionsMode': 'disable' };
+const scalarDefinitions = { includeCoAuthoredBy: false, 'permissions.disableBypassPermissionsMode': 'disable' };
 const containerNames = ['permissions', 'hooks'];
 const sourceRuntimeFiles = ['components/guard-git.mjs', 'components/guard-policy.mjs', 'guidance/claude.md', 'guidance/codex.md'];
 const runtimeFiles = [...sourceRuntimeFiles, 'policy.json'];
@@ -85,7 +85,7 @@ function validateReceipt(receipt, { target, platform }) {
     || (platform === 'codex' && receipt.addedDenials.length)) fail('Invalid receipt permission ownership');
   if (!Array.isArray(receipt.createdContainers) || receipt.createdContainers.some((entry) => !containerNames.includes(entry))
     || new Set(receipt.createdContainers).size !== receipt.createdContainers.length) fail('Invalid receipt container ownership');
-  shape(receipt.features, platform === 'codex' ? ['hooks', 'memories'] : []);
+  shape(receipt.features, platform === 'codex' ? ['hooks'] : []);
   if (Object.values(receipt.features).some((value) => value !== null && typeof value !== 'boolean')) fail('Invalid prior feature value');
 }
 async function safePaths(target, locations) {
@@ -213,7 +213,7 @@ export async function planGlobalInstallation(repository, options) {
     hookOwned: hookCount(groups, expected) === 0, createdContainers: containerNames.filter((name) => !Object.hasOwn(settings, name)),
     settingsExisted: input.settings !== null, hookArrayExisted: getSetting(settings, ['hooks', 'PreToolUse']).present,
     denyArrayExisted: platform === 'claude' && getSetting(settings, ['permissions', 'deny']).present,
-    configExisted: input.config !== null, features: features?.values ?? {}, createdFeatureTable: features ? features.featureHeader === null : false };
+    configExisted: input.config !== null, features: features ? { hooks: features.values.hooks } : {}, createdFeatureTable: features ? features.featureHeader === null : false };
   if (platform === 'claude') {
     for (const [name, value] of Object.entries(scalarDefinitions)) {
       const keys = name.split('.');
@@ -239,7 +239,7 @@ export async function planGlobalInstallation(repository, options) {
       const retained = deny.filter((entry) => !previous.addedDenials.includes(entry));
       setSetting(modified, ['permissions', 'deny'], retained.length || previous.denyArrayExisted ? scalarState(retained) : { present: false });
     }
-  } else if (previous && !equal(features.values, { hooks: true, memories: false })) conflicts.push('features: owned Codex feature values were edited');
+  } else if (previous && features.values.hooks !== true) conflicts.push('features: owned Codex hook feature was edited');
   if (operation === 'apply') {
     if (previous && !previous.hookOwned && !equal(oldHook, expected)) conflicts.push('hooks: existing unowned hook cannot be replaced automatically');
     let retained = previous?.hookOwned && !equal(oldHook, expected) ? removeExactHook(groups, oldHook) : groups;
@@ -255,7 +255,7 @@ export async function planGlobalInstallation(repository, options) {
   }
   let config = input.config;
   if (platform === 'codex' && operation !== 'audit' && (operation === 'apply' || previous)) {
-    const updated = editFeatures(input.config?.toString('utf8') ?? '', operation === 'apply' ? { hooks: true, memories: false } : previous.features,
+    const updated = editFeatures(input.config?.toString('utf8') ?? '', operation === 'apply' ? { hooks: true } : previous.features,
       operation === 'remove' && previous.createdFeatureTable);
     config = operation === 'remove' && !previous.configExisted && !updated.trim() ? null : Buffer.from(updated);
   }
@@ -275,7 +275,7 @@ export async function planGlobalInstallation(repository, options) {
     evidence, applicable: conflicts.length === 0, conflicts,
     activation: settings.disableAllHooks === true && operation !== 'remove' ? 'Guard activation is blocked: local settings disable all hooks.' : operation === 'remove' ? 'Removal restores prior owned settings; shared runtime is retained.'
       : operation === 'audit' && !previous ? 'No global installation receipt is present.'
-        : platform === 'codex' ? 'Configuration enables hooks and disables memories; review/trust through /hooks remains interactive.' : 'Configuration enables the PreToolUse guard and disables automatic memory.',
+        : platform === 'codex' ? 'Configuration enables hooks; review/trust through /hooks remains interactive.' : 'Configuration enables the PreToolUse guard.',
     tools: [process.execPath, 'git (when checking push commands)'], runtime: operation === 'apply' ? runtime : previousRuntime,
     retainedRuntime: 'Shared immutable runtime revisions are retained on removal.' };
   plan.migrated = { guidance: Boolean(adoptingLegacyGuidance), hook: migratedLegacyHook };

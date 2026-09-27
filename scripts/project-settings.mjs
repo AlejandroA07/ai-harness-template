@@ -2,7 +2,7 @@ import { isDeepStrictEqual as equal } from 'node:util';
 import { object, parseSettings, getSetting, setSetting, hookGroups, hookCount, removeExactHook, pruneContainers } from './global-settings.mjs';
 import { encode } from './installation-core.mjs';
 
-const scalars = { autoMemoryEnabled: false, includeCoAuthoredBy: false };
+const scalars = { includeCoAuthoredBy: false };
 export function projectSettings(platform, bytes, expected, prior, remove = false) {
   if (!['codex', 'claude'].includes(platform)) throw new Error('Invalid project platform');
   const settings = parseSettings(bytes);

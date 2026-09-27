@@ -3,8 +3,8 @@
 Current selective receipt formats are version 2 for M2 machine Skills and M3 global
 configuration, and version 3 for M4 project configuration. M2/M3 retain scoped historical metadata
 under the platform store's `evidence/<hash>.json`; M4 retains project payload
-snapshots. Commit project evidence with its receipt. Machine evidence stays in the
-target installation store. Evidence is retained on updates, removal and rollback.
+snapshots. Machine evidence stays in the target installation store. Evidence is
+retained on updates, removal and rollback.
 
 A separate current-revision record binds the active receipt: `skills-current.json`
 or `global-current.json` in the platform store, and `.harness/project-current.json`

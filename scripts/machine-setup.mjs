@@ -81,7 +81,6 @@ const claudeSettingsPath = path.join(home, '.claude', 'settings.json');
 const claudeSettings = await readJson(claudeSettingsPath);
 const claudeTemplate = JSON.parse((await fs.readFile(path.join(root, 'global', 'claude-settings.json'), 'utf8')).replaceAll('{{HARNESS_ROOT}}', root.replaceAll('\\', '/')));
 claudeSettings.includeCoAuthoredBy = false;
-claudeSettings.autoMemoryEnabled = false;
 claudeSettings.permissions ??= {};
 claudeSettings.permissions.deny = reconcileHarnessDenials(
   claudeSettings.permissions.deny,
@@ -109,8 +108,6 @@ const planned = [
   path.join(home, '.claude', 'skills'),
   path.join(home, '.agents', 'skills'),
   `${root} -> git core.hooksPath=.githooks`,
-  'Codex memories -> disabled',
-  'Claude auto-memory environment lock -> enabled',
 ];
 for (const item of planned) console.log(`${apply ? 'APPLY' : 'WOULD APPLY'} ${item}`);
 if (!apply) {
@@ -131,16 +128,6 @@ await fs.mkdir(path.dirname(claudeSettingsPath), { recursive: true });
 await fs.writeFile(claudeSettingsPath, `${JSON.stringify(claudeSettings, null, 2)}\n`);
 await fs.mkdir(path.dirname(codexHooksPath), { recursive: true });
 await fs.writeFile(codexHooksPath, `${JSON.stringify(codexHooks, null, 2)}\n`);
-
-const disableMemories = run('codex', ['features', 'disable', 'memories']);
-if (disableMemories.status !== 0) throw new Error(disableMemories.stderr || 'Failed to disable Codex memories');
-
-if (process.platform === 'win32') {
-  const lockMemory = run('setx', ['CLAUDE_CODE_DISABLE_AUTO_MEMORY', '1']);
-  if (lockMemory.status !== 0) throw new Error(lockMemory.stderr || 'Failed to set Claude auto-memory environment lock');
-} else {
-  console.log('NOTE Set CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 in your login environment for a machine-level Claude lock.');
-}
 
 const hooksPath = run('git', ['config', 'core.hooksPath', '.githooks']);
 if (hooksPath.status !== 0) throw new Error(hooksPath.stderr || 'Failed to enable template Git hooks');

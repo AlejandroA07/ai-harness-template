@@ -5,7 +5,6 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
 import { discoverSkills, inspectManagedSkillLink, readInvocationPolicy } from './skill-lib.mjs';
-import { runTool } from './windows-cli.mjs';
 import { hasHarnessHook } from './config-merge.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,7 +35,7 @@ async function findMarkdownFiles(directory) {
 async function checkTemplate() {
   const required = [
     'README.md', 'MACHINE-SETUP.md', 'BOOTSTRAP.md', 'TOKEN-COSTS.md',
-    'scripts/machine-setup.mjs', 'scripts/bootstrap.mjs', 'scripts/verify.mjs',
+    'scripts/machine-setup.mjs', 'scripts/bootstrap.mjs', 'scripts/verify.mjs', 'scripts/verification-runner.mjs',
     'components/guard-git.mjs', 'components/claude-tool-policy.mjs', 'skills/invocation-policy.json',
     'skills/upstream-sources.json', 'scripts/upstream-skills.mjs',
   ];
@@ -83,7 +82,6 @@ async function checkMachine() {
   const claudeSettingsPath = path.join(home, '.claude', 'settings.json');
   try {
     const settings = JSON.parse(await fs.readFile(claudeSettingsPath, 'utf8'));
-    settings.autoMemoryEnabled === false ? pass('Claude auto-memory disabled') : fail('Claude auto-memory is not disabled');
     settings.includeCoAuthoredBy === false ? pass('Claude attribution disabled') : fail('Claude attribution setting is not disabled');
     hasHarnessHook(settings.hooks?.PreToolUse, claudeTemplate.hooks.PreToolUse[0])
       ? pass('Claude machine guard configured with shell and read coverage') : fail('Claude machine guard missing or modified');
@@ -100,28 +98,12 @@ async function checkMachine() {
     }
   } catch (error) { fail(`cannot audit Claude settings: ${error.message}`); }
 
-  if (process.platform === 'win32') {
-    const memoryLock = spawnSync('powershell', ['-NoProfile', '-Command', "[Environment]::GetEnvironmentVariable('CLAUDE_CODE_DISABLE_AUTO_MEMORY','User')"], { encoding: 'utf8' });
-    if (memoryLock.error) fail(`cannot verify Claude machine auto-memory lock: ${memoryLock.error.message}`);
-    else if (memoryLock.status !== 0) fail(`cannot verify Claude machine auto-memory lock: ${memoryLock.stderr.trim() || `exit ${memoryLock.status}`}`);
-    else if (memoryLock.stdout.trim() === '1') pass('Claude machine auto-memory lock enabled');
-    else fail('Claude machine auto-memory lock missing');
-  } else {
-    warn('Claude environment-level auto-memory lock is not audited on this OS');
-  }
-
   try {
     const hooks = JSON.parse(await fs.readFile(path.join(home, '.codex', 'hooks.json'), 'utf8'));
     hasHarnessHook(hooks.hooks?.PreToolUse, codexTemplate.hooks.PreToolUse[0])
       ? pass('Codex machine guard configured') : fail('Codex machine guard missing or modified');
     warn('Codex hook trust is interactive; confirm it with /hooks after changes');
   } catch (error) { fail(`cannot audit Codex hooks: ${error.message}`); }
-
-  const features = runTool('codex', ['features', 'list']);
-  if (features.error) fail(`cannot verify Codex memories: ${features.error.message}`);
-  else if (features.status !== 0) fail(`cannot verify Codex memories: ${features.stderr.trim() || `exit ${features.status}`}`);
-  else if (/^memories\s+.*\sfalse$/m.test(features.stdout)) pass('Codex memories disabled');
-  else fail('Codex memories are enabled or absent from the feature inventory');
 
   const canonicalSkills = await discoverSkills(path.join(root, 'skills'));
   const canonicalNames = new Set(canonicalSkills.map((skill) => skill.name));

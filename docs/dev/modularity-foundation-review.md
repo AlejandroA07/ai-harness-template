@@ -55,7 +55,7 @@ receipt format is introduced.
 the shape/type of saved scalar values; line 182 restores them directly. The
 runtime hash binds generated guidance and policy, not the prior values or
 ownership flags. A temporary Claude installation started with
-`autoMemoryEnabled: true`. Changing only its receipt's saved value to `false`
+`includeCoAuthoredBy: true`. Changing only its receipt's saved value to `false`
 passed audit; removal restored `false`. Changing the prior bypass-mode value to
 `enable` likewise succeeded. This violates the plan's forged-receipt preservation
 rule and M3's promise to restore actual prior values. Audit/apply/remove must

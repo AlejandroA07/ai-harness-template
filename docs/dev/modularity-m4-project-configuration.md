@@ -58,8 +58,8 @@ pointers yourself where they belong. New guidance uses the selected gate.
 Domain glossary and ADR files are never generated from guessed knowledge.
 
 Only selected platform settings/adapters are installed. Claude receives the
-project guard and disabled automatic memory/attribution. Codex receives its
-project guard plus `features.hooks = true` and `features.memories = false`.
+project guard and disabled attribution. Codex receives its project guard plus
+`features.hooks = true`. Neither platform's memory preferences are managed.
 The existing project hook command templates resolve the project root at runtime;
 the guard and its imports are copied into the project. Review platform trust and
 effective layered settings after installation; Codex hook trust is not copied or
@@ -77,8 +77,7 @@ options, file hashes and scoped prior settings. One project receipt owns shared
 runtime/guidance once. Removing one platform preserves the other platform and
 shared files; the last removal retires unchanged owned shared files. This receipt
 contains relative project paths, so a checkout can move or be cloned with its
-runtime. Commit the receipt, current-revision record, ownership payloads and generated runtime/adapters with
-project changes.
+runtime.
 
 Receipt version 3 points to a content-addressed snapshot under
 `.harness/project-payloads/<hash>/`. The snapshot contains installer-produced owned

@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import process from 'node:process';
-import { evaluateCommitBranch } from './guard-policy.mjs';
 import { attributionTextForScan, containsAttribution, shouldScanAttributionPath } from './attribution-policy.mjs';
 
 function git(args, options = {}) {
@@ -11,13 +10,6 @@ function git(args, options = {}) {
     process.exit(result.status ?? 1);
   }
   return result.stdout;
-}
-
-const branch = git(['branch', '--show-current']).trim();
-const branchReason = evaluateCommitBranch(branch);
-if (branchReason) {
-  console.error(`[pre-commit] ${branchReason}`);
-  process.exit(1);
 }
 
 const staged = git(['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']).split('\0').filter(Boolean);
