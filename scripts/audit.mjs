@@ -36,7 +36,7 @@ async function findMarkdownFiles(directory) {
 async function checkTemplate() {
   const required = [
     'README.md', 'MACHINE-SETUP.md', 'BOOTSTRAP.md', 'TOKEN-COSTS.md',
-    'scripts/machine-setup.mjs', 'scripts/bootstrap.mjs', 'scripts/verify.mjs',
+    'scripts/machine-setup.mjs', 'scripts/bootstrap.mjs', 'scripts/verify.mjs', 'scripts/verification-runner.mjs',
     'components/guard-git.mjs', 'components/claude-tool-policy.mjs', 'skills/invocation-policy.json',
     'skills/upstream-sources.json', 'scripts/upstream-skills.mjs',
   ];

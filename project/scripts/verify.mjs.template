@@ -1,20 +1,23 @@
 import process from 'node:process';
 import { runTool } from '../.harness/runtime/windows-cli.mjs';
 
+__VERIFICATION_RUNNER_SOURCE__
+
 // Bootstrap replaces this marker with commands detected from the project. Keep
 // the sequence deterministic: restore -> build/analyze -> format -> tests ->
 // dependency/security gates. CI runs this same file.
 const steps = __VERIFY_STEPS__;
 
-for (const step of steps) {
-  console.log(`\n==> ${step.name}`);
-  const options = { cwd: new URL('..', import.meta.url), stdio: 'inherit', shell: false };
-  const result = runTool(step.command, step.args, options);
-  if (result.error) {
-    console.error(result.error.message);
-    process.exit(1);
-  }
-  if (result.status !== 0) process.exit(result.status ?? 1);
-}
-
-console.log('\nVerification passed.');
+const result = runVerification({
+  steps,
+  execute(step, { timeoutMs }) {
+    return runTool(step.command, step.args, {
+      cwd: new URL('..', import.meta.url),
+      encoding: 'utf8',
+      maxBuffer: 50 * 1024 * 1024,
+      shell: false,
+      timeout: timeoutMs,
+    });
+  },
+});
+process.exitCode = result.status;

@@ -1,34 +1,16 @@
 import fs from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
+import { runVerification } from './verification-runner.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-
-function run(command, args, label) {
-  console.log(`\n==> ${label}`);
-  const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', shell: false });
-  if (result.error) {
-    console.error(result.error.message);
-    process.exit(1);
-  }
-  if (result.status !== 0) process.exit(result.status ?? 1);
-}
-
-run(process.execPath, [path.join(root, 'tests', 'run.mjs')], 'Node tests');
-run('git', ['diff', '--check'], 'Whitespace check');
-run('gitleaks', ['git', '--redact', '-v'], 'Gitleaks full-history scan');
-// Scan the whole tree, not just this repository's own workflows: project/ holds
-// the workflows and Dependabot config shipped into every bootstrapped project,
-// and CI audits them the same way.
-run('zizmor', ['.'], 'GitHub Actions security');
-
 const jsonFiles = [
   'skills/invocation-policy.json', 'catalog/integrations.json', 'catalog/token-measurements.json', 'global/claude-settings.json',
   'project/.claude/settings.json', 'project/.codex/hooks.json',
 ];
-for (const relative of jsonFiles) JSON.parse(await fs.readFile(path.join(root, relative), 'utf8'));
 
 const sourceFiles = [];
 async function walk(directory) {
@@ -40,6 +22,43 @@ async function walk(directory) {
   }
 }
 await walk(root);
-for (const file of sourceFiles.filter((file) => file.endsWith('.mjs'))) run(process.execPath, ['--check', file], `Syntax ${path.relative(root, file)}`);
 
-console.log('\nHarness verification passed.');
+const steps = [
+  { name: 'Whitespace', command: 'git', args: ['diff', '--check'] },
+  ...jsonFiles.map((relative) => ({
+    name: `JSON ${relative}`,
+    check() { return JSON.parse(readFileSync(path.join(root, relative), 'utf8')); },
+  })),
+  ...sourceFiles.filter((file) => file.endsWith('.mjs')).map((file) => ({
+    name: `Syntax ${path.relative(root, file)}`,
+    command: process.execPath,
+    args: ['--check', file],
+  })),
+  { name: 'Node tests', command: process.execPath, args: [path.join(root, 'tests', 'run.mjs')] },
+  { name: 'Gitleaks full-history scan', command: 'gitleaks', args: ['git', '--redact', '-v'] },
+  // Scan the whole tree, not just this repository's own workflows: project/
+  // contains workflows and Dependabot configuration shipped to projects.
+  { name: 'GitHub Actions security', command: 'zizmor', args: ['.'] },
+];
+
+const result = runVerification({
+  steps,
+  execute(step, { timeoutMs }) {
+    if (step.check) {
+      try {
+        step.check();
+        return { status: 0, stdout: '', stderr: '' };
+      } catch (error) {
+        return { status: 1, stdout: '', stderr: `${error.name}: ${error.message}\n` };
+      }
+    }
+    return spawnSync(step.command, step.args, {
+      cwd: root,
+      encoding: 'utf8',
+      maxBuffer: 50 * 1024 * 1024,
+      shell: false,
+      timeout: timeoutMs,
+    });
+  },
+});
+process.exitCode = result.status;

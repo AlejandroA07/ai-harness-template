@@ -9,7 +9,7 @@ A reusable, cross-platform workflow for Claude Code and Codex. It keeps durable 
 - Architecture: browse [ARCHITECTURE.md](ARCHITECTURE.md), regenerate it with `node scripts/architecture-view.mjs --write`, or inspect a receipt-backed target with `node scripts/architecture-view.mjs --platform codex --scope project --target <absolute-project-path> --json`.
 - Token cost: review [TOKEN-COSTS.md](TOKEN-COSTS.md) and update it with `node scripts/token-costs.mjs --write`.
 - Audit installed state: run `node scripts/audit.mjs`, or add `--project <path>` to check whether one project conforms to the template.
-- Verify repository correctness: run `node scripts/verify.mjs` to execute the template's tests and security gates. Exit code `0` is the definition of done. CodeQL runs separately in GitHub; check its result before merging.
+- Verify repository correctness: run `node scripts/verify.mjs` to execute the template's tests and security gates. Normal success prints only `PASS`; warnings and failures stay concise, while `--verbose` exposes complete stage output. Exit code `0` is the definition of done. See [ADR 0001](docs/adr/0001-token-efficient-verification.md). CodeQL runs separately in GitHub; check its result before merging.
 
 All mutating setup commands are dry-run by default and require `--apply`.
 

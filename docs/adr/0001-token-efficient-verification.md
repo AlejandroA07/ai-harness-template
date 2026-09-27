@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Use a quiet, script-owned repository verification contract
@@ -24,4 +24,4 @@ The verifier should run inexpensive checks first, fail fast, use correctness-pre
 
 The verification script becomes the maintained source of truth for required checks. A passing result proves only that its configured checks passed, so the script must evolve with the project. Full output remains available for diagnosis without consuming tokens during normal successful work.
 
-Implementation follows only after this proposed decision is reviewed.
+The contract is implemented by the shared verification runner used by both the harness repository and generated project verifiers.

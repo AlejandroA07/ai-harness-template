@@ -124,7 +124,10 @@ export async function planProjectInstallation(repository, options) {
       const steps = buildVerificationSteps({ dotnetTarget, hasDotnet, hasNode: packageBytes !== null, isGithub: config.ci === 'github', packageJson, relativeFiles: files });
       if (packageBytes === null && !hasDotnet) conflicts.push('Unknown stack requires an existing scripts/verify.mjs');
       const template = (await sourceFile('project/scripts/verify.mjs.template')).toString('utf8');
-      desired['scripts/verify.mjs'] = Buffer.from(template.replace('__VERIFY_STEPS__', JSON.stringify(steps, null, 2)));
+      const verificationRunner = (await sourceFile('scripts/verification-runner.mjs')).toString('utf8');
+      desired['scripts/verify.mjs'] = Buffer.from(template
+        .replace('__VERIFICATION_RUNNER_SOURCE__', verificationRunner)
+        .replace('__VERIFY_STEPS__', JSON.stringify(steps, null, 2)));
       if (config.ci === 'github') {
         if (packageBytes && !files.includes('package-lock.json')) conflicts.push('Generated Node CI requires package-lock.json');
         const globalJson = await read('global.json');
