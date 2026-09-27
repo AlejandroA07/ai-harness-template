@@ -6,11 +6,12 @@ function command(value, currentBranch = 'feature/example') {
   return evaluateHook({ hook_event_name: 'PreToolUse', tool_input: { command: value } }, currentBranch);
 }
 
-test('allows only an explicit push of the current eligible branch to origin', () => {
+test('checks push safety without deciding which branch family policy authorizes', () => {
   assert.equal(command('git push origin feature/example', 'feature/example'), null);
   assert.equal(command('git push -u origin feature/example', 'feature/example'), null);
   assert.equal(command('git push --set-upstream origin research/auth-options', 'research/auth-options'), null);
   assert.equal(command('git push origin prototype/auth-options', 'prototype/auth-options'), null);
+  assert.equal(command('git push origin release/1.2.0', 'release/1.2.0'), null);
 });
 
 test('blocks implicit, mismatched, alternate, compound, and dangerous pushes', () => {
@@ -30,6 +31,7 @@ test('blocks implicit, mismatched, alternate, compound, and dangerous pushes', (
   assert.ok(command('git push origin feature/another', 'feature/example'));
   assert.ok(command('git push origin research/another', 'research/auth-options'));
   assert.ok(command('git push origin main', 'main'));
+  assert.ok(command('git push origin master', 'master'));
 });
 
 test('mentions of push syntax are not treated as invocations', () => {
