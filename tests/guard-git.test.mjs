@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { evaluateCommitBranch, evaluateHook, parseHookInput } from '../components/guard-policy.mjs';
+import { evaluateHook, parseHookInput } from '../components/guard-policy.mjs';
 
 function command(value, currentBranch = 'feature/example') {
   return evaluateHook({ hook_event_name: 'PreToolUse', tool_input: { command: value } }, currentBranch);
@@ -40,15 +40,6 @@ test('mentions of push syntax are not treated as invocations', () => {
     "echo 'git push --force origin feature/example'",
     "sh -c \"rg -n 'git push' .\"",
   ]) assert.equal(command(value), null);
-});
-
-test('allows commits only on feature, research, and prototype branches', () => {
-  assert.equal(evaluateCommitBranch('feature/auth-flow'), null);
-  assert.equal(evaluateCommitBranch('research/auth-options'), null);
-  assert.equal(evaluateCommitBranch('prototype/auth-options'), null);
-  for (const branch of ['', 'main', 'master', 'fix/auth-flow', 'codex/auth-flow']) {
-    assert.ok(evaluateCommitBranch(branch));
-  }
 });
 
 test('blocks destructive Git commands', () => {

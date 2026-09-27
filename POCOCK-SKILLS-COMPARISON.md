@@ -82,7 +82,7 @@ This matches Pocock's tracker/domain contract architecture while preserving dete
 
 `ready-for-agent` describes workflow state and is retained. `ready-for-human` and the triage role/state machine are not used.
 
-The policy now targets the actual unwanted behavior: model/tool self-attribution or authorship claims in branch names, commits, PRs, comments, code, reviews, reports, and repository documentation. Ordinary workflow language is not prohibited. The branch guard separately rejects tool-branded branch prefixes.
+The policy now targets the actual unwanted behavior: model/tool self-attribution or authorship claims in branch names, commits, PRs, comments, code, reviews, reports, and repository documentation. Ordinary workflow language is not prohibited. Branch naming is guidance rather than an executable commit restriction.
 
 ## Prototype Git policy
 

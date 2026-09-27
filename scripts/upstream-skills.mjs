@@ -157,10 +157,6 @@ async function main() {
         .filter(([, entry]) => entry.mode !== 'local' && entry.reviewedCommit !== ref)
         .map(([name]) => name);
       if (unreviewed.length > 0) throw new Error(`Manifest has not recorded review at ${ref}: ${unreviewed.join(', ')}`);
-      const branch = run('git', ['-C', root, 'branch', '--show-current']);
-      if (!/^feature\/[a-zA-Z0-9._/-]+$/.test(branch)) {
-        throw new Error(`Exact updates require a feature/<topic> branch; current branch is '${branch || 'detached HEAD'}'`);
-      }
       for (const [name, entry] of Object.entries(manifest.skills).filter(([, value]) => value.mode === 'exact')) {
         const upstream = path.join(acquired.source, ...entry.upstreamPath.split('/'));
         const local = path.join(root, 'skills', entry.upstreamPath.split('/')[1], name);

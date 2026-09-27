@@ -254,14 +254,6 @@ export function parseHookInput(raw) {
   return { input };
 }
 
-export function evaluateCommitBranch(branch) {
-  if (!branch) return 'Commits from detached HEAD are blocked. Switch to a feature/<topic>, research/<topic>, or prototype/<topic> branch.';
-  if (!/^(?:feature|research|prototype)\/[a-zA-Z0-9._/-]+$/.test(branch)) {
-    return `Branch '${branch}' is not eligible for agent commits. Use feature/<topic>, research/<topic> for approved Wayfinder research, or prototype/<topic> for a throwaway prototype.`;
-  }
-  return null;
-}
-
 export function commandNeedsCurrentBranch(command) {
   return gitInvocations(command).some(({ subcommand }) => subcommand === 'push');
 }

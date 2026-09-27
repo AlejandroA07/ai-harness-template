@@ -45,8 +45,8 @@ This is a capability trade-off, not just a permission-prompt change. Re-run the 
 
 | File | Measured bytes | Estimated tokens |
 | --- | ---: | ---: |
-| global/AGENTS.md | 2424 | 606 |
-| global/CLAUDE.md | 2424 | 606 |
+| global/AGENTS.md | 1848 | 462 |
+| global/CLAUDE.md | 1848 | 462 |
 
 ## Static capability inventory
 
@@ -63,7 +63,7 @@ Metadata is the approximate always-discovered cost. Body cost is paid only when 
 | grill-with-docs | workflows | user-only | 31 | 16 | 0 / 0 |
 | grilling | skills | model-or-user | 41 | 421 | 0 / 0 |
 | handoff | skills | user-only | 24 | 168 | 0 / 0 |
-| implement | workflows | user-only | 55 | 498 | 0 / 0 |
+| implement | workflows | user-only | 55 | 354 | 0 / 0 |
 | improve-codebase-architecture | workflows | user-only | 39 | 1449 | 1 / 6685 |
 | prototype | skills | model-or-user | 48 | 685 | 2 / 13052 |
 | research | skills | model-or-user | 62 | 131 | 0 / 0 |
