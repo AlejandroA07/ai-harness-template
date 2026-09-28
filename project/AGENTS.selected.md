@@ -15,8 +15,7 @@ generated adapters. Keep optional workflow and tool activation explicit.
 Work on a non-default branch. Preserve unrelated work and test denied paths at
 external boundaries. Run the verification gate before committing. A task that
 calls for remote publication may push only the current non-default branch
-explicitly to `origin`; force, deletion, alternate
-repositories, and extra refspecs remain blocked. Use `gh` for ordinary issue and
-pull-request collaboration, not high-impact repository, merge, release, workflow,
-credential, secret, or arbitrary API mutations. Keep durable knowledge in
-reviewable project documents.
+explicitly to `origin`; force, deletion, alternate repositories, and extra
+refspecs remain blocked. Use `gh` for GitHub work. Merges, releases, and workflow
+control require explicit user intent. Keep durable knowledge in reviewable
+project documents.

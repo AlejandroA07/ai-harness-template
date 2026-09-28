@@ -217,12 +217,9 @@ function destructiveGhReason(command) {
     if (subcommand === 'auth' && action !== 'status') return `GitHub authentication ${action || 'change'}`;
     if (subcommand === 'alias' && action !== 'list') return `GitHub alias ${action || 'change'}`;
     if (subcommand === 'config' && !['get', 'list'].includes(action)) return `GitHub configuration ${action || 'change'}`;
-    if (subcommand === 'pr' && action === 'merge') return 'GitHub pull request merge';
     if (subcommand === 'repo' && ['archive', 'edit', 'rename'].includes(action)) return `GitHub repository ${action}`;
     if (subcommand === 'repo' && action === 'sync' && hasFlag(args.slice(1), 'f', '--force')) return 'forced GitHub repository sync';
-    if (subcommand === 'release' && ['create', 'edit', 'upload'].includes(action)) return `GitHub release ${action}`;
-    if (subcommand === 'workflow' && ['disable', 'enable', 'run'].includes(action)) return `GitHub workflow ${action}`;
-    if (subcommand === 'run' && ['cancel', 'rerun'].includes(action)) return `GitHub Actions run ${action}`;
+    if (subcommand === 'workflow' && ['disable', 'enable'].includes(action)) return `GitHub workflow ${action}`;
     if (['secret', 'variable'].includes(subcommand) && action === 'set') return `GitHub ${subcommand} set`;
     if (['ssh-key', 'gpg-key'].includes(subcommand) && action === 'add') return `GitHub ${subcommand} add`;
     if (lower.includes('--force') && ['repo', 'pr', 'release', 'workflow', 'run'].includes(subcommand)) return `forced GitHub ${subcommand} operation`;
