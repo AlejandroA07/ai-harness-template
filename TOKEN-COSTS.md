@@ -45,8 +45,8 @@ This is a capability trade-off, not just a permission-prompt change. Re-run the 
 
 | File | Measured bytes | Estimated tokens |
 | --- | ---: | ---: |
-| global/AGENTS.md | 1848 | 462 |
-| global/CLAUDE.md | 1848 | 462 |
+| global/AGENTS.md | 1482 | 371 |
+| global/CLAUDE.md | 1482 | 371 |
 
 ## Static capability inventory
 

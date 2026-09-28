@@ -26,6 +26,7 @@ async function createFixture({ machineSetup = false } = {}) {
   const home = path.join(root, 'home');
   const files = [
     'components/claude-tool-policy.mjs',
+    'components/secret-policy.mjs',
     'scripts/audit.mjs',
     'scripts/sync-skills.mjs',
     'scripts/skill-lib.mjs',

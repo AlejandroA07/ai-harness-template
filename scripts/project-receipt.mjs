@@ -2,7 +2,7 @@ import { object } from './global-settings.mjs';
 
 export const receiptPath = '.harness/project-installation.json';
 export const runtimeNames = ['installation-core.mjs', 'installation-evidence.mjs', 'skill-lib.mjs', 'global-settings.mjs', 'project-settings.mjs', 'project-state.mjs', 'project-adapters.mjs', 'project-receipt.mjs', 'project-check.mjs', 'project-provenance.mjs'];
-export const componentNames = ['guard-policy.mjs', 'guard-git.mjs', 'attribution-policy.mjs', 'check-attribution.mjs'];
+export const componentNames = ['secret-policy.mjs', 'guard-policy.mjs', 'guard-git.mjs', 'attribution-policy.mjs', 'check-attribution.mjs'];
 export const sharedPaths = ['AGENTS.md', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'scripts/verify.mjs', 'scripts/verify-harness.mjs',
   '.gitleaks.toml', '.github/workflows/harness-project.yml', '.harness/runtime/windows-cli.mjs',
   ...runtimeNames.map((name) => `.harness/project-runtime/${name}`), ...componentNames.map((name) => `.harness/hooks/${name}`)];

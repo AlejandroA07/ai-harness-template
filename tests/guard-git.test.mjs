@@ -50,8 +50,6 @@ test('blocks destructive Git commands', () => {
     'git reset --hard>reset.log',
     'git clean -fd',
     'git clean -fd; Write-Output unsafe',
-    'git branch -D old-work',
-    'git branch -D old-work>deleted.log',
     'git checkout .',
     'git checkout .;',
     'git restore .',
@@ -59,11 +57,8 @@ test('blocks destructive Git commands', () => {
     'git clean --force',
     'git checkout --force .',
     'git restore --worktree .',
-    'git branch --delete --force old-work',
     'git checkout -f',
     'git checkout HEAD -- .',
-    'git reset --keep HEAD~1',
-    'git reset --merge',
     'git rm -rf .',
     'git stash clear',
     'git worktree remove --force ../wt',
@@ -80,7 +75,11 @@ test('allows non-destructive Git forms needed for normal work', () => {
   for (const value of [
     'git clean -n',
     'git branch -d merged-work',
+    'git branch -D old-work',
+    'git branch --delete --force old-work',
     'git checkout feature/example',
+    'git reset --keep HEAD~1',
+    'git reset --merge',
     'git restore src/example.mjs',
     'git rm src/obsolete.mjs',
     'git worktree remove ../clean-worktree',
@@ -96,6 +95,13 @@ test('allows normal GitHub collaboration and the tracker relationship endpoints'
     'gh issue edit 42 --add-assignee @me',
     'gh pr create --title Example --body-file body.md',
     'gh pr review 42 --approve',
+    'gh pr merge 42 --squash',
+    'gh release create v1.0.0',
+    'gh release edit v1.0.0 --notes Updated',
+    'gh release upload v1.0.0 artifact.zip',
+    'gh workflow run deploy.yml',
+    'gh run cancel 123',
+    'gh run rerun 123',
     'gh run view 123',
     'gh api repos/acme/example/issues/42 --jq .id',
     'gh api --method POST repos/acme/example/issues/42/sub_issues -F sub_issue_id=123',
@@ -108,16 +114,11 @@ test('blocks destructive and high-impact GitHub operations', () => {
   for (const value of [
     'gh repo delete acme/example --yes',
     'gh issue delete 42 --yes',
-    'gh pr merge 42 --squash',
     'gh repo edit acme/example --visibility public',
     'gh repo archive acme/example --yes',
     'gh repo sync acme/example --force',
-    'gh release create v1.0.0',
     'gh release delete v1.0.0 --yes',
-    'gh workflow run deploy.yml',
     'gh workflow disable deploy.yml',
-    'gh run cancel 123',
-    'gh run rerun 123',
     'gh secret set API_TOKEN',
     'gh variable set DEPLOY_ENV --body production',
     'gh auth refresh',
@@ -152,9 +153,23 @@ test('blocks secret reads but permits env templates', () => {
     'Get-ChildItem Env:',
     'Get-Item Env:*',
   ]) assert.ok(command(value));
+  for (const value of [
+    'rg token .env.local',
+    "grep --include='.env.local' token .",
+    'grep token src/private.pem',
+    'echo safe > .env.local',
+    'node -e "require(\'fs\').readFileSync(\'.env\')"',
+  ]) assert.ok(command(value), value);
   assert.equal(command('Get-Content .env.example'), null);
   assert.equal(command('env NODE_ENV=test node app.mjs'), null);
   assert.equal(command('Get-Item Env:NODE_ENV'), null);
+  for (const value of [
+    "rg -n '\\.env|private\\.pem' components tests",
+    "grep -R '.env.local' components",
+    "grep --exclude='.env.local' token .",
+    "echo '.env.local'",
+    "Write-Output '.env.local'",
+  ]) assert.equal(command(value), null, value);
 });
 
 test('adversarial quoting cannot stall the guard', () => {

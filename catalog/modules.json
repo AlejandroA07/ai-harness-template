@@ -336,6 +336,7 @@
       "sources": [
         "components/guard-policy.mjs",
         "components/guard-git.mjs",
+        "components/secret-policy.mjs",
         "components/attribution-policy.mjs",
         "components/check-attribution.mjs",
         "components/pre-commit.mjs",

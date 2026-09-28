@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
+import { claudeSecretDenials } from '../components/secret-policy.mjs';
 import { reconcileHarnessDenials, replaceHarnessHook } from './config-merge.mjs';
 import { buildVerificationSteps } from './project-verification.mjs';
 import { detectDomainSignals, inspectExistingDomainConfiguration, inspectExistingDomainContract, inspectExistingTrackerConfiguration, renderDomainInstructions, renderTrackerInstructions } from './project-configuration.mjs';
@@ -100,7 +101,7 @@ if (existingDomain.state === 'conflict' || existingDomainContract.state === 'con
   console.log(`RECOMMENDED domain layout: ${domainLayout === 'multi' ? 'multi-context' : 'single-context'}${detected}`);
 }
 
-const componentFiles = ['guard-policy.mjs', 'guard-git.mjs', 'attribution-policy.mjs', 'check-attribution.mjs', 'pre-commit.mjs'];
+const componentFiles = ['secret-policy.mjs', 'guard-policy.mjs', 'guard-git.mjs', 'attribution-policy.mjs', 'check-attribution.mjs', 'pre-commit.mjs'];
 const planned = [
   'AGENTS.md', 'CLAUDE.md', '.claude/settings.json', '.codex/hooks.json',
   'docs/agents/issue-tracker.md', 'docs/agents/domain.md',
@@ -160,7 +161,7 @@ projectClaude.includeCoAuthoredBy = false;
 projectClaude.permissions ??= {};
 projectClaude.permissions.deny = reconcileHarnessDenials(
   projectClaude.permissions.deny,
-  [...claudeTemplate.permissions.deny, ...deniedClaudeBuiltInTools],
+  [...claudeSecretDenials('project'), ...claudeTemplate.permissions.deny, ...deniedClaudeBuiltInTools],
   obsoleteHarnessClaudeDenials,
 );
 projectClaude.hooks ??= {};
