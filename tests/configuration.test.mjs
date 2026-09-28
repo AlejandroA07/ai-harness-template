@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
+import { claudeSecretDenials, containsSensitivePath, isSecretBearingCommitPath } from '../components/secret-policy.mjs';
 import { hasHarnessHook, reconcileHarnessDenials, replaceHarnessHook } from '../scripts/config-merge.mjs';
 import { buildVerificationSteps } from '../scripts/project-verification.mjs';
 import { inspectManagedSkillLink, readLinkTarget } from '../scripts/skill-lib.mjs';
@@ -76,6 +77,19 @@ test('project verification includes local security gates', () => {
   });
   assert.ok(steps.some((step) => step.command === 'gitleaks'));
   assert.ok(steps.some((step) => step.command === 'zizmor'));
+});
+
+test('secret paths have one canonical policy for settings, runtime and commits', async () => {
+  assert.ok(claudeSecretDenials('machine').includes('Read(~/.ssh/**)'));
+  assert.ok(claudeSecretDenials('project').includes('Read(./.env)'));
+  assert.equal(containsSensitivePath('src/private.pem'), true);
+  assert.equal(containsSensitivePath('.env.example'), false);
+  assert.equal(isSecretBearingCommitPath('config/.env.local'), true);
+  assert.equal(isSecretBearingCommitPath('config/.env.template'), false);
+  for (const relative of ['global/claude-settings.json', 'project/.claude/settings.json']) {
+    const settings = JSON.parse(await fs.readFile(path.resolve(import.meta.dirname, '..', relative), 'utf8'));
+    assert.deepEqual(settings.permissions.deny, []);
+  }
 });
 
 test('Claude tool policy removes only approved optional tools and guards both shells', async () => {

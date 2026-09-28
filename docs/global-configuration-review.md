@@ -10,11 +10,11 @@ This document keeps the global harness review small and sequential. For each pen
 4. **Branch creation and commit authorization** — Completed. Branch naming is a short non-default-branch preference, not an executable restriction. The pre-commit hook no longer rejects branch families; verification, secret scanning, user-work protection, and push safety remain separate controls.
 5. **Destructive Git restrictions** — Completed. Direct broad deletion of files, uncommitted work, stashes, and worktrees remains blocked. Recovery and cleanup operations such as `reset --merge`, `reset --keep`, and forced local branch deletion are allowed.
 6. **GitHub operation permissions** — Completed. Pull-request merges, release creation/editing, and workflow run/rerun/cancel actions are allowed when explicitly requested. Deletion, repository/security settings, credentials, forced operations, and unrestricted API mutations remain blocked.
+7. **Secret-protection layers** — Completed. One canonical secret policy now supplies Claude denials, runtime path checks, and pre-commit filename checks. Harmless searches and text references are allowed, while real reads, redirections, commits, history scans, and CI scans remain protected.
 10. **Agent memory defaults** — Completed. The harness no longer instructs agents about memory or changes Claude or Codex memory settings.
 
 ## Pending review
 
-7. **Secret-protection layers** — Review Claude permission denials, global command/read hooks, pre-commit checks, and Gitleaks. Preserve meaningful secret protection while removing duplication and false-positive behavior.
 8. **Model/tool attribution restrictions** — Decide whether to retain the checks that reject model/tool authorship markers, commit trailers, selected phrases, and the robot emoji.
 9. **Disabled built-in tools** — Review the current denials for scheduling, monitoring, worktrees, notifications, workflows, notebooks, file sending, and related Claude tools. Remove denials that no longer match the desired level of agent autonomy.
 11. **Repeated global instructions** — Review duplication across global `AGENTS.md`, global `CLAUDE.md`, project guidance, skills, and documentation. Keep only duplication required by different platform entry points and move conditional detail behind concise pointers.

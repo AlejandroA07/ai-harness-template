@@ -4,6 +4,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
+import { claudeSecretDenials } from '../components/secret-policy.mjs';
 import { discoverSkills, inspectManagedSkillLink, readInvocationPolicy } from './skill-lib.mjs';
 import { hasHarnessHook } from './config-merge.mjs';
 
@@ -90,6 +91,10 @@ async function checkMachine() {
     missingToolDenials.length === 0
       ? pass(`Claude optional built-in tools disabled: ${deniedClaudeBuiltInTools.length}`)
       : fail(`Claude optional built-in tools remain enabled: ${missingToolDenials.join(', ')}`);
+    const missingSecretDenials = claudeSecretDenials('machine').filter((entry) => !denied.has(entry));
+    missingSecretDenials.length === 0
+      ? pass(`Claude secret paths denied: ${claudeSecretDenials('machine').length}`)
+      : fail(`Claude secret-path denials are missing: ${missingSecretDenials.join(', ')}`);
     for (const shell of ['Bash', 'PowerShell']) {
       denied.has(shell) ? fail(`Claude required shell is disabled: ${shell}`) : pass(`Claude required shell remains available: ${shell}`);
     }

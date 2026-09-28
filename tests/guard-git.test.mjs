@@ -153,9 +153,23 @@ test('blocks secret reads but permits env templates', () => {
     'Get-ChildItem Env:',
     'Get-Item Env:*',
   ]) assert.ok(command(value));
+  for (const value of [
+    'rg token .env.local',
+    "grep --include='.env.local' token .",
+    'grep token src/private.pem',
+    'echo safe > .env.local',
+    'node -e "require(\'fs\').readFileSync(\'.env\')"',
+  ]) assert.ok(command(value), value);
   assert.equal(command('Get-Content .env.example'), null);
   assert.equal(command('env NODE_ENV=test node app.mjs'), null);
   assert.equal(command('Get-Item Env:NODE_ENV'), null);
+  for (const value of [
+    "rg -n '\\.env|private\\.pem' components tests",
+    "grep -R '.env.local' components",
+    "grep --exclude='.env.local' token .",
+    "echo '.env.local'",
+    "Write-Output '.env.local'",
+  ]) assert.equal(command(value), null, value);
 });
 
 test('adversarial quoting cannot stall the guard', () => {

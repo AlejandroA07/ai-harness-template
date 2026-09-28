@@ -7,12 +7,13 @@ import { digest, encode, stat, readRegular, payloadHash, treeFiles, acquireTarge
   targetLockPath, publishFiles } from './installation-core.mjs';
 import { object, parseSettings, getSetting, setSetting, pruneContainers, hookCount, removeExactHook, hookGroups, inspectFeatures, editFeatures } from './global-settings.mjs';
 import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
+import { claudeSecretDenials } from '../components/secret-policy.mjs';
 
 const plans = new WeakMap();
 const hashPattern = /^[a-f0-9]{64}$/;
 const scalarDefinitions = { includeCoAuthoredBy: false, 'permissions.disableBypassPermissionsMode': 'disable' };
 const containerNames = ['permissions', 'hooks'];
-const sourceRuntimeFiles = ['components/guard-git.mjs', 'components/guard-policy.mjs', 'guidance/claude.md', 'guidance/codex.md'];
+const sourceRuntimeFiles = ['components/guard-git.mjs', 'components/guard-policy.mjs', 'components/secret-policy.mjs', 'guidance/claude.md', 'guidance/codex.md'];
 const runtimeFiles = [...sourceRuntimeFiles, 'policy.json'];
 const scalarState = (value) => value === undefined ? { present: false } : { present: true, value };
 const bytesEqual = (a, b) => a === null ? b === null : b !== null && a.equals(b);
@@ -51,7 +52,7 @@ async function sourceBundle(root) {
     files[relative] = relative.startsWith('guidance/') ? Buffer.from(bytes.toString('utf8').replaceAll('{{HARNESS_ROOT}}', root)) : bytes;
   }
   const template = parseSettings(await readRegular(path.join(root, 'global/claude-settings.json')));
-  const denials = [...new Set([...template.permissions.deny, ...deniedClaudeBuiltInTools])];
+  const denials = [...new Set([...claudeSecretDenials('machine'), ...template.permissions.deny, ...deniedClaudeBuiltInTools])];
   if (denials.some((entry) => typeof entry !== 'string')) fail('Invalid canonical permission denials');
   files['policy.json'] = Buffer.from(encode({ version: 1, executable: process.execPath, denials }));
   return { files, hash: payloadHash(files), denials };

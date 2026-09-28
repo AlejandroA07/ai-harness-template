@@ -1,18 +1,4 @@
-function containsSensitivePath(value) {
-  const normalized = value.replaceAll('\\', '/');
-  const envMatches = normalized.match(/(?:^|[\/\s"'])\.env(?:\.[a-zA-Z0-9_-]+)*/g) ?? [];
-  for (const match of envMatches) {
-    const name = match.trim().replace(/^['"]/, '').split('/').at(-1).toLowerCase();
-    if (!['.env.example', '.env.sample', '.env.template'].includes(name)) return true;
-  }
-  return /(?:^|\/)(?:id_rsa[^/]*|id_ed25519[^/]*|[^/]+\.(?:pem|key|p12|pfx))(?=$|[\s"';&|<>()])/i.test(normalized)
-    || /(?:^|\/)\.(?:ssh|aws|azure|kube|gnupg|config\/gcloud)(?:\/|$)/i.test(normalized)
-    || /(?:^|\/)\.claude\/\.credentials\.json(?=$|[\s"';&|<>()])/i.test(normalized)
-    || /(?:^|\/)\.config\/gh\/hosts\.yml(?=$|[\s"';&|<>()])/i.test(normalized)
-    || /(?:^|\/)\.docker\/config\.json(?=$|[\s"';&|<>()])/i.test(normalized)
-    || /(?:^|\/)\.npmrc(?=$|[\s"';&|<>()])/i.test(normalized)
-    || /(?:^|[\/\s"'])(?:service[-_.]?account(?:[-_.]key)?|application_default_credentials)\.json(?=$|[\s"';&|<>()])/i.test(normalized);
-}
+import { containsSensitivePath } from './secret-policy.mjs';
 
 function shellCommands(value) {
   const commands = [];
@@ -107,6 +93,76 @@ function commandInvocations(command, depth = 0) {
     invocations.push({ executable, args });
   }
   return invocations;
+}
+
+function searchReferencesSensitivePath({ executable, args }) {
+  const filesMode = executable.startsWith('rg') && args.some((arg) => arg.toLowerCase() === '--files');
+  let patternDeclared = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    const lower = arg.toLowerCase();
+    if (['-e', '--regexp', '-pattern'].includes(lower)) { patternDeclared = true; index += 1; continue; }
+    if (lower.startsWith('--regexp=') || lower.startsWith('-e=')) { patternDeclared = true; continue; }
+    if (['-f', '--file', '-path', '-literalpath'].includes(lower)) {
+      const value = args[index += 1] ?? '';
+      if (containsSensitivePath(value)) return true;
+      continue;
+    }
+    if (['-g', '--glob', '--iglob', '--include', '-include'].includes(lower)) {
+      const value = args[index += 1] ?? '';
+      if (containsSensitivePath(value)) return true;
+      continue;
+    }
+    if (['--glob=', '--iglob=', '--include=', '-include:'].some((prefix) => lower.startsWith(prefix))
+      && containsSensitivePath(arg.slice(arg.indexOf('=') >= 0 ? arg.indexOf('=') + 1 : arg.indexOf(':') + 1))) return true;
+    if (/^-g.+/i.test(arg) && containsSensitivePath(arg.slice(2))) return true;
+    if (arg.startsWith('-')) continue;
+    if (filesMode || patternDeclared) {
+      if (containsSensitivePath(arg)) return true;
+    } else patternDeclared = true;
+  }
+  return false;
+}
+
+function redirectsSensitivePath(command) {
+  let quote = '';
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+    if (quote) {
+      if (character === quote) quote = '';
+      else if (character === '\\' && quote === '"') index += 1;
+      continue;
+    }
+    if (character === '"' || character === "'") { quote = character; continue; }
+    if (character !== '<' && character !== '>') continue;
+    while (command[index + 1] === character) index += 1;
+    while (/\s/.test(command[index + 1] ?? '')) index += 1;
+    let target = '';
+    const targetQuote = ['"', "'"].includes(command[index + 1]) ? command[index += 1] : '';
+    while (index + 1 < command.length) {
+      const next = command[index + 1];
+      if (targetQuote ? next === targetQuote : /[\s;&|<>()]/.test(next)) break;
+      target += next;
+      index += 1;
+    }
+    if (containsSensitivePath(target)) return true;
+  }
+  return false;
+}
+
+function commandReferencesSensitivePath(command) {
+  if (redirectsSensitivePath(command)) return true;
+  const mentionOnly = new Set(['echo', 'echo.exe', 'printf', 'write-output', 'write-host']);
+  const searches = new Set(['rg', 'rg.exe', 'ripgrep', 'grep', 'grep.exe', 'egrep', 'fgrep', 'select-string']);
+  for (const invocation of commandInvocations(command)) {
+    if (mentionOnly.has(invocation.executable)) continue;
+    if (searches.has(invocation.executable)) {
+      if (searchReferencesSensitivePath(invocation)) return true;
+      continue;
+    }
+    if (invocation.args.some(containsSensitivePath)) return true;
+  }
+  return false;
 }
 
 function gitInvocations(command) {
@@ -263,7 +319,7 @@ export function evaluateHook(input, currentBranch = '') {
     return 'Reading secret-bearing files is blocked. Use the project secret mechanism; example/template env files remain readable.';
   }
   if (!command) return null;
-  if (containsSensitivePath(command)) {
+  if (commandReferencesSensitivePath(command)) {
     return 'Commands that reference secret-bearing files are blocked. Do not read or print secrets.';
   }
   if (exposesCredentialMaterial(command)) return 'Commands that print credential or environment material are blocked. Request only a specific non-secret value when needed.';
