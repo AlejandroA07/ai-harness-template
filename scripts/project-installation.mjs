@@ -193,7 +193,8 @@ export async function planProjectInstallation(repository, options) {
   after[receiptPath] = active.length ? Buffer.from(encode(next)) : null;
   const operations = operation === 'audit' || (operation === 'remove' && !selected) ? [] : Object.entries(after)
     .filter(([file, bytes]) => !sameBytes(observed[file] ?? null, bytes)
-      || (bytes !== null && file.startsWith('.githooks/') && executableModes[file] !== null && !(executableModes[file] & 0o111)))
+      || (process.platform !== 'win32' && bytes !== null && file.startsWith('.githooks/')
+        && typeof executableModes[file] === 'number' && !(executableModes[file] & 0o111)))
     .map(([id, bytes]) => ({ id, file: path.join(target, id), before: observed[id] ?? null, after: bytes,
       receipt: id === receiptPath, ...(id.startsWith('.githooks/') ? { mode: 0o700 } : {}) }));
   const plan = { version: 1, module: 'project-configuration', scope, profile: 'coexistence', operation, target, platform,
