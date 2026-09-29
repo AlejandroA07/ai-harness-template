@@ -612,7 +612,7 @@
       ],
       "routes": [],
       "prerequisites": [
-        "Invocation requires an approved specification or ticket and the project verification command node scripts/verify.mjs.",
+        "Invocation requires an approved specification or ticket and the project verification command node scripts/verify-harness.mjs.",
         "Git operations require Git; project checks may require stack-specific tools."
       ],
       "resources": [],

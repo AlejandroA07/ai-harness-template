@@ -160,20 +160,20 @@ test('workflow lifecycle installs required skills once and preserves a direct de
 test('project workflow plans report missing contracts, configured contracts and documented fallbacks', async () => fixture(async (f) => {
   const missing = await f.plan(['implement'], { scope: 'project' });
   const verification = missing.capabilities.find((entry) => entry.id === 'implement').prerequisites
-    .find((entry) => entry.paths.includes('scripts/verify.mjs'));
+    .find((entry) => entry.paths.includes('scripts/verify-harness.mjs'));
   assert.equal(verification.status, 'missing');
-  assert.deepEqual(verification.missing, ['scripts/verify.mjs']);
+  assert.deepEqual(verification.missing, ['scripts/verify-harness.mjs']);
   const tracker = missing.capabilities.find((entry) => entry.id === 'code-review').prerequisites
     .find((entry) => entry.paths.includes('docs/agents/issue-tracker.md'));
   assert.equal(tracker.status, 'fallback');
   assert.match(tracker.description, /GitHub Issues.*\.scratch/);
   await fs.mkdir(path.join(f.target, 'scripts'));
-  await fs.writeFile(path.join(f.target, 'scripts/verify.mjs'), 'process.exit(0);\n');
+  await fs.writeFile(path.join(f.target, 'scripts/verify-harness.mjs'), 'process.exit(0);\n');
   await fs.mkdir(path.join(f.target, 'docs/agents'), { recursive: true });
   await fs.writeFile(path.join(f.target, 'docs/agents/issue-tracker.md'), '# Local tracker\n');
   const configured = await f.plan(['implement'], { scope: 'project' });
   assert.equal(configured.capabilities.find((entry) => entry.id === 'implement').prerequisites
-    .find((entry) => entry.paths.includes('scripts/verify.mjs')).status, 'configured');
+    .find((entry) => entry.paths.includes('scripts/verify-harness.mjs')).status, 'configured');
   assert.equal(configured.capabilities.find((entry) => entry.id === 'code-review').prerequisites
     .find((entry) => entry.paths.includes('docs/agents/issue-tracker.md')).status, 'configured');
 }));
