@@ -9,7 +9,6 @@ import { runVerification } from './verification-runner.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const jsonFiles = [
   'skills/invocation-policy.json', 'catalog/integrations.json', 'catalog/token-measurements.json', 'global/claude-settings.json',
-  'project/.claude/settings.json', 'project/.codex/hooks.json',
 ];
 
 const sourceFiles = [];

@@ -35,10 +35,10 @@ The groups below cover the tracked baseline. A path can have one implementation 
 | `global/AGENTS.md`, `global/CLAUDE.md` | Global configuration | Shared policy expressed through two platform outputs; preserve both effective behaviors and avoid text drift |
 | `global/claude-settings.json`, `global/codex-hooks/` | Global configuration | Platform settings with shared guard dependencies; absolute source-checkout references need lifecycle handling |
 | `project/AGENTS.md.template`, `project/CLAUDE.md` | Project configuration | Human-tailored project guidance; preserve local edits |
-| `project/.claude/`, `project/.codex/` | Project configuration | Selected platform adapters; both currently installed together |
+| `.claude/skills/`, `.agents/skills/` in configured projects | Project configuration | Selected project skill adapters; agent settings remain machine-owned |
 | `project/.githooks/`, `project/.gitleaks.toml` | Project configuration / verification | Consume shared policy/runtime; own specific installed paths and Git configuration |
 | `project/.github/`, `project/scripts/verify.mjs.template` | Project configuration / verification and CI | Preserve gate ordering, pinned actions, least privilege, conditional runtime provisioning |
-| `components/guard-policy.mjs`, `guard-git.mjs`, `attribution-policy.mjs`, `check-attribution.mjs`, `pre-commit.mjs`, `claude-tool-policy.mjs` | Shared policy/runtime | Global configuration, project copies, this repository's Git hooks and CI |
+| `components/guard-policy.mjs`, `guard-git.mjs`, `attribution-policy.mjs`, `check-attribution.mjs`, `pre-commit.mjs`, `global/claude-tools.json`, `scripts/claude-dev.mjs` | Shared policy/runtime | Global configuration, repository Git hooks, this repository's Git hooks and token-focused Claude CLI sessions |
 | `components/mcp/` | Tool integrations | Existing Context7/Playwright adapters; keep separate from the agent command guards |
 | `scripts/machine-setup.mjs`, `bootstrap.mjs` | Installation core entry points | Preserve legacy full-profile commands while adding explicit selection |
 | `scripts/config-merge.mjs`, `skill-lib.mjs`, `sync-skills.mjs`, `generate-skills.mjs`, `generate-project-skills.mjs` | Installation core | Generation and owned installation state for Skills, Workflows, and integration adapters |

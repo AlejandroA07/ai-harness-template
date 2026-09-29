@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { evaluateHook, parseHookInput } from '../components/guard-policy.mjs';
+
+const guardProgram = fileURLToPath(new URL('../components/guard-git.mjs', import.meta.url));
 
 function command(value, currentBranch = 'feature/example') {
   return evaluateHook({ hook_event_name: 'PreToolUse', tool_input: { command: value } }, currentBranch);
@@ -59,8 +63,38 @@ test('blocks destructive Git commands', () => {
     'git restore --worktree .',
     'git checkout -f',
     'git checkout HEAD -- .',
+    'git checkout HEAD -- :/',
+    "git checkout HEAD -- ':/*'",
+    'git checkout HEAD -- ./',
+    "git checkout HEAD -- '*'",
+    "git checkout HEAD -- ':(top)**'",
+    "git checkout HEAD -- ':(glob)**'",
+    "git checkout HEAD -- ':(exclude)nonexistent'",
+    "git checkout HEAD ':(exclude)nonexistent'",
+    'git restore --worktree :/',
+    "git restore --worktree -- ':/**'",
+    "git restore --worktree -- ':!nonexistent'",
+    "git restore --source HEAD ':(exclude)nonexistent'",
+    "git restore -s HEAD ':!nonexistent'",
+    'git restore --pathspec-from-file=paths.txt',
+    'git restore ./',
     'git rm -rf .',
+    'git rm -rf ./',
+    "git rm -rf -- ':^nonexistent'",
+    'git switch --discard-changes main',
+    'git switch -f main',
+    'git switch --force main',
     'git stash clear',
+    'git reflog expire --expire=now --all',
+    'git prune',
+    'git gc --prune=now',
+    'git gc --prune=0',
+    'git -c gc.pruneExpire=now gc',
+    'git -c gc.pruneExpire=0 gc',
+    'git -cgc.pruneExpire=all gc',
+    'git config gc.pruneExpire now',
+    'git config gc.pruneExpire 0',
+    'git config --local gc.pruneExpire=all',
     'git worktree remove --force ../wt',
     'git -C ../repo clean --force',
     'git commit --no-verify -m unsafe',
@@ -80,7 +114,12 @@ test('allows non-destructive Git forms needed for normal work', () => {
     'git checkout feature/example',
     'git reset --keep HEAD~1',
     'git reset --merge',
+    'git reflog expire --dry-run --expire=now --all',
+    'git prune --dry-run',
+    'git gc',
+    'git config --get gc.pruneExpire now',
     'git restore src/example.mjs',
+    "git restore -- src ':(exclude)src/generated'",
     'git rm src/obsolete.mjs',
     'git worktree remove ../clean-worktree',
     'git commit -m safe',
@@ -130,6 +169,10 @@ test('blocks destructive and high-impact GitHub operations', () => {
     'gh api repos/acme/example/issues/42 -f title=Changed',
     'gh api graphql -f query=mutation',
   ]) assert.ok(command(value), value);
+
+  const reason = command('gh repo delete acme/example --yes');
+  assert.match(reason, /deletes data/);
+  assert.doesNotMatch(reason, /publishes a release|runs automation/);
 });
 
 test('blocks secret reads but permits env templates', () => {
@@ -143,6 +186,9 @@ test('blocks secret reads but permits env templates', () => {
     'cat ~/.config/gh/hosts.yml',
     'gh auth token',
     'cat ~/.npmrc',
+    'cat ~/.netrc',
+    'cat ~/.git-credentials',
+    'cat ~/.pypirc',
     'cat ~/.kube/config',
     'cat ~/.docker/config.json',
     'cat ~/.gnupg/secring.gpg',
@@ -150,8 +196,31 @@ test('blocks secret reads but permits env templates', () => {
     'cat application_default_credentials.json',
     'printenv',
     'env',
+    'env -0',
+    'env -u HOME',
     'Get-ChildItem Env:',
     'Get-Item Env:*',
+    'echo $API_TOKEN',
+    'echo $API_KEY',
+    'echo "it\'s $API_TOKEN"',
+    'echo "${API_TOKEN:-missing}"',
+    'printf "%s" "${DEPLOY_SECRET}"',
+    'Write-Output $env:DATABASE_PASSWORD',
+    'Write-Output "${env:API_TOKEN}"',
+    'printenv CI_CREDENTIAL',
+    'printenv AWS_ACCESS_KEY_ID',
+    'NAME=API_TOKEN; printenv $NAME',
+    'NAME=API_TOKEN; echo ${!NAME}',
+    'Get-Item Env:PRIVATE_KEY',
+    'Get-Item "Env:$NAME"',
+    'Get-Item Env:API_*',
+    'Get-ChildItem Env:API_TOKEN',
+    'Get-ChildItem -Path Env:',
+    'gci -LiteralPath Env:',
+    'gci Env:*',
+    'cmd /c echo %API_TOKEN%',
+    "sh -c 'echo $API_TOKEN'",
+    "pwsh -Command 'Write-Output $env:API_TOKEN'",
   ]) assert.ok(command(value));
   for (const value of [
     'rg token .env.local',
@@ -162,7 +231,14 @@ test('blocks secret reads but permits env templates', () => {
   ]) assert.ok(command(value), value);
   assert.equal(command('Get-Content .env.example'), null);
   assert.equal(command('env NODE_ENV=test node app.mjs'), null);
+  assert.equal(command('printenv NODE_ENV'), null);
+  assert.equal(command('echo $NODE_ENV'), null);
   assert.equal(command('Get-Item Env:NODE_ENV'), null);
+  assert.equal(command("Get-Item 'Env:ProgramFiles(x86)'"), null);
+  assert.equal(command('Get-ChildItem Env:NODE_ENV'), null);
+  assert.equal(command('Get-ChildItem -Path Env:NODE_ENV'), null);
+  assert.equal(command('cmd /c echo %NODE_ENV%'), null);
+  assert.equal(command("Write-Output '$API_TOKEN'"), null);
   for (const value of [
     "rg -n '\\.env|private\\.pem' components tests",
     "grep -R '.env.local' components",
@@ -188,4 +264,26 @@ test('malformed and empty hook input fail closed', () => {
   assert.deepEqual(parseHookInput('{"tool_input":{"command":"git status"}}'), {
     input: { tool_input: { command: 'git status' } },
   });
+  assert.ok(parseHookInput(`{"tool_input":{"command":"${'x'.repeat(1_100_000)}"}}`).reason);
+});
+
+test('hook process stays silent on success and rejects oversized input without echoing it', () => {
+  const allowed = spawnSync(process.execPath, [guardProgram], {
+    encoding: 'utf8',
+    input: JSON.stringify({ tool_input: { command: 'git status' } }),
+  });
+  assert.equal(allowed.status, 0);
+  assert.equal(allowed.stdout, '');
+  assert.equal(allowed.stderr, '');
+
+  const oversized = spawnSync(process.execPath, [guardProgram], {
+    encoding: 'utf8',
+    input: JSON.stringify({ tool_input: { command: 'x'.repeat(1_100_000) } }),
+    maxBuffer: 2 * 1024 * 1024,
+  });
+  assert.equal(oversized.status, 0);
+  assert.equal(oversized.stderr, '');
+  const denial = JSON.parse(oversized.stdout);
+  assert.match(denial.hookSpecificOutput.permissionDecisionReason, /oversized/);
+  assert.doesNotMatch(oversized.stdout, /x{100}/);
 });

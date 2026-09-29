@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "tools": [
+    "Agent",
+    "AskUserQuestion",
+    "Bash",
+    "Edit",
+    "EnterPlanMode",
+    "ExitPlanMode",
+    "Glob",
+    "Grep",
+    "LSP",
+    "PowerShell",
+    "Read",
+    "Skill",
+    "WebFetch",
+    "WebSearch",
+    "Write"
+  ]
+}

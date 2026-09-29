@@ -55,12 +55,22 @@ The apply step:
 
 - installs the global Claude and Codex guidance;
 - disables Claude's automatic Git attribution;
-- removes the optional Claude built-ins listed in `components/claude-tool-policy.mjs` while retaining Bash and PowerShell;
+- removes retired harness-owned Claude tool denials while preserving secret-path denials;
 - installs the machine-wide command/secret guard;
 - reconciles the visible user skills to the canonical `skills/` inventory, generates Claude/Codex adapters, and safely links them into their official user locations;
 - enables this template's Git hooks.
 
 It does not enable, remove, or reconfigure MCP servers.
+
+### Token-focused Claude CLI
+
+Start a development session through the native tool allowlist:
+
+```powershell
+node scripts/claude-dev.mjs
+```
+
+Arguments are forwarded to Claude, for example `node scripts/claude-dev.mjs --model sonnet`. Customize the available developer tools in `global/claude-tools.json`; use `node scripts/claude-dev.mjs --print-tools` to inspect the active list. This launcher uses Claude's `--tools` option, so excluded built-ins are unavailable to the model instead of merely being rejected after selection. Direct `claude` launches and Claude Desktop do not use this allowlist.
 
 The canonical `skills/` tree is the complete source of truth for harness-managed user skills. After apply, every visible skill directory or link under `~/.claude/skills/` and `~/.agents/skills/` is either a canonical harness link or has been moved to a recoverable archive under `~/.ai-harness-skill-archive/<session>/<claude|codex>/`. This includes an older manual copy whose name is now canonical and any case-variant spelling of a canonical name. The synchronizer never deletes the displaced entry. The two skill roots themselves must be absent or real directories; linked roots fail closed before enumeration. Hidden platform-managed entries and ordinary non-skill files are left alone; Codex system and plugin skills outside these two directories are not owned by the harness.
 

@@ -17,7 +17,7 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | Module | Purpose | Visibility | Platforms | Scopes | Planned / installed / observed | Depends on |
 | --- | --- | --- | --- | --- | --- | --- |
 | Global configuration | Machine-wide guidance and platform settings. | public | claude/codex | machine | not-evaluated / not-inspected / not-inspected | Installation core, Shared policy/runtime |
-| Project configuration | Repository guidance, verification and optional CI. | public | claude/codex | project | not-evaluated / not-inspected / not-inspected | Installation core, Shared policy/runtime |
+| Project configuration | Repository-specific guidance, skill adapters, verification and optional CI. | public | claude/codex | project | not-evaluated / not-inspected / not-inspected | Installation core, Shared policy/runtime |
 | Skills | Individual reusable capabilities; ownership is refined per capability. | public | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Installation core |
 | Workflows | Ordered compositions packaged through the existing skill adapters. | public | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Skills, Installation core |
 | Tool integrations | Optional pinned programs and MCP adapters with explicit acquisition and activation definitions. | public | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Installation core |
@@ -30,8 +30,8 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | --- | --- | --- |
 | Global configuration | claude | Claude machine guidance, Claude machine policy |
 | Global configuration | codex | Codex machine guidance, Codex machine policy |
-| Project configuration | claude | Claude project guidance, Claude project policy, Project verification, Project CI |
-| Project configuration | codex | Codex project guidance, Codex project policy, Project verification, Project CI |
+| Project configuration | claude | Claude project guidance, Project verification, Project CI |
+| Project configuration | codex | Codex project guidance, Project verification, Project CI |
 | Skills | claude | Code Review, Codebase Design, Diagnosing Bugs, Domain Modeling, Grilling, Handoff, Prototype, Research, Security Checklist, Tdd, To Questionnaire, Wait What, Writing For Agents |
 | Skills | codex | Code Review, Codebase Design, Diagnosing Bugs, Domain Modeling, Grilling, Handoff, Prototype, Research, Security Checklist, Tdd, To Questionnaire, Wait What, Writing For Agents |
 | Workflows | claude | Ask Alfred, Grill Me, Grill With Docs, Implement, Improve Codebase Architecture, Teach, To Spec, To Tickets, Wayfinder |
@@ -51,8 +51,6 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | global-configuration | Codex machine policy | Enable the command guard. | codex | hook: Codex PreToolUse for Bash or Read after interactive hook trust | not-evaluated / not-inspected / not-inspected | [`scripts/global-installation.mjs`](scripts/global-installation.mjs)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
 | project-configuration | Claude project guidance | Load repository-owned guidance into Claude sessions. | claude | session: Claude opens the repository and loads CLAUDE.md | not-evaluated / not-inspected / not-inspected | [`project/CLAUDE.md`](project/CLAUDE.md) |
 | project-configuration | Codex project guidance | Load repository-owned guidance into Codex sessions. | codex | session: Codex opens the repository and loads AGENTS.md | not-evaluated / not-inspected / not-inspected | [`project/AGENTS.selected.md`](project/AGENTS.selected.md) |
-| project-configuration | Claude project policy | Run repository-owned command and secret-path checks. | claude | hook: Claude PreToolUse for Bash, PowerShell or Read | not-evaluated / not-inspected / not-inspected | [`project/.claude/settings.json`](project/.claude/settings.json)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
-| project-configuration | Codex project policy | Run repository-owned command and secret-path checks. | codex | hook: Codex PreToolUse for Bash or Read after interactive hook trust | not-evaluated / not-inspected / not-inspected | [`project/.codex/hooks.json`](project/.codex/hooks.json)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
 | project-configuration | Project verification | Run the repository's selected deterministic completion gate. | claude/codex | command: node scripts/verify-harness.mjs | not-evaluated / not-inspected / not-inspected | [`project/scripts/verify-harness.mjs`](project/scripts/verify-harness.mjs) |
 | project-configuration | Project CI | Run the generated project verification gate in GitHub Actions when selected. | claude/codex | ci: GitHub push to main or pull_request when --ci github is selected | not-evaluated / not-inspected / not-inspected | [`project/.github/workflows/verify.yml`](project/.github/workflows/verify.yml) |
 | workflows | Ask Alfred | Ask which skill or flow fits your situation. A router over the skills in this harness. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/ask-alfred/SKILL.md`](skills/engineering/ask-alfred/SKILL.md)<br>[`skills/engineering/ask-alfred/PHASE-BOUNDARIES.md`](skills/engineering/ask-alfred/PHASE-BOUNDARIES.md) |
@@ -88,15 +86,10 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | --- | --- | --- | --- | --- |
 | Claude machine policy | includeCoAuthoredBy | false | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
 | Claude machine policy | permissions.disableBypassPermissionsMode | disable | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
-| Claude machine policy | permissions.deny | canonical secret paths plus reviewed built-in tool denials | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
+| Claude machine policy | permissions.deny | canonical secret paths | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
 | Claude machine policy | hooks.PreToolUse | one harness-owned guard | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
 | Codex machine policy | features.hooks | true | [`scripts/global-installation.mjs`](scripts/global-installation.mjs) | Codex PreToolUse for Bash or Read after interactive hook trust |
 | Codex machine policy | hooks.PreToolUse | one harness-owned guard | [`scripts/global-installation.mjs`](scripts/global-installation.mjs) | Codex PreToolUse for Bash or Read after interactive hook trust |
-| Claude project policy | includeCoAuthoredBy | false | [`project/.claude/settings.json`](project/.claude/settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
-| Claude project policy | permissions.deny | project and nested secret paths | [`project/.claude/settings.json`](project/.claude/settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
-| Claude project policy | hooks.PreToolUse | one harness-owned project guard | [`project/.claude/settings.json`](project/.claude/settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
-| Codex project policy | features.hooks | true | [`project/.codex/hooks.json`](project/.codex/hooks.json) | Codex PreToolUse for Bash or Read after interactive hook trust |
-| Codex project policy | hooks.PreToolUse | one harness-owned project guard | [`project/.codex/hooks.json`](project/.codex/hooks.json) | Codex PreToolUse for Bash or Read after interactive hook trust |
 | Project verification | verification | existing or generated | [`project/scripts/verify-harness.mjs`](project/scripts/verify-harness.mjs) | node scripts/verify-harness.mjs |
 | Project CI | ci | none or github | [`project/.github/workflows/verify.yml`](project/.github/workflows/verify.yml) | GitHub push to main or pull_request when --ci github is selected |
 
@@ -167,15 +160,6 @@ Containment, installation, activation, dependencies, conditional uses, routes an
 | Codex machine policy | configures | hooks.PreToolUse | — | declared |
 | Claude opens the repository and loads CLAUDE.md | activates | Claude project guidance | — | declared |
 | Codex opens the repository and loads AGENTS.md | activates | Codex project guidance | — | declared |
-| Claude PreToolUse for Bash, PowerShell or Read | activates | Claude project policy | — | declared |
-| Claude project policy | executes | components/guard-git.mjs | — | declared |
-| Claude project policy | configures | includeCoAuthoredBy | — | declared |
-| Claude project policy | configures | permissions.deny | — | declared |
-| Claude project policy | configures | hooks.PreToolUse | — | declared |
-| Codex PreToolUse for Bash or Read after interactive hook trust | activates | Codex project policy | — | declared |
-| Codex project policy | executes | components/guard-git.mjs | — | declared |
-| Codex project policy | configures | features.hooks | — | declared |
-| Codex project policy | configures | hooks.PreToolUse | — | declared |
 | node scripts/verify-harness.mjs | activates | Project verification | — | declared |
 | Project verification | configures | verification | — | declared |
 | GitHub push to main or pull_request when --ci github is selected | activates | Project CI | — | declared |

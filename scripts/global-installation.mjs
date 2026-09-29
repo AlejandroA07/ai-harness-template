@@ -6,15 +6,17 @@ import { assertSafeDirectory, isPathWithin, isAbsolutePathInput } from './skill-
 import { digest, encode, stat, readRegular, payloadHash, treeFiles, acquireTargetLock, releaseTargetLock,
   targetLockPath, publishFiles } from './installation-core.mjs';
 import { object, parseSettings, getSetting, setSetting, pruneContainers, hookCount, removeExactHook, hookGroups, inspectFeatures, editFeatures } from './global-settings.mjs';
-import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
 import { claudeSecretDenials } from '../components/secret-policy.mjs';
+import { retiredClaudeToolDenials, retiredHarnessClaudeDenials } from './retired-claude-denials.mjs';
 
 const plans = new WeakMap();
 const hashPattern = /^[a-f0-9]{64}$/;
 const scalarDefinitions = { includeCoAuthoredBy: false, 'permissions.disableBypassPermissionsMode': 'disable' };
+const retiredScalarDefinitions = { autoMemoryEnabled: false };
 const containerNames = ['permissions', 'hooks'];
 const sourceRuntimeFiles = ['components/guard-git.mjs', 'components/guard-policy.mjs', 'components/secret-policy.mjs', 'guidance/claude.md', 'guidance/codex.md'];
 const runtimeFiles = [...sourceRuntimeFiles, 'policy.json'];
+const legacyRuntimeFiles = runtimeFiles.filter((file) => file !== 'components/secret-policy.mjs');
 const scalarState = (value) => value === undefined ? { present: false } : { present: true, value };
 const bytesEqual = (a, b) => a === null ? b === null : b !== null && a.equals(b);
 function fail(message) { throw new Error(message); }
@@ -52,7 +54,7 @@ async function sourceBundle(root) {
     files[relative] = relative.startsWith('guidance/') ? Buffer.from(bytes.toString('utf8').replaceAll('{{HARNESS_ROOT}}', root)) : bytes;
   }
   const template = parseSettings(await readRegular(path.join(root, 'global/claude-settings.json')));
-  const denials = [...new Set([...claudeSecretDenials('machine'), ...template.permissions.deny, ...deniedClaudeBuiltInTools])];
+  const denials = [...new Set([...claudeSecretDenials('machine'), ...template.permissions.deny])];
   if (denials.some((entry) => typeof entry !== 'string')) fail('Invalid canonical permission denials');
   files['policy.json'] = Buffer.from(encode({ version: 1, executable: process.execPath, denials }));
   return { files, hash: payloadHash(files), denials };
@@ -75,10 +77,14 @@ function validateReceipt(receipt, { target, platform }) {
   for (const key of ['hookOwned', 'settingsExisted', 'hookArrayExisted', 'denyArrayExisted', 'configExisted', 'createdFeatureTable']) {
     if (typeof receipt[key] !== 'boolean') fail('Invalid global receipt flag');
   }
-  shape(receipt.scalars, platform === 'claude' ? Object.keys(scalarDefinitions) : []);
+  const scalarFields = platform === 'claude' ? Object.keys(scalarDefinitions) : [];
+  const legacyScalarFields = platform === 'claude' ? [...scalarFields, ...Object.keys(retiredScalarDefinitions)] : [];
+  if (!object(receipt.scalars) || (!equal(Object.keys(receipt.scalars).sort(), scalarFields.sort())
+    && !equal(Object.keys(receipt.scalars).sort(), legacyScalarFields.sort()))) fail('Malformed global installation receipt');
   for (const [key, state] of Object.entries(receipt.scalars)) {
     shape(state, state.present === true ? ['present', 'value'] : ['present']);
-    if (typeof state.present !== 'boolean' || (state.present && typeof state.value !== typeof scalarDefinitions[key])) fail('Invalid prior setting');
+    const definition = scalarDefinitions[key] ?? retiredScalarDefinitions[key];
+    if (typeof state.present !== 'boolean' || (state.present && typeof state.value !== typeof definition)) fail('Invalid prior setting');
     if (state.present && key === 'permissions.disableBypassPermissionsMode' && !['disable', 'enable'].includes(state.value)) fail('Invalid prior bypass setting');
   }
   if (!Array.isArray(receipt.addedDenials) || receipt.addedDenials.some((entry) => typeof entry !== 'string')
@@ -86,7 +92,10 @@ function validateReceipt(receipt, { target, platform }) {
     || (platform === 'codex' && receipt.addedDenials.length)) fail('Invalid receipt permission ownership');
   if (!Array.isArray(receipt.createdContainers) || receipt.createdContainers.some((entry) => !containerNames.includes(entry))
     || new Set(receipt.createdContainers).size !== receipt.createdContainers.length) fail('Invalid receipt container ownership');
-  shape(receipt.features, platform === 'codex' ? ['hooks'] : []);
+  const featureFields = platform === 'codex' ? ['hooks'] : [];
+  const legacyFeatureFields = platform === 'codex' ? ['hooks', 'memories'] : [];
+  if (!object(receipt.features) || (!equal(Object.keys(receipt.features).sort(), featureFields.sort())
+    && !equal(Object.keys(receipt.features).sort(), legacyFeatureFields.sort()))) fail('Malformed global installation receipt');
   if (Object.values(receipt.features).some((value) => value !== null && typeof value !== 'boolean')) fail('Invalid prior feature value');
 }
 async function safePaths(target, locations) {
@@ -159,7 +168,8 @@ export async function planGlobalInstallation(repository, options) {
     try {
       await assertSafeDirectory(target, previousRuntime);
       ownedFiles = await treeFiles(previousRuntime);
-      if (!equal(Object.keys(ownedFiles).sort(), [...runtimeFiles].sort()) || payloadHash(ownedFiles) !== previous.runtime
+      const ownedPaths = Object.keys(ownedFiles).sort();
+      if ((!equal(ownedPaths, [...runtimeFiles].sort()) && !equal(ownedPaths, [...legacyRuntimeFiles].sort())) || payloadHash(ownedFiles) !== previous.runtime
         || digest(ownedFiles[`guidance/${platform}.md`]) !== previous.guidanceHash) fail('Owned runtime mismatch');
       previousPolicy = JSON.parse(ownedFiles['policy.json'].toString('utf8'));
       shape(previousPolicy, ['version', 'executable', 'denials']);
@@ -216,6 +226,12 @@ export async function planGlobalInstallation(repository, options) {
     denyArrayExisted: platform === 'claude' && getSetting(settings, ['permissions', 'deny']).present,
     configExisted: input.config !== null, features: features ? { hooks: features.values.hooks } : {}, createdFeatureTable: features ? features.featureHeader === null : false };
   if (platform === 'claude') {
+    if (previous && Object.hasOwn(previous.scalars, 'autoMemoryEnabled')) {
+      const actual = getSetting(settings, ['autoMemoryEnabled']);
+      if (!equal(actual, scalarState(retiredScalarDefinitions.autoMemoryEnabled))) conflicts.push('autoMemoryEnabled: retired owned setting was edited');
+      if (operation === 'apply') delete receipt.scalars.autoMemoryEnabled;
+      if (operation === 'remove') setSetting(modified, ['autoMemoryEnabled'], previous.scalars.autoMemoryEnabled);
+    }
     for (const [name, value] of Object.entries(scalarDefinitions)) {
       const keys = name.split('.');
       const actual = getSetting(settings, keys);
@@ -231,7 +247,12 @@ export async function planGlobalInstallation(repository, options) {
     if (!Array.isArray(deny) || deny.some((entry) => typeof entry !== 'string')) fail('Incompatible permission deny array');
     if (previous && previousPolicy?.denials.some((entry) => !deny.includes(entry))) conflicts.push('permissions.deny: required denial is missing');
     if (operation === 'apply') {
-      const retired = receipt.addedDenials.filter((entry) => !bundle.denials.includes(entry));
+      const completeRetiredToolPolicy = retiredClaudeToolDenials.every((entry) => deny.includes(entry));
+      const retired = [...new Set([
+        ...receipt.addedDenials.filter((entry) => !bundle.denials.includes(entry)),
+        ...(completeRetiredToolPolicy ? retiredClaudeToolDenials : []),
+        ...(legacy ? retiredHarnessClaudeDenials.filter((entry) => !bundle.denials.includes(entry)) : []),
+      ])];
       const retained = deny.filter((entry) => !retired.includes(entry));
       const additions = bundle.denials.filter((entry) => !retained.includes(entry));
       receipt.addedDenials = [...new Set([...receipt.addedDenials.filter((entry) => !retired.includes(entry)), ...additions])];
@@ -240,7 +261,13 @@ export async function planGlobalInstallation(repository, options) {
       const retained = deny.filter((entry) => !previous.addedDenials.includes(entry));
       setSetting(modified, ['permissions', 'deny'], retained.length || previous.denyArrayExisted ? scalarState(retained) : { present: false });
     }
-  } else if (previous && features.values.hooks !== true) conflicts.push('features: owned Codex hook feature was edited');
+  } else if (previous) {
+    if (features.values.hooks !== true) conflicts.push('features: owned Codex hook feature was edited');
+    if (Object.hasOwn(previous.features, 'memories')) {
+      if (features.values.memories !== false) conflicts.push('features: retired Codex memory setting was edited');
+      if (operation === 'apply') delete receipt.features.memories;
+    }
+  }
   if (operation === 'apply') {
     if (previous && !previous.hookOwned && !equal(oldHook, expected)) conflicts.push('hooks: existing unowned hook cannot be replaced automatically');
     let retained = previous?.hookOwned && !equal(oldHook, expected) ? removeExactHook(groups, oldHook) : groups;

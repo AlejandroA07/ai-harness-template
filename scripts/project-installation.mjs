@@ -7,9 +7,10 @@ import { assertSafeDirectory, isPathWithin } from './skill-lib.mjs';
 import { stat, readRegular, digest, encode, payloadHash, acquireTargetLock, releaseTargetLock, publishFiles } from './installation-core.mjs';
 import { parseSettings } from './global-settings.mjs';
 import { projectSettings } from './project-settings.mjs';
-import { projectIgnore, projectFeatures } from './project-state.mjs';
+import { removeLegacyProjectFeatures } from './legacy-project-state.mjs';
+import { projectIgnore } from './project-state.mjs';
 import { projectAdapters, projectTree } from './project-adapters.mjs';
-import { receiptPath, runtimeNames, componentNames, filePlatform, allowedProjectFile, validateProjectReceipt } from './project-receipt.mjs';
+import { receiptPath, runtimeNames, componentNames, filePlatform, allowedProjectFile, validateProjectReceipt, hasLegacyProjectPolicy } from './project-receipt.mjs';
 import { buildVerificationSteps, selectDotnetTarget } from './project-verification.mjs';
 import { detectDomainSignals, inspectExistingDomainConfiguration, inspectExistingDomainContract, inspectExistingTrackerConfiguration, renderDomainInstructions, renderTrackerInstructions } from './project-configuration.mjs';
 
@@ -66,6 +67,8 @@ export async function planProjectInstallation(repository, options) {
   observed['.harness/project-current.json'] = await verifyOwnershipHead(target, path.join(target, '.harness/project-current.json'), previous?.payload ?? null);
   const conflicts = [];
   const notes = [];
+  const legacyPolicy = previous ? hasLegacyProjectPolicy(previous) : false;
+  if (operation === 'audit' && legacyPolicy) conflicts.push('Legacy project agent policy requires an apply migration to machine authority');
   if (await stat(path.join(target, '.ai-harness-install.lock'))) conflicts.push('Target is locked; inspect the active or interrupted operation');
   for (const file of Object.keys(previous?.owned ?? {})) {
     const bytes = await read(file);
@@ -169,14 +172,10 @@ export async function planProjectInstallation(repository, options) {
     after[file] = wanted;
     if (wanted !== null) next.owned[file] = digest(wanted);
   }
-  for (const name of new Set([...(previous?.platforms ?? []), ...active])) {
-    const expected = operation === 'apply' ? parseSettings(await sourceFile(`project/.${name}/` + (name === 'claude' ? 'settings.json' : 'hooks.json'))).hooks.PreToolUse[0] : previous.settings[name].hook;
+  if (legacyPolicy) for (const name of previous.platforms) {
     const file = settingsFile(name);
-    const bytes = await read(file);
     try {
-      const merged = projectSettings(name, bytes, expected, previous?.settings[name], !active.includes(name));
-      if (active.includes(name)) next.settings[name] = merged.state;
-      after[file] = merged.after;
+      after[file] = projectSettings(name, await read(file), previous.settings[name].hook, previous.settings[name], true).after;
     } catch (error) { conflicts.push(error.message); }
   }
   if (active.length || previous) {
@@ -186,11 +185,9 @@ export async function planProjectInstallation(repository, options) {
       after['.gitignore'] = merged.after;
     } catch (error) { conflicts.push(error.message); }
   }
-  if (active.includes('codex') || previous?.platforms.includes('codex')) {
+  if (legacyPolicy && previous.platforms.includes('codex')) {
     try {
-      const merged = projectFeatures(await read('.codex/config.toml'), previous?.codexFeatures, !active.includes('codex'));
-      if (active.includes('codex')) next.codexFeatures = merged.state;
-      after['.codex/config.toml'] = merged.after;
+      after['.codex/config.toml'] = removeLegacyProjectFeatures(await read('.codex/config.toml'), previous.codexFeatures);
     } catch (error) { conflicts.push(error.message); }
   }
   if (operation === 'audit') {
@@ -210,7 +207,7 @@ export async function planProjectInstallation(repository, options) {
     installed: selected, platforms: active, options: config, applicable: !conflicts.length, conflicts, notes,
     changes: operations.map(({ id, before, after }) => ({ id, action: after === null ? 'remove' : before === null ? 'create' : 'update' })),
     tools: ['Node', 'Git', ...(config.verification === 'generated' ? ['Gitleaks', ...(config.ci === 'github' ? ['Zizmor'] : [])] : ['project verifier dependencies'])],
-    activation: 'Run node scripts/verify-harness.mjs. Review project guidance and platform hook trust; no Git configuration or machine settings are changed.' };
+    activation: 'Run node scripts/verify-harness.mjs. Review project guidance; no Git configuration or machine settings are changed.' };
   const parents = await parentIdentities(target, Object.keys(observed));
   const fingerprint = encode({ plan, observed: Object.fromEntries(Object.entries(observed).map(([file, bytes]) => [file, bytes === null ? null : digest(bytes)])),
     source: payloadHash(source), adapters: payloadHash(adapters.source), parents, files });

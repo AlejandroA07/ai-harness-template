@@ -2,9 +2,9 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
 import { claudeSecretDenials } from '../components/secret-policy.mjs';
 import { reconcileHarnessDenials, replaceHarnessHook } from './config-merge.mjs';
+import { retiredHarnessClaudeDenials } from './retired-claude-denials.mjs';
 import { runTool } from './windows-cli.mjs';
 
 const apply = process.argv.includes('--apply');
@@ -85,8 +85,8 @@ claudeSettings.includeCoAuthoredBy = false;
 claudeSettings.permissions ??= {};
 claudeSettings.permissions.deny = reconcileHarnessDenials(
   claudeSettings.permissions.deny,
-  [...claudeSecretDenials('machine'), ...claudeTemplate.permissions.deny, ...deniedClaudeBuiltInTools],
-  obsoleteHarnessClaudeDenials,
+  [...claudeSecretDenials('machine'), ...claudeTemplate.permissions.deny],
+  retiredHarnessClaudeDenials,
 );
 claudeSettings.permissions.disableBypassPermissionsMode = 'disable';
 claudeSettings.hooks ??= {};

@@ -3,8 +3,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
 import { claudeSecretDenials, containsSensitivePath, isSecretBearingCommitPath } from '../components/secret-policy.mjs';
+import { claudeLaunchArgs, loadClaudeToolConfig } from '../scripts/claude-dev.mjs';
 import { hasHarnessHook, reconcileHarnessDenials, replaceHarnessHook } from '../scripts/config-merge.mjs';
 import { buildVerificationSteps } from '../scripts/project-verification.mjs';
 import { inspectManagedSkillLink, readLinkTarget } from '../scripts/skill-lib.mjs';
@@ -82,38 +82,29 @@ test('project verification includes local security gates', () => {
 test('secret paths have one canonical policy for settings, runtime and commits', async () => {
   assert.ok(claudeSecretDenials('machine').includes('Read(~/.ssh/**)'));
   assert.ok(claudeSecretDenials('project').includes('Read(./.env)'));
+  for (const file of ['.netrc', '.git-credentials', '.pypirc']) {
+    assert.ok(claudeSecretDenials('machine').includes(`Read(**/${file})`));
+    assert.equal(containsSensitivePath(file), true);
+    assert.equal(isSecretBearingCommitPath(file), true);
+  }
   assert.equal(containsSensitivePath('src/private.pem'), true);
   assert.equal(containsSensitivePath('.env.example'), false);
   assert.equal(isSecretBearingCommitPath('config/.env.local'), true);
   assert.equal(isSecretBearingCommitPath('config/.env.template'), false);
-  for (const relative of ['global/claude-settings.json', 'project/.claude/settings.json']) {
-    const settings = JSON.parse(await fs.readFile(path.resolve(import.meta.dirname, '..', relative), 'utf8'));
-    assert.deepEqual(settings.permissions.deny, []);
-  }
+  const settings = JSON.parse(await fs.readFile(path.resolve(import.meta.dirname, '..', 'global/claude-settings.json'), 'utf8'));
+  assert.deepEqual(settings.permissions.deny, []);
 });
 
-test('Claude tool policy removes only approved optional tools and guards both shells', async () => {
-  assert.deepEqual(deniedClaudeBuiltInTools, [
-    'Artifact',
-    'CronCreate',
-    'CronDelete',
-    'CronList',
-    'EnterWorktree',
-    'ExitWorktree',
-    'Monitor',
-    'NotebookEdit',
-    'PushNotification',
-    'RemoteTrigger',
-    'ScheduleWakeup',
-    'SendUserFile',
-    'ShareOnboardingGuide',
-    'TaskOutput',
-    'Workflow',
-  ]);
-  for (const relative of ['global/claude-settings.json', 'project/.claude/settings.json']) {
-    const settings = JSON.parse(await fs.readFile(path.resolve(import.meta.dirname, '..', relative), 'utf8'));
-    assert.equal(settings.hooks.PreToolUse[0].matcher, 'Bash|PowerShell|Read');
+test('Claude launcher uses a focused native tool allowlist and guards both shells', async () => {
+  const config = await loadClaudeToolConfig();
+  for (const tool of ['Agent', 'AskUserQuestion', 'Bash', 'Edit', 'Glob', 'Grep', 'LSP', 'Read', 'Skill', 'WebFetch', 'WebSearch', 'Write']) {
+    assert.ok(config.tools.includes(tool), tool);
   }
-  assert.equal(deniedClaudeBuiltInTools.includes('Bash'), false);
-  assert.equal(deniedClaudeBuiltInTools.includes('PowerShell'), false);
+  for (const tool of ['Artifact', 'CronCreate', 'Monitor', 'NotebookEdit', 'TaskOutput', 'Workflow']) {
+    assert.equal(config.tools.includes(tool), false, tool);
+  }
+  assert.deepEqual(claudeLaunchArgs(['Read', 'Write'], ['--model', 'sonnet']), ['--tools', 'Read,Write', '--model', 'sonnet']);
+  assert.throws(() => claudeLaunchArgs(['Read'], ['--tools', 'default']), /claude-tools\.json/);
+  const settings = JSON.parse(await fs.readFile(path.resolve(import.meta.dirname, '..', 'global/claude-settings.json'), 'utf8'));
+  assert.equal(settings.hooks.PreToolUse[0].matcher, 'Bash|PowerShell|Read');
 });

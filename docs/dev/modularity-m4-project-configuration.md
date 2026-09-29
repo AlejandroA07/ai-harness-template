@@ -47,7 +47,7 @@ remain separate project/full-profile choices.
 ## Verification and activation
 
 The selected gate is `node scripts/verify-harness.mjs`. It validates owned
-runtime/guidance files, scoped settings and generated adapter content before
+runtime/guidance files, ignore state and generated adapter content before
 running the project's `scripts/verify.mjs`. A nonzero result from that verifier
 is propagated. Audit itself does not execute the project verifier, install
 dependencies, run hooks, or prove platform activation.
@@ -57,23 +57,20 @@ are preserved. For existing guidance, review and add the gate/domain/tracker
 pointers yourself where they belong. New guidance uses the selected gate.
 Domain glossary and ADR files are never generated from guessed knowledge.
 
-Only selected platform settings/adapters are installed. Claude receives the
-project guard and disabled attribution. Codex receives its project guard plus
-`features.hooks = true`. Neither platform's memory preferences are managed.
-The existing project hook command templates resolve the project root at runtime;
-the guard and its imports are copied into the project. Review platform trust and
-effective layered settings after installation; Codex hook trust is not copied or
-bypassed. Custom shell/version compatibility needs validation in that platform.
+Only selected platform guidance and skill adapters are installed. Universal
+Claude and Codex behavior belongs to machine setup: this lifecycle does not create
+or edit `.claude/settings.json`, `.codex/hooks.json`, or `.codex/config.toml`.
+Receipts from the earlier project-policy design are accepted only so an apply or
+remove operation can restore the exact owned settings and retire the copied guard;
+audit reports that migration as required.
 
 No machine configuration, machine skills, custom agents, environment variables,
-Git hooks or `core.hooksPath` are changed. Existing Git hooks remain active. The
-shared attribution checker is shipped for explicit use, but installation does
-not attach a new pre-commit hook or silently change a project's commit policy.
+Git hooks or `core.hooksPath` are changed. Existing Git hooks remain active.
 
 ## Ownership and project adapters
 
 `.harness/project-installation.json` records the active platforms, configuration
-options, file hashes and scoped prior settings. One project receipt owns shared
+options, file hashes and ignore-block ownership. One project receipt owns shared
 runtime/guidance once. Removing one platform preserves the other platform and
 shared files; the last removal retires unchanged owned shared files. This receipt
 contains relative project paths, so a checkout can move or be cloned with its
@@ -160,16 +157,15 @@ selection because a machine migration cannot infer its verification and CI choic
 ## Evidence
 
 The registered project lifecycle tests cover both platforms; untouched machine,
-Git and unrelated project state; default read-only CLI behavior with no platform
-tools; idempotence; moved-checkout execution; adapter metadata/resources, drift
-and reinstall; exact settings ownership; optional CI dependencies; domain/tracker
+agent settings, Git and unrelated project state; default read-only CLI behavior
+with no platform tools; idempotence; moved-checkout execution; adapter
+metadata/resources, drift and reinstall; optional CI dependencies; domain/tracker
 conflicts; unsafe paths and malformed receipts; stale plans; injected rollback;
 concurrent source edits; preserved competing edits; abrupt termination; project
-verifier failure propagation; and actual guard/attribution denial.
+verifier failure propagation; and owned legacy-policy migration.
 Review regressions also cover forged ownership, missing/edited payload evidence,
 legacy receipt rejection, nonblocking FIFO denial, retained-platform preservation
-despite changed sources, explicit nested .NET paths and matcher-independent Claude
-scalar ownership.
+despite changed sources, and explicit nested .NET paths.
 
 Security-checklist verdicts:
 
@@ -177,7 +173,7 @@ Security-checklist verdicts:
 |---|---|
 | Access and identity | Pass for the explicit local target: validated module/platform/scope and private in-process plans. Network identity controls are not applicable. |
 | Input/output | Pass: constrained receipt paths/schema, fixed option enums and scoped ownership. Plans omit arbitrary configuration contents. |
-| Injection and filesystem | Pass within the documented local authority boundary: known command arrays, reused platform hook templates, unsafe path/link denial and staged exclusive publication. |
+| Injection and filesystem | Pass within the documented local authority boundary: known command arrays, unsafe path/link denial and staged exclusive publication. |
 | Browser/network | Not applicable to local installation; opt-in CI uses existing pinned actions with limited permissions. |
 | Files and abuse | Pass: private staging, bounded structural discovery and tested conflict/recovery behavior. Upload/rate-limit controls are not applicable. |
 | Dependencies and delivery | Pass: no new package dependencies; shipped imports are self-contained and generated CI installs its declared tools. |

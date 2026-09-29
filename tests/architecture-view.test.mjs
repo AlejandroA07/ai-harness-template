@@ -18,7 +18,7 @@ test('architecture view links modules through platforms and capabilities to vali
   assert.equal(model.nodes.filter((entry) => entry.kind === 'module').length, 7);
   assert.equal(model.nodes.filter((entry) => entry.kind === 'capability').length, 22);
   assert.equal(model.nodes.filter((entry) => entry.kind === 'integration').length, 4);
-  assert.equal(model.nodes.filter((entry) => entry.kind === 'behavior').length, 10);
+  assert.equal(model.nodes.filter((entry) => entry.kind === 'behavior').length, 8);
   assert.equal(model.costs.capabilities.length, 22);
   assert.equal(model.costs.measurements.samples.length, 3);
   assert.equal(node(model, 'capability:implement').state.planned, 'not-evaluated');
