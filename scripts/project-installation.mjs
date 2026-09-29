@@ -6,17 +6,14 @@ import { isDeepStrictEqual as equal } from 'node:util';
 import { assertSafeDirectory, isPathWithin } from './skill-lib.mjs';
 import { stat, readRegular, digest, encode, payloadHash, acquireTargetLock, releaseTargetLock, publishFiles } from './installation-core.mjs';
 import { parseSettings } from './global-settings.mjs';
-import { projectSettings } from './project-settings.mjs';
-import { removeLegacyProjectFeatures } from './legacy-project-state.mjs';
 import { projectIgnore } from './project-state.mjs';
 import { projectAdapters, projectTree } from './project-adapters.mjs';
-import { receiptPath, runtimeNames, componentNames, filePlatform, allowedProjectFile, validateProjectReceipt, hasLegacyProjectPolicy } from './project-receipt.mjs';
+import { receiptPath, runtimeNames, repositoryHookNames, filePlatform, allowedProjectFile, validateProjectReceipt } from './project-receipt.mjs';
 import { buildVerificationSteps, selectDotnetTarget } from './project-verification.mjs';
 import { detectDomainSignals, inspectExistingDomainConfiguration, inspectExistingDomainContract, inspectExistingTrackerConfiguration, renderDomainInstructions, renderTrackerInstructions } from './project-configuration.mjs';
 
 const plans = new WeakMap();
 const sameBytes = (a, b) => a === null ? b === null : b !== null && a.equals(b);
-const settingsFile = (platform) => platform === 'claude' ? '.claude/settings.json' : '.codex/hooks.json';
 async function optional(target, relative) {
   const file = path.join(target, relative);
   await assertSafeDirectory(target, path.dirname(file));
@@ -67,8 +64,6 @@ export async function planProjectInstallation(repository, options) {
   observed['.harness/project-current.json'] = await verifyOwnershipHead(target, path.join(target, '.harness/project-current.json'), previous?.payload ?? null);
   const conflicts = [];
   const notes = [];
-  const legacyPolicy = previous ? hasLegacyProjectPolicy(previous) : false;
-  if (operation === 'audit' && legacyPolicy) conflicts.push('Legacy project agent policy requires an apply migration to machine authority');
   if (await stat(path.join(target, '.ai-harness-install.lock'))) conflicts.push('Target is locked; inspect the active or interrupted operation');
   for (const file of Object.keys(previous?.owned ?? {})) {
     const bytes = await read(file);
@@ -107,10 +102,12 @@ export async function planProjectInstallation(repository, options) {
   const preserve = new Set(['AGENTS.md', 'CLAUDE.md', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', '.gitleaks.toml']);
   if (active.length && operation === 'apply') {
     for (const name of runtimeNames) desired[`.harness/project-runtime/${name}`] = await sourceFile(`scripts/${name}`);
-    for (const name of componentNames) desired[`.harness/hooks/${name}`] = await sourceFile(`components/${name}`);
+    for (const name of repositoryHookNames) desired[`.harness/hooks/${name}`] = await sourceFile(`components/${name}`);
+    desired['.githooks/pre-commit'] = await sourceFile('project/.githooks/pre-commit');
+    desired['.githooks/commit-msg'] = await sourceFile('project/.githooks/commit-msg');
     desired['.harness/runtime/windows-cli.mjs'] = await sourceFile('scripts/windows-cli.mjs');
     desired['scripts/verify-harness.mjs'] = await sourceFile('project/scripts/verify-harness.mjs');
-    desired['AGENTS.md'] = await sourceFile('project/AGENTS.selected.md');
+    desired['AGENTS.md'] = await sourceFile('project/AGENTS.md.template');
     if (active.includes('claude')) desired['CLAUDE.md'] = await sourceFile('project/CLAUDE.md');
     desired['docs/agents/domain.md'] = Buffer.from(renderDomainInstructions({ multiContext: config.domainLayout === 'multi' }));
     desired['docs/agents/issue-tracker.md'] = Buffer.from(renderTrackerInstructions({ github: config.tracker === 'github' }));
@@ -160,7 +157,7 @@ export async function planProjectInstallation(repository, options) {
       }
     }
   }
-  const next = { version: 3, module: 'project-configuration', scope: 'project', profile: 'coexistence', platforms: active, options: config, owned: {}, settings: {}, ignore: null, codexFeatures: null };
+  const next = { version: 4, module: 'project-configuration', scope: 'project', profile: 'coexistence', platforms: active, options: config, owned: {}, ignore: null };
   const after = {};
   for (const file of new Set([...Object.keys(previous?.owned ?? {}), ...Object.keys(desired)])) {
     const before = await read(file);
@@ -172,12 +169,6 @@ export async function planProjectInstallation(repository, options) {
     after[file] = wanted;
     if (wanted !== null) next.owned[file] = digest(wanted);
   }
-  if (legacyPolicy) for (const name of previous.platforms) {
-    const file = settingsFile(name);
-    try {
-      after[file] = projectSettings(name, await read(file), previous.settings[name].hook, previous.settings[name], true).after;
-    } catch (error) { conflicts.push(error.message); }
-  }
   if (active.length || previous) {
     try {
       const merged = projectIgnore(await read('.gitignore'), previous?.ignore, active.length === 0);
@@ -185,10 +176,10 @@ export async function planProjectInstallation(repository, options) {
       after['.gitignore'] = merged.after;
     } catch (error) { conflicts.push(error.message); }
   }
-  if (legacyPolicy && previous.platforms.includes('codex')) {
-    try {
-      after['.codex/config.toml'] = removeLegacyProjectFeatures(await read('.codex/config.toml'), previous.codexFeatures);
-    } catch (error) { conflicts.push(error.message); }
+  const executableModes = {};
+  if (process.platform !== 'win32') for (const file of ['.githooks/pre-commit', '.githooks/commit-msg']) {
+    executableModes[file] = (await stat(path.join(target, file)))?.mode ?? null;
+    if (operation === 'audit' && executableModes[file] !== null && !(executableModes[file] & 0o111)) conflicts.push(`Project hook is not executable: ${file}`);
   }
   if (operation === 'audit') {
     for (const [file, bytes] of Object.entries(adapters.files)) if (previous?.owned[file] !== digest(bytes)) conflicts.push(`Project adapter source drift: ${file}`);
@@ -201,15 +192,18 @@ export async function planProjectInstallation(repository, options) {
   after['.harness/project-current.json'] = active.length ? ownershipHeadBytes(next.payload) : null;
   after[receiptPath] = active.length ? Buffer.from(encode(next)) : null;
   const operations = operation === 'audit' || (operation === 'remove' && !selected) ? [] : Object.entries(after)
-    .filter(([file, bytes]) => !sameBytes(observed[file] ?? null, bytes))
-    .map(([id, bytes]) => ({ id, file: path.join(target, id), before: observed[id] ?? null, after: bytes, receipt: id === receiptPath }));
+    .filter(([file, bytes]) => !sameBytes(observed[file] ?? null, bytes)
+      || (process.platform !== 'win32' && bytes !== null && file.startsWith('.githooks/')
+        && typeof executableModes[file] === 'number' && !(executableModes[file] & 0o111)))
+    .map(([id, bytes]) => ({ id, file: path.join(target, id), before: observed[id] ?? null, after: bytes,
+      receipt: id === receiptPath, ...(id.startsWith('.githooks/') ? { mode: 0o700 } : {}) }));
   const plan = { version: 1, module: 'project-configuration', scope, profile: 'coexistence', operation, target, platform,
     installed: selected, platforms: active, options: config, applicable: !conflicts.length, conflicts, notes,
     changes: operations.map(({ id, before, after }) => ({ id, action: after === null ? 'remove' : before === null ? 'create' : 'update' })),
     tools: ['Node', 'Git', ...(config.verification === 'generated' ? ['Gitleaks', ...(config.ci === 'github' ? ['Zizmor'] : [])] : ['project verifier dependencies'])],
     activation: 'Run node scripts/verify-harness.mjs. Review project guidance; no Git configuration or machine settings are changed.' };
   const parents = await parentIdentities(target, Object.keys(observed));
-  const fingerprint = encode({ plan, observed: Object.fromEntries(Object.entries(observed).map(([file, bytes]) => [file, bytes === null ? null : digest(bytes)])),
+  const fingerprint = encode({ plan, observed: Object.fromEntries(Object.entries(observed).map(([file, bytes]) => [file, bytes === null ? null : digest(bytes)])), executableModes,
     source: payloadHash(source), adapters: payloadHash(adapters.source), parents, files });
   plans.set(plan, { root, options: { ...options, target, operation }, operations, observed, fingerprint, parents, next,
     previous, payloadFiles, adapterSource: operation === 'remove' ? null : payloadHash(adapters.source), source, adapterDirectories: [...new Set([...allAdapterFiles].map((file) => file.split('/').slice(0, 3).join('/')))] });

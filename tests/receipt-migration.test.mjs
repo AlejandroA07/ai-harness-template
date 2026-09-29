@@ -46,7 +46,7 @@ test('receipt assessment preserves current, legacy, tampered and unsupported sta
       const current = await snapshot(target);
       assert.equal((await assessReceiptMigration(root, options)).status, 'current');
       assert.deepEqual(await snapshot(target), current);
-      for (const version of (project ? [1, 2, 99] : [1, 99])) {
+      for (const version of (project ? [1, 2, 3, 99] : [1, 99])) {
         const changed = { ...original, version };
         if (version === 1) { delete changed.evidence; delete changed.payload; }
         await fs.writeFile(file, JSON.stringify(changed));

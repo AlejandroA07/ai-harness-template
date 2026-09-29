@@ -2,212 +2,94 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildVerificationSteps } from './project-verification.mjs';
-import { detectDomainSignals, inspectExistingDomainConfiguration, inspectExistingDomainContract, inspectExistingTrackerConfiguration, renderDomainInstructions, renderTrackerInstructions } from './project-configuration.mjs';
+import { planProjectInstallation, applyProjectInstallation } from './project-installation.mjs';
 
 const args = process.argv.slice(2);
 const apply = args.includes('--apply');
 const githubOverride = args.includes('--github');
-const domainLayoutArg = args.find((arg) => arg.startsWith('--domain-layout='))?.split('=')[1] ?? null;
-if (domainLayoutArg && !['single', 'multi'].includes(domainLayoutArg)) {
-  console.error('Domain layout must be --domain-layout=single or --domain-layout=multi');
-  process.exit(2);
-}
-const targetArg = args.find((arg) => !arg.startsWith('--'));
-if (!targetArg) {
+const domainArguments = args.filter((arg) => arg.startsWith('--domain-layout='));
+const targets = args.filter((arg) => !arg.startsWith('--'));
+const unknown = args.filter((arg) => arg.startsWith('--')
+  && arg !== '--apply' && arg !== '--github' && !arg.startsWith('--domain-layout='));
+if (targets.length !== 1 || unknown.length || domainArguments.length > 1) {
   console.error('Usage: node scripts/bootstrap.mjs <project-path> [--github] [--domain-layout=single|multi] [--apply]');
   process.exit(2);
 }
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const project = path.resolve(targetArg);
-const excludedDirectories = new Set(['.git', 'node_modules', 'bin', 'obj', '.next', 'dist', 'coverage']);
-
-async function exists(filePath) {
-  try { await fs.access(filePath); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+const domainLayout = domainArguments[0]?.split('=')[1];
+if (domainLayout && !['single', 'multi'].includes(domainLayout)) {
+  console.error('Domain layout must be --domain-layout=single or --domain-layout=multi');
+  process.exit(2);
 }
 
-if (!(await exists(project))) throw new Error(`Project path does not exist: ${project}`);
+async function main() {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const target = path.resolve(targets[0]);
+  try { await fs.access(target); } catch { throw new Error(`Project path does not exist: ${target}`); }
+  const origin = spawnSync('git', ['remote', 'get-url', 'origin'], { cwd: target, encoding: 'utf8' });
+  const github = spawnSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { cwd: target, encoding: 'utf8' });
+  const isGithub = githubOverride || github.status === 0 || (origin.status === 0 && /(?:github\.com|github\.enterprise)/i.test(origin.stdout));
+  const gitRepository = spawnSync('git', ['rev-parse', '--git-dir'], { cwd: target, encoding: 'utf8' });
+  const hookConfiguration = gitRepository.status === 0
+    ? spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: target, encoding: 'utf8' }) : null;
+  const existingHookPath = hookConfiguration?.status === 0 ? hookConfiguration.stdout.trim() : '';
+  const hookConflict = existingHookPath && existingHookPath !== '.githooks'
+    ? `Existing core.hooksPath is ${existingHookPath}; review it before replacing repository hook activation.` : null;
+  let hasVerifier = true;
+  try { await fs.access(path.join(target, 'scripts', 'verify.mjs')); }
+  catch (error) { if (error.code === 'ENOENT') hasVerifier = false; else throw error; }
 
-async function findFiles(directory, depth = 0) {
-  if (depth > 3) return [];
-  const files = [];
-  for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
-    if (entry.isDirectory() && !excludedDirectories.has(entry.name)) files.push(...await findFiles(path.join(directory, entry.name), depth + 1));
-    else if (entry.isFile()) files.push(path.join(directory, entry.name));
+  const options = (platform) => ({
+    operation: 'apply',
+    platform,
+    scope: 'project',
+    target,
+    tracker: isGithub ? 'github' : 'local',
+    ...(domainLayout ? { domainLayout } : {}),
+    ...(isGithub && !hasVerifier ? { ci: 'github' } : {}),
+  });
+
+  function print(plans) {
+    const changes = new Map();
+    for (const plan of plans) for (const change of plan.changes) changes.set(change.id, change.action);
+    console.log(`Bootstrap ${apply ? 'APPLY' : 'DRY RUN'} for ${target}`);
+    for (const [file, action] of [...changes].sort(([left], [right]) => left.localeCompare(right))) console.log(`${action.toUpperCase()} ${file}`);
+    for (const conflict of new Set(plans.flatMap((plan) => plan.conflicts))) console.log(`BLOCKED ${conflict}`);
+    if (hookConflict) console.log(`BLOCKED ${hookConflict}`);
+    for (const note of new Set(plans.flatMap((plan) => plan.notes))) console.log(`NOTE ${note}`);
+    if (isGithub && hasVerifier && plans.every((plan) => plan.options.ci === 'none')) {
+      console.log('NOTE Existing verification was preserved; configure CI from its declared dependencies instead of guessing them.');
+    }
   }
-  return files;
-}
 
-const files = await findFiles(project);
-const relativeFiles = files.map((file) => path.relative(project, file).replaceAll('\\', '/'));
-const csProjects = relativeFiles.filter((file) => file.endsWith('.csproj'));
-const hasDotnet = csProjects.length > 0 || relativeFiles.some((file) => /\.(?:sln|slnx)$/.test(file));
-const packageJsonPath = path.join(project, 'package.json');
-const hasNode = await exists(packageJsonPath);
-let packageJson = {};
-if (hasNode) packageJson = JSON.parse(await fs.readFile(packageJsonPath, 'utf8'));
-const dependencies = { ...(packageJson.dependencies ?? {}), ...(packageJson.devDependencies ?? {}) };
-const hasUi = ['react', 'next', 'vue', 'svelte', '@angular/core'].some((name) => dependencies[name]);
-const hasGlobalJson = await exists(path.join(project, 'global.json'));
-const hasDocker = relativeFiles.some((file) => /(^|\/)Dockerfile(?:\.|$)/i.test(file));
-const ghCheck = spawnSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { cwd: project, encoding: 'utf8' });
-const originCheck = spawnSync('git', ['remote', 'get-url', 'origin'], { cwd: project, encoding: 'utf8' });
-const hasGitHubRemote = originCheck.status === 0 && /(?:github\.com|github\.enterprise)/i.test(originCheck.stdout);
-const isGithub = githubOverride || ghCheck.status === 0 || hasGitHubRemote;
-const domainSignals = detectDomainSignals(relativeFiles, packageJson);
-const existingDomain = await inspectExistingDomainConfiguration(project);
-const existingDomainContract = await inspectExistingDomainContract(project);
-const existingTracker = await inspectExistingTrackerConfiguration(project, isGithub);
-const domainFileLayout = existingDomain.state === 'single-context' ? 'single' : existingDomain.state === 'multi-context' ? 'multi' : null;
-const contractLayout = existingDomainContract.state === 'configured' ? existingDomainContract.layout : null;
-const domainSourcesConflict = domainFileLayout && contractLayout && domainFileLayout !== contractLayout;
-const existingLayout = domainFileLayout ?? contractLayout;
-let domainLayout = domainLayoutArg;
-if (!domainLayout) {
-  if (existingLayout === 'single' && domainSignals.length === 0) domainLayout = 'single';
-  else if (existingLayout === 'multi') domainLayout = 'multi';
-  else if (existingDomain.state === 'unconfigured' && domainSignals.length === 0) domainLayout = 'single';
-}
-const domainLayoutConflict = existingLayout && domainLayoutArg && existingLayout !== domainLayoutArg;
-
-function recommendation(label, state, reason, trigger) {
-  console.log(`${state} ${label}: ${reason}`);
-  if (trigger) console.log(`  Re-evaluate when: ${trigger}`);
-}
-
-console.log(`Bootstrap ${apply ? 'APPLY' : 'DRY RUN'} for ${project}\n`);
-recommendation('base harness', 'RECOMMENDED', 'portable project guidance and repository verification');
-recommendation('GitHub CI', isGithub ? 'RECOMMENDED' : 'NOT CURRENTLY', isGithub ? 'GitHub project detected' : 'no GitHub project detected', 'the project is hosted on GitHub');
-if (existingTracker.state === 'conflict') console.log(`BLOCKED issue tracker: ${existingTracker.reason} Reconcile it before applying bootstrap.`);
-recommendation('Context7 MCP', 'NOT CURRENTLY', 'only useful when work repeatedly needs current third-party documentation', 'the project depends on fast-moving external APIs or frameworks');
-recommendation('Playwright MCP', hasUi ? 'RECOMMENDED' : 'NOT CURRENTLY', hasUi ? 'UI framework detected' : 'no browser UI detected', 'the project gains a browser-driven UI');
-recommendation('.NET analyzer tightening', hasDotnet ? 'RECOMMENDED' : 'NOT CURRENTLY', hasDotnet ? 'review built-in analyzers and current Sonar rules; ratchet legacy warnings' : 'no .NET project detected');
-recommendation('architecture tests', csProjects.length >= 3 ? 'RECOMMENDED' : 'NOT CURRENTLY', csProjects.length >= 3 ? 'several .NET projects may represent real dependency boundaries' : 'no stable multi-module boundary detected', 'a boundary becomes important and repeatedly violated');
-recommendation('mutation testing', 'NOT CURRENTLY', 'reserve it for mature, high-risk test suites', 'critical logic has a stable suite whose fault-detection strength matters');
-if (existingDomain.state === 'conflict' || existingDomainContract.state === 'conflict' || domainSourcesConflict || domainLayoutConflict) {
-  const reason = existingDomain.reason
-    ?? existingDomainContract.reason
-    ?? (domainSourcesConflict ? `Domain files declare ${domainFileLayout}-context while docs/agents/domain.md declares ${contractLayout}-context.` : null)
-    ?? `Existing ${existingLayout}-context files conflict with --domain-layout=${domainLayoutArg}.`;
-  console.log(`BLOCKED domain configuration: ${reason} Resolve the contradiction before applying bootstrap.`);
-} else if (!domainLayout && domainSignals.length > 0) {
-  console.log(`REVIEW REQUIRED domain layout: structural signals found (${domainSignals.join(', ')}). Choose --domain-layout=single or --domain-layout=multi after checking whether these projects represent distinct domain contexts.`);
-} else {
-  const detected = domainSignals.length > 0 ? `; reviewed signals: ${domainSignals.join(', ')}` : '';
-  console.log(`RECOMMENDED domain layout: ${domainLayout === 'multi' ? 'multi-context' : 'single-context'}${detected}`);
-}
-
-const componentFiles = ['secret-policy.mjs', 'attribution-policy.mjs', 'check-attribution.mjs', 'pre-commit.mjs'];
-const planned = [
-  'AGENTS.md', 'CLAUDE.md',
-  'docs/agents/issue-tracker.md', 'docs/agents/domain.md',
-  '.githooks/pre-commit', '.githooks/commit-msg', 'scripts/verify.mjs',
-  '.harness/runtime/windows-cli.mjs',
-  '.gitleaks.toml', '.gitignore harness block', 'git core.hooksPath=.githooks',
-  ...componentFiles.map((file) => `.harness/hooks/${file}`),
-];
-if (isGithub) planned.push('.github/workflows/verify.yml', '.github/workflows/harness-security.yml', '.github/dependabot.yml');
-if (isGithub && (hasNode || (hasDotnet && hasGlobalJson))) planned.push('.github/workflows/codeql.yml');
-if (isGithub && hasDotnet && !hasGlobalJson) console.log('BLOCKED CodeQL for C#: add and review a pinned global.json first.');
-for (const item of planned) console.log(`${apply ? 'APPLY' : 'WOULD APPLY'} ${item}`);
-
-if (!apply) {
-  console.log('\nDry run complete. The agent must still tailor AGENTS.md, verification, architecture, and conditional recommendations from project evidence.');
-  process.exit(0);
-}
-
-if (existingTracker.state === 'conflict') throw new Error(existingTracker.reason);
-if (existingDomain.state === 'conflict') throw new Error(existingDomain.reason);
-if (existingDomainContract.state === 'conflict') throw new Error(existingDomainContract.reason);
-if (domainSourcesConflict) throw new Error(`Domain files declare ${domainFileLayout}-context while docs/agents/domain.md declares ${contractLayout}-context.`);
-if (domainLayoutConflict) throw new Error(`Existing ${existingLayout}-context files conflict with --domain-layout=${domainLayoutArg}.`);
-if (!domainLayout) {
-  throw new Error(`Domain layout needs review because bootstrap found: ${domainSignals.join(', ')}. Rerun with --domain-layout=single or --domain-layout=multi.`);
-}
-
-async function copyIfMissing(source, destination) {
-  if (await exists(destination)) return false;
-  await fs.mkdir(path.dirname(destination), { recursive: true });
-  await fs.copyFile(source, destination);
-  return true;
-}
-
-async function copyAlways(source, destination) {
-  await fs.mkdir(path.dirname(destination), { recursive: true });
-  await fs.copyFile(source, destination);
-}
-
-await copyIfMissing(path.join(root, 'project', 'AGENTS.md.template'), path.join(project, 'AGENTS.md'));
-await copyIfMissing(path.join(root, 'project', 'CLAUDE.md'), path.join(project, 'CLAUDE.md'));
-const trackerPath = path.join(project, 'docs', 'agents', 'issue-tracker.md');
-const domainPath = path.join(project, 'docs', 'agents', 'domain.md');
-await fs.mkdir(path.dirname(trackerPath), { recursive: true });
-if (!(await exists(trackerPath))) await fs.writeFile(trackerPath, renderTrackerInstructions({ github: isGithub }));
-if (!(await exists(domainPath))) await fs.writeFile(domainPath, renderDomainInstructions({ multiContext: domainLayout === 'multi' }));
-await copyAlways(path.join(root, 'project', '.githooks', 'pre-commit'), path.join(project, '.githooks', 'pre-commit'));
-await copyAlways(path.join(root, 'project', '.githooks', 'commit-msg'), path.join(project, '.githooks', 'commit-msg'));
-await copyAlways(path.join(root, 'project', '.gitleaks.toml'), path.join(project, '.gitleaks.toml'));
-for (const file of componentFiles) await copyAlways(path.join(root, 'components', file), path.join(project, '.harness', 'hooks', file));
-await copyAlways(path.join(root, 'scripts', 'windows-cli.mjs'), path.join(project, '.harness', 'runtime', 'windows-cli.mjs'));
-
-const verifySteps = buildVerificationSteps({ hasDotnet, hasNode, isGithub, packageJson, relativeFiles });
-const verifyTemplate = await fs.readFile(path.join(root, 'project', 'scripts', 'verify.mjs.template'), 'utf8');
-const verificationRunner = await fs.readFile(path.join(root, 'scripts', 'verification-runner.mjs'), 'utf8');
-const verifyText = verifyTemplate
-  .replace('__VERIFICATION_RUNNER_SOURCE__', verificationRunner)
-  .replace('__VERIFY_STEPS__', JSON.stringify(verifySteps, null, 2));
-if (!(await exists(path.join(project, 'scripts', 'verify.mjs')))) {
-  await fs.mkdir(path.join(project, 'scripts'), { recursive: true });
-  await fs.writeFile(path.join(project, 'scripts', 'verify.mjs'), verifyText);
-}
-
-const gitignorePath = path.join(project, '.gitignore');
-let gitignore = '';
-try { gitignore = await fs.readFile(gitignorePath, 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
-const marker = '# Local harness state';
-if (!gitignore.includes(marker)) {
-  const block = `${marker}\n.scratch/\n.claude/settings.local.json\n.harness/tmp/\n\n# Secret-bearing local files\n.env\n.env.*\n!.env.example\n!.env.sample\n!.env.template\n*.pem\n*.key\n*.p12\n*.pfx\n`;
-  await fs.writeFile(gitignorePath, `${gitignore}${gitignore && !gitignore.endsWith('\n') ? '\n' : ''}${block}`);
-}
-
-const hookConfig = spawnSync('git', ['config', 'core.hooksPath', '.githooks'], { cwd: project, encoding: 'utf8' });
-if (hookConfig.status !== 0) throw new Error(hookConfig.stderr || 'Failed to configure core.hooksPath');
-
-if (await exists(path.join(project, '.harness', 'skills'))) {
-  const generated = spawnSync(process.execPath, [path.join(root, 'scripts', 'generate-project-skills.mjs'), '--project', project], { encoding: 'utf8' });
-  if (generated.status !== 0) throw new Error(generated.stderr || generated.stdout);
-}
-
-if (isGithub) {
-  await fs.mkdir(path.join(project, '.github', 'workflows'), { recursive: true });
-  await copyAlways(path.join(root, 'project', '.github', 'workflows', 'verify.yml'), path.join(project, '.github', 'workflows', 'verify.yml'));
-  await copyAlways(path.join(root, 'project', '.github', 'workflows', 'harness-security.yml'), path.join(project, '.github', 'workflows', 'harness-security.yml'));
-  const ecosystem = (name, extra = '') => `  - package-ecosystem: ${name}\n    directory: /\n    schedule:\n      interval: weekly\n    cooldown:\n      default-days: 7\n${extra}`;
-  const ecosystems = [ecosystem('github-actions')];
-  if (hasNode) ecosystems.unshift(ecosystem('npm', '    groups:\n      minor-and-patch:\n        update-types: [minor, patch]\n'));
-  if (hasDotnet) ecosystems.unshift(ecosystem('nuget', '    groups:\n      minor-and-patch:\n        update-types: [minor, patch]\n'));
-  if (hasDocker) ecosystems.push(ecosystem('docker'));
-  const dependabotTemplate = await fs.readFile(path.join(root, 'project', '.github', 'dependabot.yml.template'), 'utf8');
-  await fs.writeFile(path.join(project, '.github', 'dependabot.yml'), dependabotTemplate.replace('__ECOSYSTEMS__', ecosystems.join('\n')));
-
-  const languages = [];
-  if (hasNode) languages.push('javascript-typescript');
-  if (hasDotnet && hasGlobalJson) languages.push('csharp');
-  if (languages.length) {
-    const setupDotnet = languages.includes('csharp')
-      ? `- name: Setup .NET\n        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5\n        with:\n          global-json-file: global.json`
-      : `- name: No compiled runtime setup\n        run: echo "Interpreted language analysis"`;
-    const autobuild = languages.includes('csharp')
-      ? `- uses: github/codeql-action/autobuild@bce182f857edf1feab116e9795a3393d21977282 # v4`
-      : `- name: No compiled build required\n        run: echo "Interpreted language analysis"`;
-    const codeqlTemplate = await fs.readFile(path.join(root, 'project', '.github', 'workflows', 'codeql.yml.template'), 'utf8');
-    const codeql = codeqlTemplate
-      .replace('__LANGUAGES__', languages.join(','))
-      .replace('__SETUP_DOTNET__', setupDotnet)
-      .replace('__AUTOBUILD__', autobuild);
-    await fs.writeFile(path.join(project, '.github', 'workflows', 'codeql.yml'), codeql);
+  if (!apply) {
+    const plans = await Promise.all(['codex', 'claude'].map((platform) => planProjectInstallation(root, options(platform))));
+    print(plans);
+    if (plans.some((plan) => !plan.applicable) || hookConflict) process.exitCode = 1;
+    else console.log('Dry run complete. Use --apply to install the planned project harness.');
+    return;
   }
+
+  if (gitRepository.status !== 0) throw new Error('Bootstrap apply requires an existing Git repository');
+  if (hookConflict) throw new Error(hookConflict);
+  const initial = await Promise.all(['codex', 'claude'].map((platform) => planProjectInstallation(root, options(platform))));
+  if (initial.some((plan) => !plan.applicable)) {
+    print(initial);
+    throw new Error(`Project conflicts: ${[...new Set(initial.flatMap((plan) => plan.conflicts))].join('; ')}`);
+  }
+  const results = [];
+  for (const platform of ['codex', 'claude']) {
+    const plan = await planProjectInstallation(root, options(platform));
+    if (!plan.applicable) { print([plan]); throw new Error(`Project conflicts: ${plan.conflicts.join('; ')}`); }
+    results.push(await applyProjectInstallation(plan));
+  }
+  const hooks = spawnSync('git', ['config', 'core.hooksPath', '.githooks'], { cwd: target, encoding: 'utf8' });
+  if (hooks.status !== 0) throw new Error(hooks.stderr || hooks.stdout || 'Failed to activate repository Git hooks');
+  print(results);
+  console.log('Bootstrap complete. Tailor AGENTS.md and keep scripts/verify.mjs current for this project.');
 }
 
-console.log('\nMechanical bootstrap complete. Tailor AGENTS.md and review every Recommended/Not currently item before declaring the project bootstrapped.');
+try { await main(); }
+catch (error) {
+  console.error(`Bootstrap: ${error.message}`);
+  process.exitCode = 1;
+}

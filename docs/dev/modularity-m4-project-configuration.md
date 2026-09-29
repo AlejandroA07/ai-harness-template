@@ -1,37 +1,33 @@
-# M4: selected project configuration
+# M4: project configuration lifecycle
 
-M4 adds project-scoped plan/apply/update/audit/remove to `setup.mjs`. It uses the
-shared target lock, file reader and staged publisher from M2/M3. Bootstrap remains
-the compatibility entry point for its established full profile.
+`bootstrap.mjs` is the single public project-configuration command. It uses the
+receipt-backed project installer, shared target lock, safe file reader and staged
+publisher from M2/M3. The lower-level lifecycle remains an implementation and
+recovery boundary, not a second user interface.
 
 ## Use
 
-Replace `<project>` with an existing absolute project directory outside the
-harness checkout. No platform CLI is needed for planning or installation.
+Replace `<project>` with an existing project directory outside the harness checkout.
+No Claude or Codex CLI is needed.
 
 ```text
-node scripts/setup.mjs plan --module project-configuration --platform codex --scope project --target <project>
-node scripts/setup.mjs apply --module project-configuration --platform codex --scope project --target <project> --apply
-node scripts/setup.mjs audit --module project-configuration --platform codex --scope project --target <project>
-node scripts/setup.mjs remove --module project-configuration --platform codex --scope project --target <project> --apply
+node scripts/bootstrap.mjs <project>
+node scripts/bootstrap.mjs <project> --apply
+node <project>/scripts/verify-harness.mjs
 ```
 
-Use `claude` for Claude. Install the second platform with a separate apply.
-Apply performs updates too. All commands are read-only unless apply/remove has
-`--apply`; `--json` returns the plan. Do not combine this module with skill IDs or
-other modules in one invocation. A new empty project needs a meaningful verifier
-or a recognized stack before setup can be applied.
+The first command is always read-only. `--apply` installs or updates both Codex
+and Claude project guidance and adapters, then activates `.githooks` in the target
+Git repository. A new empty project needs a meaningful verifier or a recognized
+stack before setup can be applied.
 
-Plan/apply options are explicit, and omitted values reuse the receipt on updates:
+Bootstrap selects the smallest deterministic configuration it can establish:
 
-| Option | Behavior |
-|---|---|
-| `--verification existing` | Preserve `scripts/verify.mjs` and run it through the new gate. Default when a verifier exists. |
-| `--verification generated` | Create a verifier for detected npm and/or .NET projects. Default when no verifier exists. Rejects an existing unowned verifier and unsupported package managers. |
-| `--ci none` | Default. Preserve existing workflows without adding CI. |
-| `--ci github` | Add `.github/workflows/harness-project.yml` for generated verification with known dependencies. Requires a Node lockfile and a pinned .NET SDK when applicable. |
-| `--tracker local` or `github` | Local Markdown is the initial default; GitHub is explicit. An existing contradictory/custom contract requires review. No remote tracker operation occurs. |
-| `--domain-layout single` or `multi` | Reuse an existing recognized layout. Without one, simple projects default to single; structural multi-project signals require an explicit choice. |
+- it preserves an existing `scripts/verify.mjs`; otherwise it generates one for a supported npm or .NET project;
+- it detects GitHub from `gh` or the `origin` remote, with `--github` as an explicit override;
+- it adds GitHub verification CI only for a generated verifier whose dependencies are known;
+- it reuses the receipt's choices on later updates;
+- it accepts `--domain-layout=single` or `--domain-layout=multi` when structural evidence needs a human decision.
 
 Changing verifier ownership mode requires removal and a fresh installation.
 Generated .NET verification passes the discovered solution or project path to
@@ -46,26 +42,26 @@ remain separate project/full-profile choices.
 
 ## Verification and activation
 
-The selected gate is `node scripts/verify-harness.mjs`. It validates owned
+The project gate is `node scripts/verify-harness.mjs`. It validates owned
 runtime/guidance files, ignore state and generated adapter content before
 running the project's `scripts/verify.mjs`. A nonzero result from that verifier
-is propagated. Audit itself does not execute the project verifier, install
-dependencies, run hooks, or prove platform activation.
+is propagated. It does not install dependencies, run hooks, or prove platform
+activation.
 
 Existing `AGENTS.md`, `CLAUDE.md`, domain/tracker documents and scanner config
 are preserved. For existing guidance, review and add the gate/domain/tracker
 pointers yourself where they belong. New guidance uses the selected gate.
 Domain glossary and ADR files are never generated from guessed knowledge.
 
-Only selected platform guidance and skill adapters are installed. Universal
-Claude and Codex behavior belongs to machine setup: this lifecycle does not create
+Both platform guidance files and any project skill adapters are installed together.
+Universal Claude and Codex behavior belongs to machine setup: this lifecycle does not create
 or edit `.claude/settings.json`, `.codex/hooks.json`, or `.codex/config.toml`.
-Receipts from the earlier project-policy design are accepted only so an apply or
-remove operation can restore the exact owned settings and retire the copied guard;
-audit reports that migration as required.
+Receipts from the earlier project-policy design are rejected without mutation.
 
-No machine configuration, machine skills, custom agents, environment variables,
-Git hooks or `core.hooksPath` are changed. Existing Git hooks remain active.
+No machine configuration, machine skills, custom agents or environment variables
+are changed. Bootstrap installs repository hooks and sets
+`core.hooksPath=.githooks`; an existing unowned hook path is not overwritten by
+the receipt lifecycle.
 
 ## Ownership and project adapters
 
@@ -76,22 +72,22 @@ shared files; the last removal retires unchanged owned shared files. This receip
 contains relative project paths, so a checkout can move or be cloned with its
 runtime.
 
-Receipt version 3 points to a content-addressed snapshot under
+Receipt version 4 points to a content-addressed snapshot under
 `.harness/project-payloads/<hash>/`. The snapshot contains installer-produced owned
 files and a manifest of scoped ownership/prior states. Planning and the installed
 gate require the receipt to match this independently checked evidence. Editing a
-receipt alone cannot claim a preserved file or rewrite prior settings ownership.
+receipt alone cannot claim a preserved file or rewrite ownership.
 The separate `.harness/project-current.json` binds the active revision, preventing
 replay of older receipts. It is published and restored with the receipt.
-Missing or edited evidence blocks mutation. Version 1–2 receipts require the [read-only assessment and reviewed recovery
+Missing or edited evidence blocks mutation. Version 1–3 receipts require the [read-only assessment and reviewed recovery
 procedure](receipt-migration.md). Preserve ambiguous content; do not use the old
 remover as a shortcut. Do not manually change a receipt
 version or reconstruct ownership from existing file hashes.
 
-Removal uses stored installed bytes and hook definitions; it does not regenerate
+Removal uses stored installed bytes; it does not regenerate
 the remaining platform from current templates or unfinished local skill sources.
-Ownership payloads remain after updates, removal and rollback. They contain scoped
-prior values and installed content, not copies of arbitrary user configuration.
+Ownership payloads remain after updates, removal and rollback. They contain
+installed content, not copies of arbitrary user configuration.
 Review and retain them with recovery evidence before any manual cleanup. These
 hashes detect inconsistency; they are not signatures or protection against an actor
 who can replace both receipt and payload with the same filesystem authority.
@@ -115,11 +111,6 @@ running both generators over the same entries.
 Ordinary owned files require their recorded content to match before update or
 removal. Editing a generated owned guide or runtime creates a conflict requiring
 review, not permission to overwrite it. Existing borrowed files remain unowned.
-Settings use exact hook matching and prior boolean states; unrelated values and
-neighboring hook handlers survive removal. JSON formatting can normalize on a
-change. Codex feature edits use the narrow TOML editor and its existing migration
-restrictions.
-
 `.gitignore` receives one marked block for local scratch, recovery staging and the
 shared target lock. Removal retires only the added block, preserving other entries
 and later additions. A preexisting exact block is not claimed. Ambiguous/edited
@@ -137,8 +128,8 @@ Installation never executes the target's verifier or package scripts.
 Private `.harness/.project-stage-*` directories hold staged outputs and moved
 originals. On POSIX they are mode 0700, with new output/journal files mode 0600;
 Windows follows target ACLs. Journals contain ordered relative file IDs and
-before/after hashes. Staging can contain complete original settings, so never
-upload it as diagnostic material. Same-filesystem hardlinks are required.
+before/after hashes. Staging can contain complete original files, so never upload
+it as diagnostic material. Same-filesystem hardlinks are required.
 
 Caught failures restore originals when current files still match the published
 state. Competing edits are preserved; ambiguous rollback and abrupt termination
@@ -162,7 +153,7 @@ with no platform tools; idempotence; moved-checkout execution; adapter
 metadata/resources, drift and reinstall; optional CI dependencies; domain/tracker
 conflicts; unsafe paths and malformed receipts; stale plans; injected rollback;
 concurrent source edits; preserved competing edits; abrupt termination; project
-verifier failure propagation; and owned legacy-policy migration.
+verifier failure propagation; and legacy receipt rejection.
 Review regressions also cover forged ownership, missing/edited payload evidence,
 legacy receipt rejection, nonblocking FIFO denial, retained-platform preservation
 despite changed sources, and explicit nested .NET paths.
@@ -183,7 +174,5 @@ All installation experiments use temporary targets. The repository gate is
 `node scripts/verify.mjs`; GitHub CodeQL must also pass before merging. This slice
 does not add rule suppressions or exclude tests from analysis.
 
-On 2026-09-13, `node scripts/verify.mjs` exited 0 after the review fixes: 146
-tests, 144 passed and two Windows-only skips, followed by whitespace, Gitleaks,
-Zizmor and syntax checks. No real project or machine profile was changed.
-Live Windows execution and PR CodeQL are not established by this local result.
+The current change must pass `node scripts/verify.mjs` before completion. Live
+Windows execution and PR CodeQL remain separate validation.

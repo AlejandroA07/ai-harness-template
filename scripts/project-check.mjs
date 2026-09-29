@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { readRegular, digest } from './installation-core.mjs';
 import { assertSafeDirectory } from './skill-lib.mjs';
 import { projectAdapters, adapterRoot, projectTree } from './project-adapters.mjs';
-import { receiptPath, validateProjectReceipt, hasLegacyProjectPolicy } from './project-receipt.mjs';
+import { receiptPath, validateProjectReceipt } from './project-receipt.mjs';
 import { projectIgnore } from './project-state.mjs';
 
 export async function checkProject(target) {
@@ -18,10 +18,12 @@ export async function checkProject(target) {
   try { await fs.access(path.join(target, '.ai-harness-install.lock')); throw new Error('Project installation is locked or interrupted'); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
   const receipt = validateProjectReceipt(JSON.parse(await read(receiptPath)));
-  if (hasLegacyProjectPolicy(receipt)) throw new Error('Legacy project agent policy requires an apply migration to machine authority');
   await readProjectPayload(target, receipt);
   await verifyOwnershipHead(target, path.join(target, '.harness/project-current.json'), receipt.payload);
   for (const [file, hash] of Object.entries(receipt.owned)) if (digest(await read(file)) !== hash) throw new Error(`Owned project file drift: ${file}`);
+  if (process.platform !== 'win32') for (const file of ['.githooks/pre-commit', '.githooks/commit-msg']) {
+    if (!((await fs.stat(path.join(target, file))).mode & 0o111)) throw new Error(`Project hook is not executable: ${file}`);
+  }
   const rendered = await projectAdapters(target, receipt.platforms);
   const adapterOwned = Object.keys(receipt.owned).filter((file) => receipt.platforms.some((platform) => file.startsWith(adapterRoot(platform) + '/'))).sort();
   if (JSON.stringify(adapterOwned) !== JSON.stringify(Object.keys(rendered.files).sort())) throw new Error('Project adapter inventory drift');

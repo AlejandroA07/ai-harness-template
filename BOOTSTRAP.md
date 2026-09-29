@@ -1,10 +1,9 @@
 # Bootstrap a project
 
-For selective project configuration with owned update, audit and removal, use
-the [M4 project lifecycle](docs/dev/modularity-m4-project-configuration.md).
-The bootstrap command below retains its existing full-profile behavior.
-
-Bootstrap installs the portable mechanical baseline. The agent still has to understand the project and tailor the parts that cannot be inferred safely.
+Bootstrap is the single public command for installing and updating a project's
+portable mechanical baseline. The agent still has to understand the project and
+tailor the parts that cannot be inferred safely. Implementation and recovery
+details are in the [M4 project lifecycle](docs/dev/modularity-m4-project-configuration.md).
 
 ## 1. Inspect the plan
 
@@ -16,7 +15,7 @@ Add `--github` only when GitHub hosting is intended but cannot yet be detected.
 
 Bootstrap validates an existing `CONTEXT.md` or `CONTEXT-MAP.md` instead of trusting it blindly. For an unconfigured repository, Node/TypeScript, .NET, and Java workspace/module signals trigger a domain-layout review. They are evidence of possible boundaries, not proof of multiple domain contexts. If review is required, rerun with either `--domain-layout=single` or `--domain-layout=multi`.
 
-The dry run reports each conditional component as `RECOMMENDED`, `NOT CURRENTLY`, or `BLOCKED`, with a trigger for reconsideration. It makes no changes.
+The dry run reports planned file changes, conflicts and short notes. It makes no changes.
 
 ## 2. Apply the mechanical baseline
 
@@ -33,7 +32,7 @@ The script installs or generates:
 - `docs/agents/domain.md`, recording the reviewed single-context or multi-context layout while leaving glossaries and ADRs lazy;
 - repository Git hooks, Gitleaks, and model/tool self-attribution checks;
 - cross-platform `node scripts/verify.mjs` from detected real commands, with a shell-free Windows command runner under `.harness/runtime/`;
-- committed security/verification CI, CodeQL, and detected Dependabot ecosystems for GitHub projects;
+- optional GitHub verification CI only when bootstrap generates a verifier with known dependencies;
 - ignored `.scratch/` state and other local-only exclusions;
 - `core.hooksPath=.githooks`;
 - generated project-specific skill adapters when `.harness/skills/` exists.
@@ -79,15 +78,14 @@ Create these lazily:
 - GitHub Issues: specifications, Wayfinder maps/decision tickets, and implementation tickets.
 - `.scratch/`: ignored local fallback when no GitHub remote exists.
 
-The bootstrap-generated files under `docs/agents/` are operational contracts, not domain content. Skills read them so tracker commands and context layout are defined once. Rerunning bootstrap preserves existing files; review and update them deliberately when hosting or repository structure changes.
+The bootstrap-generated files under `docs/agents/` are operational contracts, not domain content. Skills read them so tracker commands and context layout are defined once. Rerunning bootstrap updates harness-owned files and preserves existing user-owned contracts; review those deliberately when hosting or repository structure changes.
 
 Wayfinder uses its five routing labels: `wayfinder:map`, `wayfinder:research`, `wayfinder:prototype`, `wayfinder:grilling`, and `wayfinder:task`. Do not add the rejected triage state machine.
 
 ## 6. Final gate
 
 ```powershell
-node <harness-path>/scripts/audit.mjs --project <project-path>
-node scripts/verify.mjs
+node scripts/verify-harness.mjs
 ```
 
 Exercise the application where relevant. Only then stage the intended portable files and create the local feature-branch commit. When the task calls for remote publication, push only that current branch explicitly to `origin`; destructive or high-impact Git and GitHub operations remain blocked.

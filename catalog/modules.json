@@ -122,7 +122,7 @@
           "purpose": "Load repository-owned guidance into Codex sessions.",
           "platforms": ["codex"],
           "scopes": ["project"],
-          "source": "project/AGENTS.selected.md",
+          "source": "project/AGENTS.md.template",
           "activation": {
             "kind": "session",
             "event": "Codex opens the repository and loads AGENTS.md"
@@ -153,7 +153,7 @@
           "source": "project/.github/workflows/verify.yml",
           "activation": {
             "kind": "ci",
-            "event": "GitHub push to main or pull_request when --ci github is selected"
+            "event": "GitHub push to main or pull_request when bootstrap can generate CI with known dependencies"
           },
           "settings": [
             { "path": "ci", "value": "none or github" }
@@ -166,8 +166,6 @@
         "scripts/project-configuration.mjs",
         "scripts/project-verification.mjs",
         "scripts/project-installation.mjs",
-        "scripts/project-settings.mjs",
-        "scripts/legacy-project-state.mjs",
         "scripts/project-state.mjs",
         "scripts/project-adapters.mjs",
         "scripts/project-receipt.mjs",
