@@ -24,6 +24,14 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | Installation core | Shared selection, generation, installation and audit machinery. | internal | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Shared policy/runtime |
 | Shared policy/runtime | Shared guards, attribution policy and portable process execution. | internal | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | — |
 
+## Focused module reviews
+
+- [Global configuration](docs/modules/global-configuration.md)
+- [Project configuration](docs/modules/project-configuration.md)
+- [Skills](docs/modules/skills.md)
+- [Workflows](docs/modules/workflows.md)
+- [Tool integrations](docs/modules/tool-integrations.md)
+
 ## Global → platform → capability → source navigation
 
 | Module | Platform | Capabilities |
