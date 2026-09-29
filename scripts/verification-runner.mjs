@@ -32,7 +32,7 @@ function diagnostic(output, error) {
   if (error) return cleanLine(error.message || error);
   const lines = output.split(/\r?\n/).map((line) => cleanLine(line)).filter(Boolean);
   if (!lines.length) return 'The command failed without diagnostic output.';
-  const marker = lines.findIndex((line) => /(?:^|\s)(?:fail(?:ed)?\b|error\b|not ok\b|npm err!\b|✖|×)/i.test(line));
+  const marker = lines.findIndex((line) => /^(?:✖|×|not ok\b|[A-Za-z]*Error(?:\b|:)|npm err!\b|fail(?:ed)?(?:\b|:))/i.test(line));
   const excerpt = marker >= 0 ? lines.slice(marker, marker + 12) : lines.slice(-12);
   const joined = excerpt.join('\n');
   return joined.length <= 4000 ? joined : `${joined.slice(0, 3997)}...`;

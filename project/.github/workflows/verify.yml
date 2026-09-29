@@ -1,4 +1,4 @@
-name: Verify
+name: Project harness verification
 
 on:
   push:
@@ -53,4 +53,4 @@ jobs:
         run: python -m pip install --disable-pip-version-check "zizmor==$ZIZMOR_VERSION"
       - name: Activate repository hooks
         run: git config --local core.hooksPath .githooks
-      - run: node scripts/verify.mjs
+      - run: node scripts/verify-harness.mjs

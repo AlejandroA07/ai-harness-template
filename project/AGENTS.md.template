@@ -16,24 +16,19 @@ This file is the project's source of truth. Keep commands, boundaries, and the d
 
 <State the package-manager, lock-file, database, migration, and formatting conventions that actually exist. Delete this paragraph after tailoring.>
 
-## Invariants
+## Security boundaries
 
-- Treat every external boundary as attacker-reachable: authorize explicitly, validate untrusted input, protect secrets, and test denied paths.
-- Never read, print, hardcode, or commit secrets. Use <project secret mechanism>.
-- Never weaken, delete, or skip a check to make verification pass.
+<Describe the project's authentication boundaries, untrusted inputs, sensitive data, and secret mechanism. Delete this paragraph after tailoring.>
 
 ## Workflow
 
-- Read `docs/agents/domain.md` for the repository's domain layout and `docs/agents/issue-tracker.md` for tracker operations. Domain glossary and ADR files are created lazily when real knowledge exists.
-- Follow the matching installed skill for nontrivial workflows. Project-specific skill sources live in `.harness/skills/`; `.claude/skills/` and `.agents/skills/` are generated adapters and must not be edited by hand.
-- Keep changes within the approved ticket or specification. Do not add speculative abstractions or unrelated cleanup.
-- Prefer the nearest existing pattern. If a decision is missing and materially changes scope, stop and ask.
+- Domain terminology or decisions: read `docs/agents/domain.md`.
+- Issue-tracker operations: read `docs/agents/issue-tracker.md`.
+- Project skill changes: edit `.harness/skills/`; `.claude/skills/` and `.agents/skills/` are generated.
 
 ## Definition of done
 
-`node scripts/verify-harness.mjs` must exit `0`. It is the final vote: it checks the installed harness, then runs the project's `scripts/verify.mjs` gate used by CI.
-
-Before calling work complete, also confirm that new behavior is tested, applicable security-checklist items pass, the staged patch contains only intended files, and documentation reflects any durable project truth that changed.
+The full verification command must exit `0`. It is the final vote: it checks the installed harness, then runs the project's gate used by CI.
 
 ## Project conventions
 

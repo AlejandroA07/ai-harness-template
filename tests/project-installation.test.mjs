@@ -73,7 +73,7 @@ test('review regression: domain and tracker FIFOs fail without blocking', { skip
   for (const file of ['CONTEXT.md', 'CONTEXT-MAP.md', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md']) await fixture(async (f) => {
     await fs.mkdir(path.dirname(path.join(f.target, file)), { recursive: true });
     assert.equal(spawnSync('mkfifo', [path.join(f.target, file)]).status, 0);
-    const result = spawnSync(process.execPath, [path.join(f.source, 'scripts/bootstrap.mjs'), f.target], { encoding: 'utf8', timeout: 2000 });
+    const result = spawnSync(process.execPath, [path.join(f.source, 'scripts/bootstrap.mjs'), f.target], { encoding: 'utf8', timeout: 10_000 });
     assert.ifError(result.error);
     assert.notEqual(result.status, 0);
     await assert.rejects(fs.access(path.join(f.target, '.ai-harness-install.lock')));

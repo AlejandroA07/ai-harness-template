@@ -38,8 +38,8 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | --- | --- | --- |
 | Global configuration | claude | Claude machine guidance, Claude machine policy |
 | Global configuration | codex | Codex machine guidance, Codex machine policy |
-| Project configuration | claude | Claude project guidance, Project verification, Project CI |
-| Project configuration | codex | Codex project guidance, Project verification, Project CI |
+| Project configuration | claude | Claude project guidance, Project domain guidance, Project tracker guidance, Project verification, Project CI |
+| Project configuration | codex | Codex project guidance, Project domain guidance, Project tracker guidance, Project verification, Project CI |
 | Skills | claude | Code Review, Codebase Design, Diagnosing Bugs, Domain Modeling, Grilling, Handoff, Prototype, Research, Security Checklist, Tdd, To Questionnaire, Wait What, Writing For Agents |
 | Skills | codex | Code Review, Codebase Design, Diagnosing Bugs, Domain Modeling, Grilling, Handoff, Prototype, Research, Security Checklist, Tdd, To Questionnaire, Wait What, Writing For Agents |
 | Workflows | claude | Ask Alfred, Grill Me, Grill With Docs, Implement, Improve Codebase Architecture, Teach, To Spec, To Tickets, Wayfinder |
@@ -59,6 +59,8 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | global-configuration | Codex machine policy | Enable the command guard. | codex | hook: Codex PreToolUse for Bash or Read after interactive hook trust | not-evaluated / not-inspected / not-inspected | [`scripts/global-installation.mjs`](scripts/global-installation.mjs)<br>[`components/guard-git.mjs`](components/guard-git.mjs) |
 | project-configuration | Claude project guidance | Load repository-owned guidance into Claude sessions. | claude | session: Claude opens the repository and loads CLAUDE.md | not-evaluated / not-inspected / not-inspected | [`project/CLAUDE.md`](project/CLAUDE.md) |
 | project-configuration | Codex project guidance | Load repository-owned guidance into Codex sessions. | codex | session: Codex opens the repository and loads AGENTS.md | not-evaluated / not-inspected / not-inspected | [`project/AGENTS.md.template`](project/AGENTS.md.template) |
+| project-configuration | Project domain guidance | Load project domain terminology and decisions only when relevant. | claude/codex | session: An agent task needs project domain terminology or decisions and follows docs/agents/domain.md | not-evaluated / not-inspected / not-inspected | [`scripts/project-configuration.mjs`](scripts/project-configuration.mjs) |
+| project-configuration | Project tracker guidance | Load project issue-tracker conventions only for tracker operations. | claude/codex | session: An agent task performs issue-tracker operations and follows docs/agents/issue-tracker.md | not-evaluated / not-inspected / not-inspected | [`scripts/project-configuration.mjs`](scripts/project-configuration.mjs) |
 | project-configuration | Project verification | Run the repository's selected deterministic completion gate. | claude/codex | command: node scripts/verify-harness.mjs | not-evaluated / not-inspected / not-inspected | [`project/scripts/verify-harness.mjs`](project/scripts/verify-harness.mjs) |
 | project-configuration | Project CI | Run the generated project verification gate in GitHub Actions when selected. | claude/codex | ci: GitHub push to main or pull_request when bootstrap can generate CI with known dependencies | not-evaluated / not-inspected / not-inspected | [`project/.github/workflows/verify.yml`](project/.github/workflows/verify.yml) |
 | workflows | Ask Alfred | Ask which skill or flow fits your situation. A router over the skills in this harness. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/ask-alfred/SKILL.md`](skills/engineering/ask-alfred/SKILL.md)<br>[`skills/engineering/ask-alfred/PHASE-BOUNDARIES.md`](skills/engineering/ask-alfred/PHASE-BOUNDARIES.md) |
@@ -98,6 +100,8 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | Claude machine policy | hooks.PreToolUse | one harness-owned guard | [`global/claude-settings.json`](global/claude-settings.json) | Claude PreToolUse for Bash, PowerShell or Read |
 | Codex machine policy | features.hooks | true | [`scripts/global-installation.mjs`](scripts/global-installation.mjs) | Codex PreToolUse for Bash or Read after interactive hook trust |
 | Codex machine policy | hooks.PreToolUse | one harness-owned guard | [`scripts/global-installation.mjs`](scripts/global-installation.mjs) | Codex PreToolUse for Bash or Read after interactive hook trust |
+| Project domain guidance | domainLayout | single or multi | [`scripts/project-configuration.mjs`](scripts/project-configuration.mjs) | An agent task needs project domain terminology or decisions and follows docs/agents/domain.md |
+| Project tracker guidance | tracker | local or github | [`scripts/project-configuration.mjs`](scripts/project-configuration.mjs) | An agent task performs issue-tracker operations and follows docs/agents/issue-tracker.md |
 | Project verification | verification | existing or generated | [`project/scripts/verify-harness.mjs`](project/scripts/verify-harness.mjs) | node scripts/verify-harness.mjs |
 | Project CI | ci | none or github | [`project/.github/workflows/verify.yml`](project/.github/workflows/verify.yml) | GitHub push to main or pull_request when bootstrap can generate CI with known dependencies |
 
@@ -168,6 +172,10 @@ Containment, installation, activation, dependencies, conditional uses, routes an
 | Codex machine policy | configures | hooks.PreToolUse | — | declared |
 | Claude opens the repository and loads CLAUDE.md | activates | Claude project guidance | — | declared |
 | Codex opens the repository and loads AGENTS.md | activates | Codex project guidance | — | declared |
+| An agent task needs project domain terminology or decisions and follows docs/agents/domain.md | activates | Project domain guidance | — | declared |
+| Project domain guidance | configures | domainLayout | — | declared |
+| An agent task performs issue-tracker operations and follows docs/agents/issue-tracker.md | activates | Project tracker guidance | — | declared |
+| Project tracker guidance | configures | tracker | — | declared |
 | node scripts/verify-harness.mjs | activates | Project verification | — | declared |
 | Project verification | configures | verification | — | declared |
 | GitHub push to main or pull_request when bootstrap can generate CI with known dependencies | activates | Project CI | — | declared |

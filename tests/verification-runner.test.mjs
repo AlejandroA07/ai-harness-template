@@ -50,7 +50,7 @@ test('failure output is bounded and preserves the complete private log', async (
       steps: [{ name: 'Syntax' }, { name: 'Tests' }, { name: 'Never reached' }],
       execute: (step) => step.name === 'Syntax'
         ? { status: 0, stdout: 'Successful syntax details\n' }
-        : { status: 7, stdout: '✖ blocks force pushes\nAssertionError: expected denied, received allowed\nmore details\n' },
+        : { status: 7, stdout: '✔ failed rendering preserves previous output\n✖ blocks force pushes\nAssertionError: expected denied, received allowed\nmore details\n' },
       stdout: stdout.stream,
       stderr: stderr.stream,
       temporaryRoot: temporary,

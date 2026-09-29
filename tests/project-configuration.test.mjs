@@ -21,7 +21,8 @@ test('renders one shared GitHub or local tracker contract', () => {
   assert.match(github, /numeric database .*id/);
   assert.match(github, /sub_issue_id=<database-id>/);
   assert.match(github, /issue_id=<blocker-database-id>/);
-  assert.match(github, /--body-file/);
+  assert.match(github, /argument arrays or body files/);
+  assert.doesNotMatch(github, /gh issue (?:view|create|comment)/);
   assert.doesNotMatch(github, /GitLab|Jira|triage/);
   assert.match(renderTrackerInstructions({ github: false }), /\.scratch/);
 });

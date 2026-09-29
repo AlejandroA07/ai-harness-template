@@ -132,8 +132,7 @@ export async function planProjectInstallation(repository, options) {
         if (packageBytes && !files.includes('package-lock.json')) conflicts.push('Generated Node CI requires package-lock.json');
         const globalJson = await read('global.json');
         if (hasDotnet && (!globalJson || !/^\d{1,3}\.\d{1,3}\.\d{1,5}(?:-[A-Za-z0-9.-]{1,80})?$/.test(parseSettings(globalJson).sdk?.version ?? ''))) conflicts.push('Generated .NET CI requires a pinned global.json SDK version');
-        const workflow = (await sourceFile('project/.github/workflows/verify.yml')).toString('utf8');
-        desired['.github/workflows/harness-project.yml'] = Buffer.from(workflow.replace('name: Verify', 'name: Project harness verification').replace('node scripts/verify.mjs', 'node scripts/verify-harness.mjs'));
+        desired['.github/workflows/harness-project.yml'] = await sourceFile('project/.github/workflows/verify.yml');
       }
     }
   }

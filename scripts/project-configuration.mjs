@@ -67,12 +67,9 @@ Issues and specifications live under ignored \`.scratch/\` paths.
 
 Issues and specifications live in GitHub Issues. Use \`gh\` with argument arrays or body files; do not interpolate untrusted issue content into shell commands.
 
-## Common operations
+## Tracker rules
 
-- Read: \`gh issue view <number> --comments\`
-- Create: write the body to a temporary Markdown file, then run \`gh issue create --title <title> --body-file <file>\`
-- Comment: \`gh issue comment <number> --body-file <file>\`
-- Label ready work: apply \`ready-for-agent\`; if the label is absent, request approval before creating it once.
+- Label ready work with \`ready-for-agent\`; create the label when first needed.
 - Close only when the active workflow calls for resolution.
 
 ## Wayfinding operations
