@@ -29,6 +29,12 @@ async function fixture(body) {
 }
 const skill = (name = 'sample') => `---\nname: ${name}\ndescription: A project fixture skill\n---\n\nUse the project fixture.\n`;
 const run = (target, script) => spawnSync(process.execPath, [script], { cwd: target, encoding: 'utf8' });
+function activateHooks(target, hooksPath = '.githooks') {
+  const initialized = spawnSync('git', ['init', '-q', target], { encoding: 'utf8' });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  const configured = spawnSync('git', ['config', '--local', 'core.hooksPath', hooksPath], { cwd: target, encoding: 'utf8' });
+  assert.equal(configured.status, 0, configured.stderr);
+}
 
 test('project lifecycle leaves agent settings under machine authority', async () => fixture(async (f) => {
   const files = {
@@ -127,7 +133,7 @@ test('review regression: nested .NET entry points are explicit and ambiguous lay
 test('selected project lifecycle preserves an existing verifier, unrelated platform and Git configuration', async () => {
   for (const platform of ['codex', 'claude']) await fixture(async (f) => {
     await f.put('AGENTS.md', 'Existing project rules\n');
-    await f.put('.git/config', '[core]\n hooksPath = existing-hooks\n');
+    activateHooks(f.target, 'existing-hooks');
     await f.put('.claude/settings.json', '{"unrelated":"claude"}');
     await f.put('.codex/hooks.json', '{"unrelated":"codex"}');
     await f.put('.codex/config.toml', '[features]\nhooks = false\n');
@@ -147,9 +153,20 @@ test('selected project lifecycle preserves an existing verifier, unrelated platf
     assert.deepEqual(await snapshot(f.target), installed);
     assert.equal((await f.plan(platform, 'audit')).applicable, true);
     await fs.rename(f.source, path.join(f.temporary, 'moved-source'));
+    const inactive = run(f.target, 'scripts/verify-harness.mjs');
+    assert.notEqual(inactive.status, 0);
+    assert.match(inactive.stderr, /Repository hooks are not active/);
+    assert.doesNotMatch(inactive.stdout, /Project verifier ran/);
+    activateHooks(f.target);
     const checked = run(f.target, 'scripts/verify-harness.mjs');
     assert.equal(checked.status, 0, checked.stderr);
     assert.match(checked.stdout, /Project verifier ran/);
+    await fs.unlink(path.join(f.target, 'AGENTS.md'));
+    const missing = run(f.target, 'scripts/verify-harness.mjs');
+    assert.notEqual(missing.status, 0);
+    assert.match(missing.stderr, /Required project file is missing: AGENTS\.md/);
+    assert.doesNotMatch(missing.stdout, /Project verifier ran/);
+    await f.put('AGENTS.md', 'Existing project rules\n');
     await fs.rename(path.join(f.temporary, 'moved-source'), f.source);
     await f.apply(platform, 'remove');
     assert.equal(await f.read('scripts/verify.mjs'), verifier);
@@ -164,6 +181,7 @@ test('project adapters preserve policy/resources, detect drift in the shipped ga
   await f.put('.harness/skills/team/sample/examples.md', 'Fixture resource\n');
   await f.put('.harness/skills/invocation-policy.json', JSON.stringify({ userOnly: ['sample'] }));
   await f.apply(); await f.apply('claude');
+  activateHooks(f.target);
   assert.match(await f.read('.claude/skills/sample/SKILL.md'), /disable-model-invocation: true/);
   assert.match(await f.read('.agents/skills/sample/agents/openai.yaml'), /allow_implicit_invocation: false/);
   assert.equal(run(f.target, 'scripts/verify-harness.mjs').status, 0);
@@ -235,7 +253,8 @@ test('project CI is opt-in, has declared tools, preserves existing workflows and
   assert.equal(preview.applicable, true, preview.conflicts.join('; '));
   await applyProjectInstallation(preview);
   const workflow = await f.read('.github/workflows/harness-project.yml');
-  for (const expected of ['actions/setup-node@', 'actions/setup-python@', 'GITLEAKS_VERSION', 'ZIZMOR_VERSION', 'node scripts/verify-harness.mjs']) assert.ok(workflow.includes(expected));
+  for (const expected of ['actions/setup-node@', 'actions/setup-python@', 'GITLEAKS_VERSION', 'ZIZMOR_VERSION',
+    'git config --local core.hooksPath .githooks', 'node scripts/verify-harness.mjs']) assert.ok(workflow.includes(expected));
   assert.equal(await f.read('.github/workflows/verify.yml'), 'Existing CI\n');
   const verifier = await f.read('scripts/verify.mjs');
   assert.match(verifier, /"ci"/);
@@ -319,6 +338,7 @@ test('project adapter removal permits a fresh reinstall and the gate propagates 
   await f.apply();
   await f.apply('codex', 'remove');
   await f.apply();
+  activateHooks(f.target);
   assert.equal(run(f.target, 'scripts/verify-harness.mjs').status, 0);
   await f.put('scripts/verify.mjs', 'process.exit(17);\n');
   assert.equal(run(f.target, 'scripts/verify-harness.mjs').status, 17);
@@ -357,6 +377,7 @@ test('generated .NET CI requires a pinned SDK and installs its runtime', async (
 
 test('selected project runtime excludes machine guard policy', async () => fixture(async (f) => {
   await f.apply();
+  activateHooks(f.target);
   for (const file of ['.harness/hooks/guard-git.mjs', '.harness/hooks/guard-policy.mjs', '.harness/project-runtime/global-settings.mjs', '.harness/project-runtime/project-settings.mjs']) {
     await assert.rejects(f.read(file), { code: 'ENOENT' });
   }

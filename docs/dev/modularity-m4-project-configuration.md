@@ -42,11 +42,13 @@ remain separate project/full-profile choices.
 
 ## Verification and activation
 
-The project gate is `node scripts/verify-harness.mjs`. It validates owned
-runtime/guidance files, ignore state and generated adapter content before
-running the project's `scripts/verify.mjs`. A nonzero result from that verifier
-is propagated. It does not install dependencies, run hooks, or prove platform
-activation.
+The project gate is `node scripts/verify-harness.mjs`. It validates required
+project contracts, owned runtime/guidance files, ignore state, generated adapter
+content, executable hook files and `core.hooksPath=.githooks` before running the
+project's `scripts/verify.mjs`. A nonzero result from that verifier is propagated.
+It does not install dependencies or execute the hooks. Generated CI activates the
+same repository hook path before invoking this gate; existing project CI must do
+the same.
 
 Existing `AGENTS.md`, `CLAUDE.md`, domain/tracker documents and scanner config
 are preserved. For existing guidance, review and add the gate/domain/tracker

@@ -20,7 +20,7 @@ This document keeps the global harness review small and sequential. For each pen
 
 ## Pending review
 
-14. **Installation, ownership, migration, and audit complexity** — In progress. The obsolete project-policy migration, its two scripts, and its receipt fields were removed; version 1–3 project receipts now fail closed without mutation. Project setup now has one public command, `bootstrap.mjs`, backed by the receipt-based installer instead of a second `setup.mjs` route. Continue reviewing the remaining installation and audit machinery one piece at a time.
+14. **Installation, ownership, migration, and audit complexity** — In progress. The obsolete project-policy migration, its two scripts, and its receipt fields were removed; version 1–3 project receipts now fail closed without mutation. Project setup now has one public command, `bootstrap.mjs`, and one project audit/verification gate, `verify-harness.mjs`. The weaker `audit.mjs --project` route was retired; `audit.mjs` remains machine/template-only. Continue reviewing the remaining installation machinery one piece at a time.
 
 ## Separate architecture follow-up
 
