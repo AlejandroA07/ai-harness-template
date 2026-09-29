@@ -1,7 +1,7 @@
 # Receipt assessment and reviewed recovery
 
 Current selective receipt formats are version 2 for M2 machine Skills and M3 global
-configuration, and version 3 for M4 project configuration. M2/M3 retain scoped historical metadata
+configuration, and version 4 for M4 project configuration. M2/M3 retain scoped historical metadata
 under the platform store's `evidence/<hash>.json`; M4 retains project payload
 snapshots. Machine evidence stays in the target installation store. Evidence is
 retained on updates, removal and rollback.
@@ -29,7 +29,7 @@ node scripts/assess-receipt-migration.mjs --target <absolute-project> --module p
 The command does not modify the target, acquire a lock, run hooks or print settings
 and prior values. `current` means the installed-state audit passes; it does not
 prove live hook activation. `absent`, `review-required` and `conflict` exit nonzero.
-Machine version 1 and project versions 1–2 always require review. Unsupported, malformed or incomplete evidence
+Machine version 1 and project versions 1–3 always require review. Unsupported, malformed or incomplete evidence
 cannot authorize recovery writes. There is deliberately no `--apply`/force mode.
 
 ## Recover an older installation without inventing ownership

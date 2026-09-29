@@ -105,7 +105,7 @@ general installer framework is needed to address the confirmed defects.
 
 ## Implementation record
 
-- R1: M2/M3 version 2 metadata evidence and M4 version 3 payload evidence are validated for audit/apply/remove and
+- R1: M2/M3 version 2 metadata evidence and M4 version 4 payload evidence are validated for audit/apply/remove and
   publication. Independent current-revision records publish and roll back with
   receipts; replaying valid older receipts is rejected on all three lifecycles.
   Semantic receipt mutations and altered/missing evidence have

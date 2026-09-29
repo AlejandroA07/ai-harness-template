@@ -28,7 +28,7 @@ export async function assessReceiptMigration(repository, { target, module, platf
     }
     return { status: 'conflict', applicable: false, receipt: relative, guidance: 'Preserve the unsafe or malformed receipt and reconcile from trusted history.' };
   }
-  if (receipt?.version === 1 || (project && receipt?.version === 2)) return { status: 'review-required', applicable: false, receipt: relative,
+  if (receipt?.version === 1 || (project && [2, 3].includes(receipt?.version))) return { status: 'review-required', applicable: false, receipt: relative,
     guidance: 'This older receipt cannot prove current historical ownership. Preserve state and follow docs/dev/receipt-migration.md; do not run the old remover or change the version field.' };
   const planner = project ? planProjectInstallation : module === 'skills' ? planInstallation : planGlobalInstallation;
   try {

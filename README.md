@@ -44,9 +44,9 @@ covers apply, update, audit, removal, existing configuration and hook trust.
 This selection installs no skills and requires no Claude CLI for Codex setup.
 
 For one repository, use
-`node scripts/setup.mjs plan --module project-configuration --platform codex --scope project --target <absolute-project-path>`.
+`node scripts/bootstrap.mjs <project-path>` to inspect the plan, then add `--apply`.
 The [project lifecycle guide](docs/dev/modularity-m4-project-configuration.md)
-covers preserved project verification, local adapters, optional CI and removal.
+covers preserved project verification, local adapters, optional CI, ownership and recovery.
 The [M5 guide](docs/dev/modularity-m5-workflows.md) explains canonical project-skill
 ownership, workflow composition, routing and the coexistence boundary with
 project-local adapters.

@@ -4,7 +4,6 @@ import { loadCatalog } from './catalog-loader.mjs';
 import { planSelection } from './module-catalog.mjs';
 import { planInstallation, applyInstallation } from './selection-installation.mjs';
 import { planGlobalInstallation, applyGlobalInstallation } from './global-installation.mjs';
-import { planProjectInstallation, applyProjectInstallation } from './project-installation.mjs';
 import { loadIntegrationCatalog, planIntegrations } from './integration-catalog.mjs';
 import { planIntegrationInstallation, applyIntegrationInstallation } from './integration-installation.mjs';
 import { planFullProfileInstallation, applyFullProfileInstallation } from './full-profile-installation.mjs';
@@ -21,11 +20,9 @@ const usage = `Usage:
   node scripts/setup.mjs <plan|apply|remove> --module tool-integrations --select <id> --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--enable <id>:<capability>] [--artifact <id>=<absolute-file>] [--materialize] [--allow-network] [--python <absolute-python>] [--apply] [--json]
   node scripts/setup.mjs audit --module tool-integrations --platform <claude|codex> --scope <machine|project> --target <absolute-target-path> [--json]
   node scripts/setup.mjs <plan|apply|audit|remove> --module global-configuration --platform <claude|codex> --scope machine --target <absolute-home-path> [--apply] [--json]
-  node scripts/setup.mjs <plan|apply|audit|remove> --module project-configuration --platform <claude|codex> --scope project --target <absolute-project-path> [--apply] [--json]
-    Plan/apply options: --verification <existing|generated> --ci <none|github> --tracker <local|github> --domain-layout <single|multi>
-
 Apply and remove preview by default; --apply performs the operation.
-Add --target to plan for read-only installation preflight. Machine/project Skills, Global configuration and Project configuration are supported.
+Add --target to plan for read-only installation preflight. Machine/project Skills and Global configuration are supported.
+Use scripts/bootstrap.mjs for repository project configuration.
 The full profile installs both global configurations, the exact canonical skill inventory, required-tool preflight and owned machine controls.
 Use --legacy-root only for an explicit migration from checkout-bound legacy state.
 Existing machine setup, bootstrap and audit commands remain compatibility entry points.`;
@@ -54,7 +51,7 @@ function parseArgs(args) {
       result[key] = true;
       continue;
     }
-    if (operation === 'list' || !['--select', '--module', '--profile', '--platform', '--scope', '--target', '--legacy-root', '--verification', '--ci', '--tracker', '--domain-layout', '--enable', '--artifact', '--python'].includes(option)) throw new Error(`Unsupported option: ${option}`);
+    if (operation === 'list' || !['--select', '--module', '--profile', '--platform', '--scope', '--target', '--legacy-root', '--enable', '--artifact', '--python'].includes(option)) throw new Error(`Unsupported option: ${option}`);
     const value = options[++index];
     if (!value || value.startsWith('--')) throw new Error(`Missing value for ${option}`);
     if (option === '--select') result.ids.push(value);
@@ -68,32 +65,29 @@ function parseArgs(args) {
     else {
       if (seen.has(option)) throw new Error(`Duplicate ${option}`);
       seen.add(option);
-      result[option === '--domain-layout' ? 'domainLayout' : option === '--legacy-root' ? 'legacyRoot' : option.slice(2)] = value;
+      result[option === '--legacy-root' ? 'legacyRoot' : option.slice(2)] = value;
     }
   }
   if (operation !== 'list' && (!result.platform || !result.scope)) throw new Error('Requires explicit --platform and --scope');
   if (['apply', 'audit', 'remove'].includes(operation) && !result.target) throw new Error('Lifecycle requires explicit --target');
   const global = result.modules.length === 1 && result.modules[0] === 'global-configuration';
-  const project = result.modules.length === 1 && result.modules[0] === 'project-configuration';
   const integrations = result.modules.length === 1 && result.modules[0] === 'tool-integrations';
   const full = result.profile === 'full';
   if (result.profile && !full) throw new Error('Only --profile full is supported');
   if (full && (result.modules.length || result.ids.length || result.enabled.length || Object.keys(result.artifacts).length
-    || result.materialize || result.allowNetwork || result.python || result.verification || result.ci || result.tracker || result.domainLayout)) {
-    throw new Error('The full profile cannot be mixed with module, selection, integration or project options');
+    || result.materialize || result.allowNetwork || result.python)) {
+    throw new Error('The full profile cannot be mixed with module, selection or integration options');
   }
   if (full && (!result.target || result.platform !== 'both' || result.scope !== 'machine')) {
     throw new Error('The full profile requires --target, --platform both and --scope machine');
   }
   if (result.legacyRoot && !full) throw new Error('--legacy-root requires --profile full');
-  if ((global || project) && (result.ids.length || !result.target)) throw new Error('Configuration modules require --target and cannot be mixed with skills');
-  if ((result.target || operation !== 'plan') && result.modules.length && !global && !project && !integrations) throw new Error('Lifecycle supports one configuration module, Tool integrations, or explicit skill IDs');
+  if (global && (result.ids.length || !result.target)) throw new Error('Global configuration requires --target and cannot be mixed with skills');
+  if ((result.target || operation !== 'plan') && result.modules.length && !global && !integrations) throw new Error('Lifecycle supports Global configuration, Tool integrations, or explicit skill IDs');
   if ((result.enabled.length || Object.keys(result.artifacts).length || result.materialize || result.allowNetwork || result.python) && !integrations) throw new Error('--enable, --artifact and runtime materialization options require --module tool-integrations');
   if (integrations && result.platform === 'both') throw new Error('Tool integration lifecycle requires one platform');
   if (integrations && operation === 'audit' && (result.ids.length || result.enabled.length || Object.keys(result.artifacts).length)) throw new Error('Tool integration audit inspects the whole receipt');
-  if (!project && ['verification', 'ci', 'tracker', 'domainLayout'].some((key) => result[key] !== undefined)) throw new Error('Project configuration options require --module project-configuration');
   result.global = global;
-  result.project = project;
   result.integrations = integrations;
   result.full = full;
   return result;
@@ -132,22 +126,23 @@ try {
           console.log(`${module.label} (${module.id}; ${module.visibility})`);
           const members = catalog.capabilities.filter((entry) => entry.module === module.id);
           for (const entry of members) console.log(`  ${entry.id}: ${entry.description} [${entry.activation}; ${entry.platforms.join('/')}; ${entry.scopes.join('/')}]`);
-          if (!members.length) console.log(['global-configuration', 'project-configuration'].includes(module.id)
+          if (!members.length) console.log(module.id === 'global-configuration'
             ? `  Lifecycle: --module ${module.id} with an explicit target, matching scope and one platform.`
+            : module.id === 'project-configuration'
+              ? '  Lifecycle: node scripts/bootstrap.mjs <project-path>'
             : module.id === 'tool-integrations'
               ? `  Integrations: ${integrationCatalog.integrations.map((entry) => entry.id).join(', ')}`
               : '  Source ownership recorded; no selectable capability definitions.');
         }
       }
     } else if (options.target) {
-      const planner = options.full ? planFullProfileInstallation : options.integrations ? planIntegrationInstallation : options.project ? planProjectInstallation : options.global ? planGlobalInstallation : planInstallation;
-      const applyPlan = options.full ? applyFullProfileInstallation : options.integrations ? applyIntegrationInstallation : options.project ? applyProjectInstallation : options.global ? applyGlobalInstallation : applyInstallation;
+      const planner = options.full ? planFullProfileInstallation : options.integrations ? planIntegrationInstallation : options.global ? planGlobalInstallation : planInstallation;
+      const applyPlan = options.full ? applyFullProfileInstallation : options.integrations ? applyIntegrationInstallation : options.global ? applyGlobalInstallation : applyInstallation;
       const plan = await planner(root, { operation: options.operation === 'plan' ? 'apply' : options.operation,
         ids: options.ids, platform: options.platform, scope: options.scope, target: options.target,
         ...(options.full ? { legacyRoot: options.legacyRoot ?? null } : {}),
         ...(options.integrations ? { enabled: options.enabled, artifacts: options.artifacts, materialize: Boolean(options.materialize),
-          allowNetwork: Boolean(options.allowNetwork), python: options.python ?? null } : {}),
-        ...(options.project ? { verification: options.verification, ci: options.ci, tracker: options.tracker, domainLayout: options.domainLayout } : {}) });
+          allowNetwork: Boolean(options.allowNetwork), python: options.python ?? null } : {}) });
       const result = options.apply ? await applyPlan(plan) : plan;
       if (options.json) console.log(JSON.stringify(result, null, 2));
       else {
@@ -162,7 +157,7 @@ try {
         for (const change of result.changes) console.log(`${change.action}: ${change.id}`);
         if (result.evidence) console.log(`${result.evidence.action}: ${result.evidence.path}`);
         for (const conflict of result.conflicts) console.log(`Conflict: ${conflict}`);
-        if (options.global || options.project || options.integrations || options.full) console.log(result.activation);
+        if (options.global || options.integrations || options.full) console.log(result.activation);
         for (const note of result.notes ?? []) console.log(note);
         if (!result.changes.length && !result.receiptChanged && result.applicable) console.log(result.installed
           ? 'No changes required; installed state is consistent.' : 'No selected installation is recorded.');

@@ -1,6 +1,6 @@
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
-const block = '# Selected project harness\n.scratch/\n.harness/.project-stage-*/\n.ai-harness-install.lock/\n# End selected project harness\n';
+const block = '# Selected project harness\n.scratch/\n.harness/.project-stage-*/\n.ai-harness-install.lock/\n.claude/settings.local.json\n.harness/tmp/\n.env\n.env.*\n!.env.example\n!.env.sample\n!.env.template\n*.pem\n*.key\n*.p12\n*.pfx\n# End selected project harness\n';
 export function projectIgnore(bytes, prior, remove = false) {
   const text = bytes?.toString('utf8') ?? '';
   if (prior && (!object(prior) || Object.keys(prior).sort().join(',') !== 'existed,owned,separator'

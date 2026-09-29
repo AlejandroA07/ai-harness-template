@@ -40,7 +40,7 @@ The groups below cover the tracked baseline. A path can have one implementation 
 | `project/.github/`, `project/scripts/verify.mjs.template` | Project configuration / verification and CI | Preserve gate ordering, pinned actions, least privilege, conditional runtime provisioning |
 | `components/guard-policy.mjs`, `guard-git.mjs`, `attribution-policy.mjs`, `check-attribution.mjs`, `pre-commit.mjs`, `global/claude-tools.json`, `scripts/claude-dev.mjs` | Shared policy/runtime | Global configuration, repository Git hooks, this repository's Git hooks and token-focused Claude CLI sessions |
 | `components/mcp/` | Tool integrations | Existing Context7/Playwright adapters; keep separate from the agent command guards |
-| `scripts/machine-setup.mjs`, `bootstrap.mjs` | Installation core entry points | Preserve legacy full-profile commands while adding explicit selection |
+| `scripts/machine-setup.mjs`, `bootstrap.mjs` | Installation core entry points | Machine full-profile setup and the single public project setup command |
 | `scripts/config-merge.mjs`, `skill-lib.mjs`, `sync-skills.mjs`, `generate-skills.mjs`, `generate-project-skills.mjs` | Installation core | Generation and owned installation state for Skills, Workflows, and integration adapters |
 | `scripts/project-configuration.mjs`, `project-verification.mjs` | Project configuration | Separate tracker, domain-layout, stack and hosting decisions from installation plumbing |
 | `scripts/windows-cli.mjs` | Shared runtime | Setup/audit and copied project verifier; retain shell-free command execution |
@@ -102,11 +102,13 @@ Treat receipts and manifests as untrusted input: validate schema, IDs, platform/
 
 Track the exact installed hook entry and target identity. Migrate known legacy entries conservatively. Preserve unknown hooks; do not use an ID or filename alone as permission to overwrite user content. Audit should verify the expected hook configuration and runtime, not just search for the filename.
 
-### R5 — Bootstrap mixes preservation and unconditional overwrites (blocking for lifecycle work)
+### R5 — Bootstrap mixed preservation and unconditional overwrites (resolved)
 
-[Bootstrap](../../scripts/bootstrap.mjs) preserves guidance and an existing verifier, but overwrites Git hook files, Gitleaks configuration, copied runtime and CI payloads, and sets `core.hooksPath` at lines 180–214. It writes some files before validating later settings/commands. There is no general installation receipt, uninstall contract, or complete rollback.
-
-Plan all changes first, validate targets, then apply with owned receipts and recoverable backups. Retain human-tailored guidance and verifier behavior. On upgrade, distinguish unchanged owned content, user-edited owned content, and unowned collisions. Restore a previous Git setting only if its current value is still the value this installation wrote. Do not blindly overwrite an existing hooks directory or chain unknown executable hooks.
+[Bootstrap](../../scripts/bootstrap.mjs) now delegates planning and publication to
+the receipt-backed project installer. It performs a read-only preview by default,
+preserves user-owned guidance and verifiers, rejects unowned collisions, and
+publishes owned changes through recoverable staging. Hook activation is performed
+only after file publication and refuses to replace another `core.hooksPath`.
 
 ### R6 — New vendors and source moves do not fit the upstream updater (blocking before vendor integration)
 

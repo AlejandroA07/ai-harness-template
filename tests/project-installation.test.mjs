@@ -7,10 +7,7 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { planProjectInstallation, applyProjectInstallation } from '../scripts/project-installation.mjs';
 import { snapshot } from './helpers/filesystem-snapshot.mjs';
-import { digest, payloadHash } from '../scripts/installation-core.mjs';
-import { ownershipHeadBytes } from '../scripts/installation-evidence.mjs';
-import { projectPayload } from '../scripts/project-provenance.mjs';
-import { projectSettings } from '../scripts/project-settings.mjs';
+import { digest } from '../scripts/installation-core.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 async function fixture(body) {
@@ -48,63 +45,13 @@ test('project lifecycle leaves agent settings under machine authority', async ()
   for (const [file, bytes] of Object.entries(files)) assert.equal(await f.read(file), bytes);
 }));
 
-test('an owned legacy project policy migrates to machine authority on apply', async () => fixture(async (f) => {
-  await f.apply('claude');
-  await f.apply('codex');
-  const receipt = JSON.parse(await f.read('.harness/project-installation.json'));
-  const hook = { matcher: 'Bash|Read', hooks: [{ type: 'command', command: 'node legacy-project-guard.mjs' }] };
-  for (const platform of ['claude', 'codex']) {
-    const installed = projectSettings(platform, null, hook);
-    await f.put(platform === 'claude' ? '.claude/settings.json' : '.codex/hooks.json', installed.after);
-    receipt.settings[platform] = installed.state;
-  }
-  await f.put('.codex/config.toml', '[features]\nhooks = true\n');
-  receipt.codexFeatures = { existed: true, createdTable: false, values: { hooks: false } };
-  const legacyRuntime = ['global-settings.mjs', 'project-settings.mjs'];
-  const legacyComponents = ['secret-policy.mjs', 'guard-policy.mjs', 'guard-git.mjs', 'attribution-policy.mjs', 'check-attribution.mjs'];
-  for (const name of legacyRuntime) {
-    const file = `.harness/project-runtime/${name}`;
-    const bytes = await fs.readFile(path.join(f.source, 'scripts', name));
-    await f.put(file, bytes);
-    receipt.owned[file] = digest(bytes);
-  }
-  for (const name of legacyComponents) {
-    const file = `.harness/hooks/${name}`;
-    const bytes = await fs.readFile(path.join(f.source, 'components', name));
-    await f.put(file, bytes);
-    receipt.owned[file] = digest(bytes);
-  }
-  const owned = {};
-  for (const file of Object.keys(receipt.owned)) owned[file] = await fs.readFile(path.join(f.target, file));
-  let payload = projectPayload(receipt, owned);
-  receipt.payload = payloadHash(payload);
-  payload = projectPayload(receipt, owned);
-  for (const [file, bytes] of Object.entries(payload)) await f.put(`.harness/project-payloads/${receipt.payload}/${file}`, bytes);
-  await f.put('.harness/project-current.json', ownershipHeadBytes(receipt.payload));
-  await f.put('.harness/project-installation.json', JSON.stringify(receipt));
-
-  const audit = await f.plan('codex', 'audit');
-  assert.equal(audit.applicable, false);
-  assert.ok(audit.conflicts.some((entry) => entry.includes('machine authority')));
-  await f.apply('codex');
-  await assert.rejects(f.read('.claude/settings.json'), { code: 'ENOENT' });
-  await assert.rejects(f.read('.codex/hooks.json'), { code: 'ENOENT' });
-  assert.equal(await f.read('.codex/config.toml'), '[features]\nhooks = false\n');
-  await assert.rejects(f.read('.harness/hooks/guard-git.mjs'), { code: 'ENOENT' });
-  const migrated = JSON.parse(await f.read('.harness/project-installation.json'));
-  assert.deepEqual(migrated.settings, {});
-  assert.equal(migrated.codexFeatures, null);
-  assert.equal(run(f.target, 'scripts/verify-harness.mjs').status, 0);
-}));
-
 test('review regression: forged file and state ownership never authorizes mutation', async () => {
-  for (const kind of ['file', 'settings', 'features', 'ignore']) await fixture(async (f) => {
+  for (const kind of ['file', 'schema', 'ignore']) await fixture(async (f) => {
     await f.put('AGENTS.md', 'User-owned guidance\n');
     await f.apply('claude'); await f.apply('codex');
     const receipt = JSON.parse(await f.read('.harness/project-installation.json'));
     if (kind === 'file') receipt.owned['AGENTS.md'] = digest(await f.read('AGENTS.md'));
-    if (kind === 'settings') receipt.settings.claude = {};
-    if (kind === 'features') receipt.codexFeatures = {};
+    if (kind === 'schema') { receipt.version = 3; receipt.settings = {}; receipt.codexFeatures = null; }
     if (kind === 'ignore') receipt.ignore.owned = false;
     await f.put('.harness/project-installation.json', JSON.stringify(receipt));
     const before = await snapshot(f.target);
@@ -120,8 +67,7 @@ test('review regression: domain and tracker FIFOs fail without blocking', { skip
   for (const file of ['CONTEXT.md', 'CONTEXT-MAP.md', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md']) await fixture(async (f) => {
     await fs.mkdir(path.dirname(path.join(f.target, file)), { recursive: true });
     assert.equal(spawnSync('mkfifo', [path.join(f.target, file)]).status, 0);
-    const result = spawnSync(process.execPath, [path.join(f.source, 'scripts/setup.mjs'), 'plan', '--module', 'project-configuration',
-      '--platform', 'codex', '--scope', 'project', '--target', f.target], { encoding: 'utf8', timeout: 2000 });
+    const result = spawnSync(process.execPath, [path.join(f.source, 'scripts/bootstrap.mjs'), f.target], { encoding: 'utf8', timeout: 2000 });
     assert.ifError(result.error);
     assert.notEqual(result.status, 0);
     await assert.rejects(fs.access(path.join(f.target, '.ai-harness-install.lock')));
@@ -152,7 +98,7 @@ test('review regression: removal preserves retained platform bytes despite chang
   await f.apply('codex'); await f.apply('claude');
   const before = {};
   for (const file of ['AGENTS.md', 'CLAUDE.md', '.claude/skills/sample/SKILL.md', '.harness/project-runtime/project-state.mjs']) before[file] = await f.read(file);
-  await fs.appendFile(path.join(f.source, 'project/AGENTS.selected.md'), '\nUpstream revision\n');
+  await fs.appendFile(path.join(f.source, 'project/AGENTS.md.template'), '\nUpstream revision\n');
   await fs.appendFile(path.join(f.source, 'scripts/project-state.mjs'), '\n// Upstream revision\n');
   await f.put('.harness/skills/sample/SKILL.md', skill() + '\nLocal draft revision\n');
   const plan = await f.plan('codex', 'remove');
@@ -264,7 +210,7 @@ test('project ownership denies unsafe paths, edited files and malformed receipts
 test('project publication rolls back install, update and removal and rejects stale plans', async () => {
   for (const operation of ['install', 'update', 'remove']) for (const phase of ['staged', 'file', 'receipt']) await fixture(async (f) => {
     if (operation !== 'install') await f.apply();
-    if (operation === 'update') await fs.appendFile(path.join(f.source, 'project/AGENTS.selected.md'), '\nFixture update\n');
+    if (operation === 'update') await fs.appendFile(path.join(f.source, 'project/AGENTS.md.template'), '\nFixture update\n');
     const originals = {};
     for (const file of ['AGENTS.md', 'scripts/verify-harness.mjs', '.harness/project-runtime/project-state.mjs', '.harness/project-installation.json']) originals[file] = await f.read(file).catch(() => null);
     await assert.rejects(f.apply('codex', operation === 'remove' ? 'remove' : 'apply', {}, { checkpoint: async (point) => { if (point === phase) throw new Error('Injected failure'); } }), /rolled back/);
@@ -311,19 +257,37 @@ test('project domain and tracker contracts require explicit resolution of contra
   assert.equal((await f.plan('codex', 'apply', { domainLayout: 'single' })).applicable, false);
 }));
 
-test('project CLI remains read-only by default and does not need platform tools', async () => fixture(async (f) => {
-  const empty = path.join(f.temporary, 'empty'); await fs.mkdir(empty);
-  const common = ['--module', 'project-configuration', '--platform', 'codex', '--scope', 'project', '--target', f.target, '--json'];
-  const cli = (...args) => spawnSync(process.execPath, [path.join(f.source, 'scripts/setup.mjs'), ...args], { encoding: 'utf8', env: { ...process.env, HOME: f.home, USERPROFILE: f.home, PATH: empty } });
+test('bootstrap is the single public project command and remains read-only by default', async () => fixture(async (f) => {
+  const bootstrap = (...args) => spawnSync(process.execPath, [path.join(f.source, 'scripts/bootstrap.mjs'), f.target, ...args], { encoding: 'utf8' });
   const before = await snapshot(f.target);
-  assert.equal(cli('plan', ...common).status, 0);
-  assert.equal(cli('apply', ...common).status, 0);
+  assert.equal(bootstrap().status, 0);
   assert.deepEqual(await snapshot(f.target), before);
-  const installed = cli('apply', ...common, '--apply');
+  assert.notEqual(bootstrap('--apply').status, 0);
+  assert.deepEqual(await snapshot(f.target), before);
+  const initialized = spawnSync('git', ['init', '-q', f.target], { encoding: 'utf8' });
+  assert.equal(initialized.status, 0, initialized.stderr);
+  assert.equal(spawnSync('git', ['config', 'core.hooksPath', 'custom-hooks'], { cwd: f.target, encoding: 'utf8' }).status, 0);
+  assert.notEqual(bootstrap('--apply').status, 0);
+  await assert.rejects(f.read('AGENTS.md'));
+  assert.equal(spawnSync('git', ['config', '--unset', 'core.hooksPath'], { cwd: f.target, encoding: 'utf8' }).status, 0);
+  const installed = bootstrap('--apply');
   assert.equal(installed.status, 0, installed.stderr);
-  assert.equal(cli('audit', ...common).status, 0);
-  assert.notEqual(cli('apply', ...common, '--select', 'research').status, 0);
-  assert.equal(cli('remove', ...common, '--apply').status, 0);
+  const receipt = JSON.parse(await f.read('.harness/project-installation.json'));
+  assert.deepEqual(receipt.platforms, ['claude', 'codex']);
+  assert.equal(spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: f.target, encoding: 'utf8' }).stdout.trim(), '.githooks');
+  if (process.platform !== 'win32') for (const hook of ['pre-commit', 'commit-msg']) {
+    assert.notEqual((await fs.stat(path.join(f.target, '.githooks', hook))).mode & 0o111, 0);
+  }
+  if (process.platform !== 'win32') {
+    await fs.chmod(path.join(f.target, '.githooks', 'pre-commit'), 0o600);
+    assert.notEqual(run(f.target, 'scripts/verify-harness.mjs').status, 0);
+  }
+  assert.equal(bootstrap('--apply').status, 0);
+  assert.equal(run(f.target, 'scripts/verify-harness.mjs').status, 0);
+  assert.notEqual(bootstrap('--unknown').status, 0);
+  const retired = spawnSync(process.execPath, [path.join(f.source, 'scripts/setup.mjs'), 'plan', '--module', 'project-configuration',
+    '--platform', 'codex', '--scope', 'project', '--target', f.target], { encoding: 'utf8' });
+  assert.notEqual(retired.status, 0);
 }));
 
 test('abrupt project interruption preserves recovery staging and blocks the next operation', async () => fixture(async (f) => {
