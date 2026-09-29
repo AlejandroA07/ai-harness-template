@@ -2,9 +2,6 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
-import { claudeSecretDenials } from '../components/secret-policy.mjs';
-import { reconcileHarnessDenials, replaceHarnessHook } from './config-merge.mjs';
 import { buildVerificationSteps } from './project-verification.mjs';
 import { detectDomainSignals, inspectExistingDomainConfiguration, inspectExistingDomainContract, inspectExistingTrackerConfiguration, renderDomainInstructions, renderTrackerInstructions } from './project-configuration.mjs';
 
@@ -80,7 +77,7 @@ function recommendation(label, state, reason, trigger) {
 }
 
 console.log(`Bootstrap ${apply ? 'APPLY' : 'DRY RUN'} for ${project}\n`);
-recommendation('base harness', 'RECOMMENDED', 'portable guidance, verification interface, hooks, and guards');
+recommendation('base harness', 'RECOMMENDED', 'portable project guidance and repository verification');
 recommendation('GitHub CI', isGithub ? 'RECOMMENDED' : 'NOT CURRENTLY', isGithub ? 'GitHub project detected' : 'no GitHub project detected', 'the project is hosted on GitHub');
 if (existingTracker.state === 'conflict') console.log(`BLOCKED issue tracker: ${existingTracker.reason} Reconcile it before applying bootstrap.`);
 recommendation('Context7 MCP', 'NOT CURRENTLY', 'only useful when work repeatedly needs current third-party documentation', 'the project depends on fast-moving external APIs or frameworks');
@@ -101,9 +98,9 @@ if (existingDomain.state === 'conflict' || existingDomainContract.state === 'con
   console.log(`RECOMMENDED domain layout: ${domainLayout === 'multi' ? 'multi-context' : 'single-context'}${detected}`);
 }
 
-const componentFiles = ['secret-policy.mjs', 'guard-policy.mjs', 'guard-git.mjs', 'attribution-policy.mjs', 'check-attribution.mjs', 'pre-commit.mjs'];
+const componentFiles = ['secret-policy.mjs', 'attribution-policy.mjs', 'check-attribution.mjs', 'pre-commit.mjs'];
 const planned = [
-  'AGENTS.md', 'CLAUDE.md', '.claude/settings.json', '.codex/hooks.json',
+  'AGENTS.md', 'CLAUDE.md',
   'docs/agents/issue-tracker.md', 'docs/agents/domain.md',
   '.githooks/pre-commit', '.githooks/commit-msg', 'scripts/verify.mjs',
   '.harness/runtime/windows-cli.mjs',
@@ -141,11 +138,6 @@ async function copyAlways(source, destination) {
   await fs.copyFile(source, destination);
 }
 
-async function readJson(filePath) {
-  try { return JSON.parse(await fs.readFile(filePath, 'utf8')); }
-  catch (error) { if (error.code === 'ENOENT') return {}; throw new Error(`Cannot safely merge invalid JSON at ${filePath}: ${error.message}`); }
-}
-
 await copyIfMissing(path.join(root, 'project', 'AGENTS.md.template'), path.join(project, 'AGENTS.md'));
 await copyIfMissing(path.join(root, 'project', 'CLAUDE.md'), path.join(project, 'CLAUDE.md'));
 const trackerPath = path.join(project, 'docs', 'agents', 'issue-tracker.md');
@@ -153,30 +145,6 @@ const domainPath = path.join(project, 'docs', 'agents', 'domain.md');
 await fs.mkdir(path.dirname(trackerPath), { recursive: true });
 if (!(await exists(trackerPath))) await fs.writeFile(trackerPath, renderTrackerInstructions({ github: isGithub }));
 if (!(await exists(domainPath))) await fs.writeFile(domainPath, renderDomainInstructions({ multiContext: domainLayout === 'multi' }));
-const projectClaudePath = path.join(project, '.claude', 'settings.json');
-const projectClaude = await readJson(projectClaudePath);
-const claudeTemplate = await readJson(path.join(root, 'project', '.claude', 'settings.json'));
-projectClaude.$schema ??= claudeTemplate.$schema;
-projectClaude.includeCoAuthoredBy = false;
-projectClaude.permissions ??= {};
-projectClaude.permissions.deny = reconcileHarnessDenials(
-  projectClaude.permissions.deny,
-  [...claudeSecretDenials('project'), ...claudeTemplate.permissions.deny, ...deniedClaudeBuiltInTools],
-  obsoleteHarnessClaudeDenials,
-);
-projectClaude.hooks ??= {};
-projectClaude.hooks.PreToolUse = replaceHarnessHook(projectClaude.hooks.PreToolUse, claudeTemplate.hooks.PreToolUse[0]);
-await fs.mkdir(path.dirname(projectClaudePath), { recursive: true });
-await fs.writeFile(projectClaudePath, `${JSON.stringify(projectClaude, null, 2)}\n`);
-
-const projectCodexPath = path.join(project, '.codex', 'hooks.json');
-const projectCodex = await readJson(projectCodexPath);
-const codexTemplate = await readJson(path.join(root, 'project', '.codex', 'hooks.json'));
-projectCodex.description ??= codexTemplate.description;
-projectCodex.hooks ??= {};
-projectCodex.hooks.PreToolUse = replaceHarnessHook(projectCodex.hooks.PreToolUse, codexTemplate.hooks.PreToolUse[0]);
-await fs.mkdir(path.dirname(projectCodexPath), { recursive: true });
-await fs.writeFile(projectCodexPath, `${JSON.stringify(projectCodex, null, 2)}\n`);
 await copyAlways(path.join(root, 'project', '.githooks', 'pre-commit'), path.join(project, '.githooks', 'pre-commit'));
 await copyAlways(path.join(root, 'project', '.githooks', 'commit-msg'), path.join(project, '.githooks', 'commit-msg'));
 await copyAlways(path.join(root, 'project', '.gitleaks.toml'), path.join(project, '.gitleaks.toml'));

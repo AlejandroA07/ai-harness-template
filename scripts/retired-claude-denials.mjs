@@ -1,4 +1,4 @@
-export const deniedClaudeBuiltInTools = Object.freeze([
+export const retiredClaudeToolDenials = Object.freeze([
   'Artifact',
   'CronCreate',
   'CronDelete',
@@ -16,6 +16,7 @@ export const deniedClaudeBuiltInTools = Object.freeze([
   'Workflow',
 ]);
 
-export const obsoleteHarnessClaudeDenials = Object.freeze([
+export const retiredHarnessClaudeDenials = Object.freeze([
+  ...retiredClaudeToolDenials,
   'Bash(git push:*)',
 ]);

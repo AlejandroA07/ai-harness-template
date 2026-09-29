@@ -24,14 +24,14 @@ The dry run reports each conditional component as `RECOMMENDED`, `NOT CURRENTLY`
 node scripts/bootstrap.mjs <project-path> --github --domain-layout=single --apply
 ```
 
+Universal Claude and Codex settings, command guards, secret-read denials, and attribution preferences come from machine setup. Bootstrap does not duplicate or modify those settings inside a repository.
+
 The script installs or generates:
 
 - root `AGENTS.md` and thin `CLAUDE.md` when missing;
 - `docs/agents/issue-tracker.md`, selecting GitHub Issues when a GitHub remote exists and ignored local Markdown otherwise;
 - `docs/agents/domain.md`, recording the reviewed single-context or multi-context layout while leaving glossaries and ADRs lazy;
-- Claude and Codex project hooks;
-- the lean Claude built-in tool policy while retaining Bash and PowerShell;
-- fail-closed Gitleaks, branch/push guards, and model/tool self-attribution checks;
+- repository Git hooks, Gitleaks, and model/tool self-attribution checks;
 - cross-platform `node scripts/verify.mjs` from detected real commands, with a shell-free Windows command runner under `.harness/runtime/`;
 - committed security/verification CI, CodeQL, and detected Dependabot ecosystems for GitHub projects;
 - ignored `.scratch/` state and other local-only exclusions;

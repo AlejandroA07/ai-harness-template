@@ -69,11 +69,17 @@ function commandInvocations(command, depth = 0) {
   for (const words of shellCommands(command)) {
     let index = 0;
     while (index < words.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index])) index += 1;
-    if (words[index]?.toLowerCase() === 'env') {
+    const wrapper = words[index]?.replaceAll('\\', '/').split('/').at(-1).toLowerCase();
+    if (['env', 'env.exe'].includes(wrapper)) {
+      const envArgs = words.slice(index + 1);
       index += 1;
       while (index < words.length && (words[index].startsWith('-') || /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[index]))) {
         if (['-u', '--unset', '-c', '--chdir'].includes(words[index].toLowerCase())) index += 1;
         index += 1;
+      }
+      if (index >= words.length) {
+        invocations.push({ executable: wrapper, args: envArgs });
+        continue;
       }
     }
     while (['command', 'builtin'].includes(words[index]?.toLowerCase())) index += 1;
@@ -82,12 +88,18 @@ function commandInvocations(command, depth = 0) {
     const args = words.slice(index + 1);
     if (['sh', 'bash', 'zsh'].includes(executable)) {
       const commandIndex = args.findIndex((arg) => /^-[a-z]*c[a-z]*$/i.test(arg) || arg === '--command');
-      if (commandIndex >= 0 && args[commandIndex + 1]) invocations.push(...commandInvocations(args[commandIndex + 1], depth + 1));
+      if (commandIndex >= 0 && args[commandIndex + 1]) {
+        const nestedCommand = args[commandIndex + 1];
+        invocations.push({ executable, args, nestedCommand }, ...commandInvocations(nestedCommand, depth + 1));
+      }
       continue;
     }
     if (['powershell', 'powershell.exe', 'pwsh', 'pwsh.exe'].includes(executable)) {
       const commandIndex = args.findIndex((arg) => ['-command', '-c'].includes(arg.toLowerCase()));
-      if (commandIndex >= 0 && args[commandIndex + 1]) invocations.push(...commandInvocations(args[commandIndex + 1], depth + 1));
+      if (commandIndex >= 0 && args[commandIndex + 1]) {
+        const nestedCommand = args[commandIndex + 1];
+        invocations.push({ executable, args, nestedCommand }, ...commandInvocations(nestedCommand, depth + 1));
+      }
       continue;
     }
     invocations.push({ executable, args });
@@ -155,6 +167,7 @@ function commandReferencesSensitivePath(command) {
   const mentionOnly = new Set(['echo', 'echo.exe', 'printf', 'write-output', 'write-host']);
   const searches = new Set(['rg', 'rg.exe', 'ripgrep', 'grep', 'grep.exe', 'egrep', 'fgrep', 'select-string']);
   for (const invocation of commandInvocations(command)) {
+    if (invocation.nestedCommand) continue;
     if (mentionOnly.has(invocation.executable)) continue;
     if (searches.has(invocation.executable)) {
       if (searchReferencesSensitivePath(invocation)) return true;
@@ -213,15 +226,73 @@ function hasFlag(args, shortName, longName) {
     || (arg.startsWith('-') && !arg.startsWith('--') && arg.slice(1).toLowerCase().includes(shortName)));
 }
 
+function wholeWorktreePathspec(value) {
+  const lower = value.toLowerCase();
+  if (['.', './', ':/', ':/*', ':/**', ':/**/*', '*', '**', '**/*', './*', './**', './**/*'].includes(lower)) return true;
+  const magic = lower.match(/^:\(([^)]*)\)(.*)$/);
+  if (!magic || !magic[1].split(',').some((name) => ['top', 'glob'].includes(name))) return false;
+  return ['', '*', '**', '**/*'].includes(magic[2]);
+}
+
+function excludePathspec(value) {
+  const lower = value.toLowerCase();
+  if (lower.startsWith(':!') || lower.startsWith(':^')) return true;
+  const magic = lower.match(/^:\(([^)]*)\)/);
+  return Boolean(magic?.[1].split(',').some((name) => ['exclude', '!', '^'].includes(name)));
+}
+
+function broadExclusionPathspec(args) {
+  const separator = args.indexOf('--');
+  if (separator < 0) return args.some(excludePathspec);
+  const pathspecs = args.slice(separator + 1);
+  return pathspecs.some(excludePathspec) && pathspecs.every(excludePathspec);
+}
+
+function usesPathspecFile(args) {
+  return args.some((arg) => arg === '--pathspec-from-file' || arg.startsWith('--pathspec-from-file='));
+}
+
+function dryRun(args) {
+  return hasFlag(args, 'n', '--dry-run');
+}
+
+function immediatePrune(args, prefixArgs) {
+  const commandOption = prefixArgs.some((arg, index) => {
+    const lower = arg.toLowerCase();
+    return /^-cgc\.pruneexpire=(?:now|all|0)$/.test(lower)
+      || (lower === '-c' && /^gc\.pruneexpire=(?:now|all|0)$/.test(prefixArgs[index + 1]?.toLowerCase() ?? ''));
+  });
+  return commandOption || args.some((arg, index) => {
+    const lower = arg.toLowerCase();
+    return ['--prune=now', '--prune=all', '--prune=0'].includes(lower)
+      || (lower === '--prune' && ['now', 'all', '0'].includes(args[index + 1]?.toLowerCase()));
+  });
+}
+
+function configuresImmediatePrune(args) {
+  const lowerArgs = args.map((arg) => arg.toLowerCase());
+  if (lowerArgs.some((arg) => ['get', 'get-all', 'get-regexp', 'get-urlmatch', '--get', '--get-all', '--get-regexp', '--get-urlmatch', '--list', '-l'].includes(arg))) return false;
+  return args.some((arg, index) => {
+    const lower = arg.toLowerCase();
+    if (/^gc\.pruneexpire=(?:now|all|0)$/.test(lower)) return true;
+    return lower === 'gc.pruneexpire' && ['now', 'all', '0'].includes(args[index + 1]?.toLowerCase());
+  });
+}
+
 function destructiveGitReason(command) {
   for (const { subcommand, args, prefixArgs } of gitInvocations(command)) {
     const lower = args.map((arg) => arg.toLowerCase());
     if (subcommand === 'reset' && lower.includes('--hard')) return 'destructive git reset mode';
     if (subcommand === 'clean' && hasFlag(args, 'f', '--force')) return 'git clean --force';
-    if (subcommand === 'checkout' && (hasFlag(args, 'f', '--force') || lower.includes('.'))) return 'destructive whole-worktree checkout';
-    if (subcommand === 'restore' && lower.includes('.')) return 'destructive whole-worktree restore';
-    if (subcommand === 'rm' && lower.includes('.') && hasFlag(args, 'r', '--recursive')) return 'recursive git removal of the whole worktree';
+    const broadPathspec = args.some(wholeWorktreePathspec) || broadExclusionPathspec(args) || usesPathspecFile(args);
+    if (subcommand === 'checkout' && (hasFlag(args, 'f', '--force') || broadPathspec)) return 'destructive whole-worktree checkout';
+    if (subcommand === 'restore' && broadPathspec) return 'destructive whole-worktree restore';
+    if (subcommand === 'rm' && broadPathspec && hasFlag(args, 'r', '--recursive')) return 'recursive git removal of the whole worktree';
+    if (subcommand === 'switch' && (lower.includes('--discard-changes') || hasFlag(args, 'f', '--force'))) return 'git switch discard-changes';
     if (subcommand === 'stash' && lower[0] === 'clear') return 'git stash clear';
+    if (subcommand === 'reflog' && lower[0] === 'expire' && !dryRun(args)) return 'git reflog expiration';
+    if (subcommand === 'prune' && !dryRun(args)) return 'git object pruning';
+    if (subcommand === 'gc' && immediatePrune(args, prefixArgs)) return 'immediate git object pruning';
     if (subcommand === 'worktree' && lower[0] === 'remove' && hasFlag(args, 'f', '--force')) return 'forced git worktree removal';
     if (subcommand === 'commit' && hasFlag(args, 'n', '--no-verify')) return 'commit hook bypass';
     if (subcommand === 'commit' && prefixArgs.some((arg, index) => {
@@ -230,6 +301,7 @@ function destructiveGitReason(command) {
         || (value === '-c' && prefixArgs[index + 1]?.toLowerCase().startsWith('core.hookspath='));
     })) return 'commit hook-path override';
     if (subcommand === 'config' && lower.some((arg) => arg === 'core.hookspath' || arg.startsWith('core.hookspath='))) return 'Git hook-path modification';
+    if (subcommand === 'config' && configuresImmediatePrune(args)) return 'immediate git pruning configuration';
   }
   return null;
 }
@@ -283,15 +355,75 @@ function destructiveGhReason(command) {
   return null;
 }
 
-function exposesCredentialMaterial(command) {
-  return /\bgh(?:\.exe)?\b[^\r\n;&|<>]*\bauth\s+token\b/i.test(command)
-    || /(?:^|[\s;&|<>])(printenv|export\s+-p)(?=$|[\s;&|<>])/i.test(command)
-    || /(?:^|[\s;&|<>])env\s*(?=$|[;&|<>])/i.test(command)
-    || /\b(?:Get-ChildItem|gci|dir|ls)\s+Env:\s*(?=$|[;&|<>])/i.test(command)
-    || /\bGet-Item\s+Env:\*\s*(?=$|[;&|<>])/i.test(command);
+function sensitiveEnvironmentName(value) {
+  return /token|secret|password|private_key|credential|(?:api|access)_key/i.test(value);
 }
 
+function literalEnvironmentName(value) {
+  return value.length > 0 && !/[\s$%*?\[\]{}"'`\\=]/.test(value);
+}
+
+const environmentReaders = new Set(['get-item', 'gi', 'get-content', 'gc', 'get-childitem', 'gci', 'dir', 'ls']);
+
+function expandedEnvironmentNames(command) {
+  const names = [];
+  for (const match of command.matchAll(/%([A-Za-z_][A-Za-z0-9_]*)%/g)) names.push(match[1]);
+  let quote = '';
+  for (let index = 0; index < command.length; index += 1) {
+    const character = command[index];
+    if (quote === "'") {
+      if (character === quote) quote = '';
+      continue;
+    }
+    if (!quote && character === "'") { quote = character; continue; }
+    if (character === '"') { quote = quote === '"' ? '' : '"'; continue; }
+    if (character !== '$') continue;
+    const fragment = command.slice(index);
+    if (fragment.startsWith('${!')) {
+      names.push('CREDENTIAL');
+      continue;
+    }
+    const match = fragment.match(/^\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}/i)
+      ?? fragment.match(/^\$env:([A-Za-z_][A-Za-z0-9_]*)/i)
+      ?? fragment.match(/^\$\{[!#]?([A-Za-z_][A-Za-z0-9_]*)/)
+      ?? fragment.match(/^\$([A-Za-z_][A-Za-z0-9_]*)/);
+    if (match) {
+      names.push(match[1]);
+      index += match[0].length - 1;
+    }
+  }
+  return names;
+}
+
+function exposesCredentialMaterial(command) {
+  if (/\bgh(?:\.exe)?\b[^\r\n;&|<>]*\bauth\s+token\b/i.test(command)
+    || /(?:^|[\s;&|<>])export\s+-p(?=$|[\s;&|<>])/i.test(command)
+    || /\b(?:Get-ChildItem|gci|dir|ls)\s+Env:\s*(?=$|[;&|<>])/i.test(command)
+    || /\bGet-Item\s+Env:\*\s*(?=$|[;&|<>])/i.test(command)) return true;
+  const invocations = commandInvocations(command);
+  const commandTexts = [command, ...invocations.flatMap((invocation) => invocation.nestedCommand ?? [])];
+  if (commandTexts.some((text) => expandedEnvironmentNames(text).some(sensitiveEnvironmentName))) return true;
+  for (const invocation of invocations) {
+    if (['env', 'env.exe'].includes(invocation.executable)) return true;
+    if (['printenv', 'printenv.exe'].includes(invocation.executable)) {
+      const names = invocation.args.filter((arg) => !arg.startsWith('-'));
+      if (!names.length || names.some((name) => !literalEnvironmentName(name) || sensitiveEnvironmentName(name))) return true;
+    }
+    if (environmentReaders.has(invocation.executable)) {
+      const names = invocation.args.flatMap((arg) => /^env:(.*)$/i.exec(arg)?.slice(1) ?? []);
+      if (names.some((name) => !literalEnvironmentName(name) || sensitiveEnvironmentName(name))) return true;
+    }
+  }
+  return false;
+}
+
+export const MAX_HOOK_INPUT_BYTES = 1024 * 1024;
+export const OVERSIZED_HOOK_INPUT_REASON = 'The safety hook received an invalid or oversized tool request, so the operation is denied.';
+
 export function parseHookInput(raw) {
+  if (typeof raw !== 'string' || Buffer.byteLength(raw, 'utf8') > MAX_HOOK_INPUT_BYTES) {
+    return { reason: OVERSIZED_HOOK_INPUT_REASON };
+  }
   let input;
   try {
     input = JSON.parse(raw || '{}');
@@ -340,6 +472,6 @@ export function evaluateHook(input, currentBranch = '') {
     }
   }
   const ghReason = destructiveGhReason(command);
-  if (ghReason) return `${ghReason} is blocked because it deletes data, changes credentials or repository controls, publishes a release, runs automation, or bypasses reviewed collaboration.`;
+  if (ghReason) return `${ghReason} is blocked because it deletes data, changes credentials or repository controls, or bypasses reviewed collaboration.`;
   return null;
 }

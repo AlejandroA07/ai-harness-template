@@ -58,7 +58,7 @@
           "settings": [
             { "path": "includeCoAuthoredBy", "value": "false" },
             { "path": "permissions.disableBypassPermissionsMode", "value": "disable" },
-            { "path": "permissions.deny", "value": "canonical secret paths plus reviewed built-in tool denials" },
+            { "path": "permissions.deny", "value": "canonical secret paths" },
             { "path": "hooks.PreToolUse", "value": "one harness-owned guard" }
           ]
         },
@@ -130,41 +130,6 @@
           "settings": []
         },
         {
-          "id": "claude-project-policy",
-          "label": "Claude project policy",
-          "purpose": "Run repository-owned command and secret-path checks.",
-          "platforms": ["claude"],
-          "scopes": ["project"],
-          "source": "project/.claude/settings.json",
-          "activation": {
-            "kind": "hook",
-            "event": "Claude PreToolUse for Bash, PowerShell or Read",
-            "program": "components/guard-git.mjs"
-          },
-          "settings": [
-            { "path": "includeCoAuthoredBy", "value": "false" },
-            { "path": "permissions.deny", "value": "project and nested secret paths" },
-            { "path": "hooks.PreToolUse", "value": "one harness-owned project guard" }
-          ]
-        },
-        {
-          "id": "codex-project-policy",
-          "label": "Codex project policy",
-          "purpose": "Run repository-owned command and secret-path checks.",
-          "platforms": ["codex"],
-          "scopes": ["project"],
-          "source": "project/.codex/hooks.json",
-          "activation": {
-            "kind": "hook",
-            "event": "Codex PreToolUse for Bash or Read after interactive hook trust",
-            "program": "components/guard-git.mjs"
-          },
-          "settings": [
-            { "path": "features.hooks", "value": "true" },
-            { "path": "hooks.PreToolUse", "value": "one harness-owned project guard" }
-          ]
-        },
-        {
           "id": "project-verification",
           "label": "Project verification",
           "purpose": "Run the repository's selected deterministic completion gate.",
@@ -202,13 +167,14 @@
         "scripts/project-verification.mjs",
         "scripts/project-installation.mjs",
         "scripts/project-settings.mjs",
+        "scripts/legacy-project-state.mjs",
         "scripts/project-state.mjs",
         "scripts/project-adapters.mjs",
         "scripts/project-receipt.mjs",
         "scripts/project-provenance.mjs",
         "scripts/project-check.mjs"
       ],
-      "description": "Repository guidance, verification and optional CI."
+      "description": "Repository-specific guidance, skill adapters, verification and optional CI."
     },
     {
       "id": "skills",
@@ -311,6 +277,7 @@
         "scripts/full-profile-installation.mjs",
         "scripts/machine-setup.mjs",
         "scripts/config-merge.mjs",
+        "scripts/retired-claude-denials.mjs",
         "scripts/skill-lib.mjs",
         "scripts/sync-skills.mjs",
         "scripts/generate-skills.mjs",
@@ -340,7 +307,8 @@
         "components/attribution-policy.mjs",
         "components/check-attribution.mjs",
         "components/pre-commit.mjs",
-        "components/claude-tool-policy.mjs",
+        "global/claude-tools.json",
+        "scripts/claude-dev.mjs",
         "scripts/windows-cli.mjs"
       ],
       "description": "Shared guards, attribution policy and portable process execution."

@@ -11,7 +11,7 @@ This is the template's central cost ledger. Static sizes are measured from files
 | Skill names and descriptions | Skill discovery | Audit unused skills; keep descriptions concise |
 | Skill bodies | When invoked or selected | User-only for deliberate workflows; progressive disclosure |
 | Skill references | When opened | Keep details in one referenced file; no duplicate README |
-| Built-in tool schemas | Every request when loaded eagerly | Disable unused optional tools only after reviewing the capability trade-off |
+| Built-in tool schemas | Every request when loaded eagerly | Launch Claude through the configured native tool allowlist |
 | Deferred and MCP tool schemas | When the client loads them; they may show zero cost while deferred | Keep tools on demand and record deferred versus loaded cost separately |
 | Conversation messages and tool output | During the session | Start implementation tickets fresh; avoid dumping broad output |
 | Specs, issues, ADRs, and code | When read | Load the relevant artifact, not the entire history |
@@ -19,34 +19,34 @@ This is the template's central cost ledger. Static sizes are measured from files
 | Images and attachments | When included | Include only the fidelity needed for the decision |
 | Compaction and handoffs | When crossing context boundaries | Reference existing artifacts instead of duplicating them |
 
-## Claude built-in tool policy
+## Claude CLI tool selection
 
-Claude Code loads built-in tool schemas into every request. The harness removes the following optional tools with bare permission denials, while retaining both Bash and PowerShell:
+Permission denials block execution but do not remove tools from Claude's available set. For token-focused CLI sessions, `node scripts/claude-dev.mjs` passes this allowlist through Claude's native `--tools` option:
 
-- `Artifact`
-- `CronCreate`
-- `CronDelete`
-- `CronList`
-- `EnterWorktree`
-- `ExitWorktree`
-- `Monitor`
-- `NotebookEdit`
-- `PushNotification`
-- `RemoteTrigger`
-- `ScheduleWakeup`
-- `SendUserFile`
-- `ShareOnboardingGuide`
-- `TaskOutput`
-- `Workflow`
+- `Agent`
+- `AskUserQuestion`
+- `Bash`
+- `Edit`
+- `EnterPlanMode`
+- `ExitPlanMode`
+- `Glob`
+- `Grep`
+- `LSP`
+- `PowerShell`
+- `Read`
+- `Skill`
+- `WebFetch`
+- `WebSearch`
+- `Write`
 
-This is a capability trade-off, not just a permission-prompt change. Re-run the runtime protocol after changing the list.
+Edit `global/claude-tools.json` to customize the list. Direct `claude` launches and Claude Desktop do not use this CLI launcher. Re-run the runtime protocol after changing the list.
 
 ## Static global guidance
 
 | File | Measured bytes | Estimated tokens |
 | --- | ---: | ---: |
-| global/AGENTS.md | 1482 | 371 |
-| global/CLAUDE.md | 1482 | 371 |
+| global/AGENTS.md | 1261 | 316 |
+| global/CLAUDE.md | 1261 | 316 |
 
 ## Static capability inventory
 

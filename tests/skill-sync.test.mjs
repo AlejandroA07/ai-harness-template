@@ -25,15 +25,17 @@ async function createFixture({ machineSetup = false } = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-skill-sync-'));
   const home = path.join(root, 'home');
   const files = [
-    'components/claude-tool-policy.mjs',
+    'scripts/retired-claude-denials.mjs',
     'components/secret-policy.mjs',
     'scripts/audit.mjs',
+    'scripts/claude-dev.mjs',
     'scripts/sync-skills.mjs',
     'scripts/skill-lib.mjs',
     'scripts/skill-installation.mjs',
     'scripts/windows-cli.mjs',
     'scripts/config-merge.mjs',
     'global/claude-settings.json',
+    'global/claude-tools.json',
     'global/codex-hooks/hooks.json.template',
   ];
   if (machineSetup) {

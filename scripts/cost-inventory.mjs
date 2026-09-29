@@ -81,7 +81,7 @@ export async function buildCostInventory(repositoryRoot, catalog, integrationCat
 
 const measurementRow = (entry, pending = false) => `| ${pending ? '—' : escapeCell(entry.date)} | ${escapeCell(entry.agentVersion)} | ${escapeCell(entry.model)} | ${escapeCell(entry.project)} | ${escapeCell(entry.scenario)} | ${escapeCell(entry.mcps)} | ${pending ? 'Pending' : escapeCell(entry.result)} | ${escapeCell(entry.method)} |`;
 
-export function renderCostMarkdown(inventory, deniedTools) {
+export function renderCostMarkdown(inventory, claudeTools) {
   const guidanceRows = inventory.guidance.map((entry) => `| ${entry.source} | ${entry.bytes} | ${entry.estimatedTokens} |`).join('\n');
   const capabilityRows = inventory.capabilities.map((entry) => `| ${entry.id} | ${entry.module} | ${entry.invocation} | ${entry.metadataEstimatedTokens} | ${entry.bodyEstimatedTokens} | ${entry.resourceFiles} / ${entry.resourceBytes} |`).join('\n');
   const adapterRows = inventory.integrationAdapters.map((entry) => `| ${entry.id} | ${entry.platform} | ${entry.kind} | ${entry.source} | ${entry.metadataEstimatedTokens || '—'} | ${entry.bodyEstimatedTokens || '—'} | ${entry.configurationBytes || '—'} | ${entry.runtimeSchema} |`).join('\n');
@@ -100,7 +100,7 @@ This is the template's central cost ledger. Static sizes are measured from files
 | Skill names and descriptions | Skill discovery | Audit unused skills; keep descriptions concise |
 | Skill bodies | When invoked or selected | User-only for deliberate workflows; progressive disclosure |
 | Skill references | When opened | Keep details in one referenced file; no duplicate README |
-| Built-in tool schemas | Every request when loaded eagerly | Disable unused optional tools only after reviewing the capability trade-off |
+| Built-in tool schemas | Every request when loaded eagerly | Launch Claude through the configured native tool allowlist |
 | Deferred and MCP tool schemas | When the client loads them; they may show zero cost while deferred | Keep tools on demand and record deferred versus loaded cost separately |
 | Conversation messages and tool output | During the session | Start implementation tickets fresh; avoid dumping broad output |
 | Specs, issues, ADRs, and code | When read | Load the relevant artifact, not the entire history |
@@ -108,13 +108,13 @@ This is the template's central cost ledger. Static sizes are measured from files
 | Images and attachments | When included | Include only the fidelity needed for the decision |
 | Compaction and handoffs | When crossing context boundaries | Reference existing artifacts instead of duplicating them |
 
-## Claude built-in tool policy
+## Claude CLI tool selection
 
-Claude Code loads built-in tool schemas into every request. The harness removes the following optional tools with bare permission denials, while retaining both Bash and PowerShell:
+Permission denials block execution but do not remove tools from Claude's available set. For token-focused CLI sessions, \`node scripts/claude-dev.mjs\` passes this allowlist through Claude's native \`--tools\` option:
 
-${deniedTools.map((tool) => `- \`${tool}\``).join('\n')}
+${claudeTools.map((tool) => `- \`${tool}\``).join('\n')}
 
-This is a capability trade-off, not just a permission-prompt change. Re-run the runtime protocol after changing the list.
+Edit \`global/claude-tools.json\` to customize the list. Direct \`claude\` launches and Claude Desktop do not use this CLI launcher. Re-run the runtime protocol after changing the list.
 
 ## Static global guidance
 

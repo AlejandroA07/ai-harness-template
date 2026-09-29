@@ -1,3 +1,11 @@
+const credentialFileNames = ['.netrc', '.git-credentials', '.pypirc'];
+const credentialFileNameSet = new Set(credentialFileNames);
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const credentialFilePattern = new RegExp(
+  `(?:^|/)(?:${credentialFileNames.map(escapeRegex).join('|')})(?=$|[\\s"';&|<>()])`,
+  'i',
+);
+
 const sharedClaudeDenials = [
   'Read(**/.env)',
   'Read(**/.env.local)',
@@ -6,6 +14,7 @@ const sharedClaudeDenials = [
   'Read(**/*.key)',
   'Read(**/id_rsa*)',
   'Read(**/id_ed25519*)',
+  ...credentialFileNames.map((name) => `Read(**/${name})`),
 ];
 
 const machineClaudeDenials = [
@@ -39,6 +48,7 @@ export function containsSensitivePath(value) {
     || /(?:^|\/)\.config\/gh\/hosts\.yml(?=$|[\s"';&|<>()])/i.test(normalized)
     || /(?:^|\/)\.docker\/config\.json(?=$|[\s"';&|<>()])/i.test(normalized)
     || /(?:^|\/)\.npmrc(?=$|[\s"';&|<>()])/i.test(normalized)
+    || credentialFilePattern.test(normalized)
     || /(?:^|[\/\s"'])(?:service[-_.]?account(?:[-_.]key)?|application_default_credentials)\.json(?=$|[\s"';&|<>()])/i.test(normalized);
 }
 
@@ -46,6 +56,7 @@ export function isSecretBearingCommitPath(filePath) {
   const name = filePath.replaceAll('\\', '/').split('/').at(-1).toLowerCase();
   if (['.env.example', '.env.sample', '.env.template'].includes(name)) return false;
   return name === '.env' || name.startsWith('.env.')
+    || credentialFileNameSet.has(name)
     || /^(?:id_rsa|id_ed25519)/i.test(name)
     || /\.(?:pem|key|p12|pfx)$/i.test(name);
 }

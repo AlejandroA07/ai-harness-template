@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import process from 'node:process';
 import { execFileSync } from 'node:child_process';
-import { containsAttribution } from './attribution-policy.mjs';
+import { containsAttribution, hasToolBrandedBranchName } from './attribution-policy.mjs';
 
 const paths = process.argv.slice(2);
 if (paths.length === 0) {
@@ -10,10 +10,12 @@ if (paths.length === 0) {
 }
 
 const texts = [];
+const branches = [];
 for (let index = 0; index < paths.length; index += 1) {
   if (paths[index] === '--github-event') {
     const event = JSON.parse(fs.readFileSync(paths[++index], 'utf8'));
     texts.push(event.pull_request?.title ?? '', event.pull_request?.body ?? '', event.head_commit?.message ?? '');
+    branches.push(event.pull_request?.head?.ref ?? event.ref ?? '');
     for (const commit of event.commits ?? []) texts.push(commit.message ?? '');
     const base = event.pull_request?.base?.sha ?? event.before;
     const head = event.pull_request?.head?.sha ?? event.after;
@@ -25,10 +27,20 @@ for (let index = 0; index < paths.length; index += 1) {
   }
 }
 
+try { branches.push(execFileSync('git', ['branch', '--show-current'], { encoding: 'utf8' }).trim()); } catch { /* event data is sufficient in CI */ }
+
 let failed = false;
 for (const text of texts) {
   if (containsAttribution(text)) {
     console.error('Model/tool self-attribution is not allowed.');
+    failed = true;
+  }
+}
+if (failed) process.exit(1);
+
+for (const branch of branches) {
+  if (branch && hasToolBrandedBranchName(branch)) {
+    console.error(`Tool-branded branch names are not allowed: ${branch}`);
     failed = true;
   }
 }

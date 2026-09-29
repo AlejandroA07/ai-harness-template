@@ -3,10 +3,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { deniedClaudeBuiltInTools, obsoleteHarnessClaudeDenials } from '../components/claude-tool-policy.mjs';
 import { claudeSecretDenials } from '../components/secret-policy.mjs';
 import { discoverSkills, inspectManagedSkillLink, readInvocationPolicy } from './skill-lib.mjs';
 import { hasHarnessHook } from './config-merge.mjs';
+import { loadClaudeToolConfig } from './claude-dev.mjs';
+import { retiredHarnessClaudeDenials } from './retired-claude-denials.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const projectIndex = process.argv.indexOf('--project');
@@ -37,13 +38,19 @@ async function checkTemplate() {
   const required = [
     'README.md', 'MACHINE-SETUP.md', 'BOOTSTRAP.md', 'TOKEN-COSTS.md',
     'scripts/machine-setup.mjs', 'scripts/bootstrap.mjs', 'scripts/verify.mjs', 'scripts/verification-runner.mjs',
-    'components/guard-git.mjs', 'components/claude-tool-policy.mjs', 'skills/invocation-policy.json',
+    'components/guard-git.mjs', 'global/claude-tools.json', 'scripts/claude-dev.mjs', 'skills/invocation-policy.json',
     'skills/upstream-sources.json', 'scripts/upstream-skills.mjs',
   ];
   for (const relative of required) {
     if (await exists(path.join(root, relative))) pass(`template has ${relative}`);
     else fail(`template missing ${relative}`);
   }
+  try {
+    const config = await loadClaudeToolConfig(path.join(root, 'global', 'claude-tools.json'));
+    config.tools.includes('Read') && config.tools.includes('Write') && config.tools.includes('Bash')
+      ? pass(`Claude developer launcher exposes ${config.tools.length} configured tools`)
+      : fail('Claude developer launcher is missing required coding tools');
+  } catch (error) { fail(`Claude developer tool configuration is invalid: ${error.message}`); }
 
   const retired = ['projects', 'global/skills/wrap-branch', 'global/skills/grill', 'project/.claude/goals', 'project/.mcp.json'];
   for (const relative of retired) {
@@ -87,10 +94,6 @@ async function checkMachine() {
     hasHarnessHook(settings.hooks?.PreToolUse, claudeTemplate.hooks.PreToolUse[0])
       ? pass('Claude machine guard configured with shell and read coverage') : fail('Claude machine guard missing or modified');
     const denied = new Set(settings.permissions?.deny ?? []);
-    const missingToolDenials = deniedClaudeBuiltInTools.filter((tool) => !denied.has(tool));
-    missingToolDenials.length === 0
-      ? pass(`Claude optional built-in tools disabled: ${deniedClaudeBuiltInTools.length}`)
-      : fail(`Claude optional built-in tools remain enabled: ${missingToolDenials.join(', ')}`);
     const missingSecretDenials = claudeSecretDenials('machine').filter((entry) => !denied.has(entry));
     missingSecretDenials.length === 0
       ? pass(`Claude secret paths denied: ${claudeSecretDenials('machine').length}`)
@@ -98,7 +101,7 @@ async function checkMachine() {
     for (const shell of ['Bash', 'PowerShell']) {
       denied.has(shell) ? fail(`Claude required shell is disabled: ${shell}`) : pass(`Claude required shell remains available: ${shell}`);
     }
-    for (const obsolete of obsoleteHarnessClaudeDenials) {
+    for (const obsolete of retiredHarnessClaudeDenials) {
       denied.has(obsolete) ? fail(`Claude settings retain obsolete harness denial: ${obsolete}`) : pass(`Claude obsolete harness denial absent: ${obsolete}`);
     }
   } catch (error) { fail(`cannot audit Claude settings: ${error.message}`); }
@@ -139,26 +142,11 @@ async function checkMachine() {
 }
 
 async function checkProject(project) {
-  for (const relative of ['AGENTS.md', 'CLAUDE.md', 'scripts/verify.mjs', '.githooks/pre-commit', '.githooks/commit-msg', '.harness/hooks/guard-git.mjs', '.harness/runtime/windows-cli.mjs']) {
+  for (const relative of ['AGENTS.md', 'CLAUDE.md', 'scripts/verify.mjs', '.githooks/pre-commit', '.githooks/commit-msg', '.harness/hooks/pre-commit.mjs', '.harness/hooks/check-attribution.mjs', '.harness/runtime/windows-cli.mjs']) {
     await exists(path.join(project, relative)) ? pass(`project has ${relative}`) : fail(`project missing ${relative}`);
   }
   const hooksPath = spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: project, encoding: 'utf8' });
   hooksPath.status === 0 && hooksPath.stdout.trim() === '.githooks' ? pass('project core.hooksPath is active') : fail('project core.hooksPath is not .githooks');
-
-  try {
-    const settings = JSON.parse(await fs.readFile(path.join(project, '.claude', 'settings.json'), 'utf8'));
-    const denied = new Set(settings.permissions?.deny ?? []);
-    const missingToolDenials = deniedClaudeBuiltInTools.filter((tool) => !denied.has(tool));
-    missingToolDenials.length === 0
-      ? pass(`project disables ${deniedClaudeBuiltInTools.length} optional Claude tools`)
-      : fail(`project leaves optional Claude tools enabled: ${missingToolDenials.join(', ')}`);
-    JSON.stringify(settings.hooks ?? {}).includes('PowerShell')
-      ? pass('project Claude guard covers PowerShell')
-      : fail('project Claude guard does not cover PowerShell');
-    for (const obsolete of obsoleteHarnessClaudeDenials) {
-      denied.has(obsolete) ? fail(`project retains obsolete harness denial: ${obsolete}`) : pass(`project obsolete harness denial absent: ${obsolete}`);
-    }
-  } catch (error) { fail(`cannot audit project Claude settings: ${error.message}`); }
 
   if (await exists(path.join(project, '.harness', 'skills'))) {
     const check = spawnSync(process.execPath, [path.join(root, 'scripts', 'generate-project-skills.mjs'), '--project', project, '--check'], { encoding: 'utf8' });

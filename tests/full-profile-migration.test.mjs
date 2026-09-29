@@ -4,10 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { deniedClaudeBuiltInTools } from '../components/claude-tool-policy.mjs';
 import { applyFullProfileControls, planFullProfileControls } from '../scripts/full-profile-controls.mjs';
 import { applyFullProfileInstallation, planFullProfileInstallation } from '../scripts/full-profile-installation.mjs';
 import { discoverSkills, generateSkillTree } from '../scripts/skill-lib.mjs';
+import { retiredHarnessClaudeDenials } from '../scripts/retired-claude-denials.mjs';
 
 const repository = path.resolve(import.meta.dirname, '..');
 const setup = path.join(repository, 'scripts', 'setup.mjs');
@@ -61,7 +61,7 @@ async function legacyFixture() {
 
   const claude = JSON.parse((await fs.readFile(path.join(repository, 'global', 'claude-settings.json'), 'utf8'))
     .replaceAll('{{HARNESS_ROOT}}', legacyRoot.replaceAll('\\', '/')));
-  claude.permissions.deny.push(...deniedClaudeBuiltInTools, 'Read(**/company-private)');
+  claude.permissions.deny.push(...retiredHarnessClaudeDenials, 'Read(**/company-private)');
   claude.companySetting = { retained: true };
   claude.hooks.PreToolUse.push({ matcher: 'Read', hooks: [{ type: 'command', command: 'company-check' }] });
   await writeJson(path.join(target, '.claude', 'settings.json'), claude);

@@ -5,13 +5,24 @@ import path from 'node:path';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { retiredClaudeToolDenials } from '../scripts/retired-claude-denials.mjs';
 import { planGlobalInstallation, applyGlobalInstallation } from '../scripts/global-installation.mjs';
+import { ownershipHeadBytes, sealReceipt } from '../scripts/installation-evidence.mjs';
+import { encode } from '../scripts/installation-core.mjs';
 import { planInstallation, applyInstallation } from '../scripts/selection-installation.mjs';
 import { inspectFeatures, editFeatures } from '../scripts/global-settings.mjs';
 import { snapshot } from './helpers/filesystem-snapshot.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+async function replaceReceiptWithLegacyMemoryOwnership(target, platform, receipt) {
+  const sealed = sealReceipt(receipt);
+  const store = path.join(target, '.ai-harness/installations', platform);
+  const { evidence, ...metadata } = sealed;
+  await fs.writeFile(path.join(store, 'global.json'), encode(sealed));
+  await fs.writeFile(path.join(store, 'global-current.json'), ownershipHeadBytes(evidence));
+  await fs.writeFile(path.join(store, 'evidence', `${evidence}.json`), encode(metadata));
+}
 async function fixture(body, suffix = 'home') {
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'global setup '));
   const repository = path.join(temporary, 'source');
@@ -99,6 +110,40 @@ test('Codex changes only hooks and preserves unrelated TOML bytes', async () => 
   await fs.appendFile(f.file('codex', 'config'), '# user addition\n');
   await f.apply('codex', 'remove');
   assert.equal(await fs.readFile(f.file('codex', 'config'), 'utf8'), config + '# user addition\n');
+}));
+
+test('global updates release retired memory ownership without changing the live preference', async () => fixture(async (f) => {
+  await f.put('claude', 'settings', { autoMemoryEnabled: false });
+  await f.apply('claude');
+  const claudeReceipt = await f.json('claude', 'receipt');
+  claudeReceipt.scalars.autoMemoryEnabled = { present: true, value: false };
+  delete claudeReceipt.evidence;
+  await replaceReceiptWithLegacyMemoryOwnership(f.target, 'claude', claudeReceipt);
+  await f.apply('claude');
+  assert.equal((await f.json('claude', 'settings')).autoMemoryEnabled, false);
+  assert.equal(Object.hasOwn((await f.json('claude', 'receipt')).scalars, 'autoMemoryEnabled'), false);
+
+  await f.put('codex', 'config', '[features]\nmemories = false\n');
+  await f.apply('codex');
+  const codexReceipt = await f.json('codex', 'receipt');
+  codexReceipt.features.memories = null;
+  delete codexReceipt.evidence;
+  await replaceReceiptWithLegacyMemoryOwnership(f.target, 'codex', codexReceipt);
+  await f.apply('codex');
+  assert.equal(inspectFeatures(await fs.readFile(f.file('codex', 'config'), 'utf8')).values.memories, false);
+  assert.equal(Object.hasOwn((await f.json('codex', 'receipt')).features, 'memories'), false);
+}));
+
+test('global update removes the complete historical tool policy but preserves individual user denials', async () => fixture(async (f) => {
+  await f.put('claude', 'settings', { permissions: { deny: [...retiredClaudeToolDenials, 'Read(company-private)'] } });
+  await f.apply('claude');
+  assert.deepEqual((await f.json('claude', 'settings')).permissions.deny.filter((entry) => !entry.startsWith('Read(')), []);
+  assert.ok((await f.json('claude', 'settings')).permissions.deny.includes('Read(company-private)'));
+
+  await f.apply('claude', 'remove');
+  await f.put('claude', 'settings', { permissions: { deny: ['NotebookEdit'] } });
+  await f.apply('claude');
+  assert.ok((await f.json('claude', 'settings')).permissions.deny.includes('NotebookEdit'));
 }));
 
 test('runtime upgrades replace the exact hook while retaining other platforms and shared policy', async () => fixture(async (f) => {

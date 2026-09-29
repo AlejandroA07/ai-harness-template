@@ -7,7 +7,10 @@ import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { planProjectInstallation, applyProjectInstallation } from '../scripts/project-installation.mjs';
 import { snapshot } from './helpers/filesystem-snapshot.mjs';
-import { digest } from '../scripts/installation-core.mjs';
+import { digest, payloadHash } from '../scripts/installation-core.mjs';
+import { ownershipHeadBytes } from '../scripts/installation-evidence.mjs';
+import { projectPayload } from '../scripts/project-provenance.mjs';
+import { projectSettings } from '../scripts/project-settings.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 async function fixture(body) {
@@ -30,34 +33,78 @@ async function fixture(body) {
 const skill = (name = 'sample') => `---\nname: ${name}\ndescription: A project fixture skill\n---\n\nUse the project fixture.\n`;
 const run = (target, script) => spawnSync(process.execPath, [script], { cwd: target, encoding: 'utf8' });
 
-test('disabled project hooks block apply and audit while owned removal preserves user settings', async () => fixture(async (f) => {
-  await f.put('.claude/settings.json', JSON.stringify({ disableAllHooks: true, other: 'keep' }));
-  const before = await snapshot(f.target);
-  assert.equal((await f.plan('claude')).applicable, false);
-  await assert.rejects(f.apply('claude'));
-  assert.deepEqual(await snapshot(f.target), before);
-  await f.put('.claude/settings.json', JSON.stringify({ other: 'keep' }));
+test('project lifecycle leaves agent settings under machine authority', async () => fixture(async (f) => {
+  const files = {
+    '.claude/settings.json': '{ invalid user-owned Claude settings',
+    '.codex/hooks.json': '{ invalid user-owned Codex hooks',
+    '.codex/config.toml': '[features]\nhooks = false\n',
+  };
+  for (const [file, bytes] of Object.entries(files)) await f.put(file, bytes);
   await f.apply('claude');
-  const settings = JSON.parse(await f.read('.claude/settings.json'));
-  settings.disableAllHooks = true;
-  await f.put('.claude/settings.json', JSON.stringify(settings));
-  const disabled = await snapshot(f.target);
-  assert.equal((await f.plan('claude', 'audit')).applicable, false);
-  assert.notEqual(run(f.target, 'scripts/verify-harness.mjs').status, 0);
-  assert.deepEqual(await snapshot(f.target), disabled);
+  await f.apply('codex');
+  for (const [file, bytes] of Object.entries(files)) assert.equal(await f.read(file), bytes);
   await f.apply('claude', 'remove');
-  assert.deepEqual(JSON.parse(await f.read('.claude/settings.json')), { other: 'keep', disableAllHooks: true });
+  await f.apply('codex', 'remove');
+  for (const [file, bytes] of Object.entries(files)) assert.equal(await f.read(file), bytes);
 }));
 
-test('review regression: forged file and setting ownership never authorizes mutation', async () => {
-  for (const kind of ['file', 'hook', 'scalar', 'features', 'ignore']) await fixture(async (f) => {
+test('an owned legacy project policy migrates to machine authority on apply', async () => fixture(async (f) => {
+  await f.apply('claude');
+  await f.apply('codex');
+  const receipt = JSON.parse(await f.read('.harness/project-installation.json'));
+  const hook = { matcher: 'Bash|Read', hooks: [{ type: 'command', command: 'node legacy-project-guard.mjs' }] };
+  for (const platform of ['claude', 'codex']) {
+    const installed = projectSettings(platform, null, hook);
+    await f.put(platform === 'claude' ? '.claude/settings.json' : '.codex/hooks.json', installed.after);
+    receipt.settings[platform] = installed.state;
+  }
+  await f.put('.codex/config.toml', '[features]\nhooks = true\n');
+  receipt.codexFeatures = { existed: true, createdTable: false, values: { hooks: false } };
+  const legacyRuntime = ['global-settings.mjs', 'project-settings.mjs'];
+  const legacyComponents = ['secret-policy.mjs', 'guard-policy.mjs', 'guard-git.mjs', 'attribution-policy.mjs', 'check-attribution.mjs'];
+  for (const name of legacyRuntime) {
+    const file = `.harness/project-runtime/${name}`;
+    const bytes = await fs.readFile(path.join(f.source, 'scripts', name));
+    await f.put(file, bytes);
+    receipt.owned[file] = digest(bytes);
+  }
+  for (const name of legacyComponents) {
+    const file = `.harness/hooks/${name}`;
+    const bytes = await fs.readFile(path.join(f.source, 'components', name));
+    await f.put(file, bytes);
+    receipt.owned[file] = digest(bytes);
+  }
+  const owned = {};
+  for (const file of Object.keys(receipt.owned)) owned[file] = await fs.readFile(path.join(f.target, file));
+  let payload = projectPayload(receipt, owned);
+  receipt.payload = payloadHash(payload);
+  payload = projectPayload(receipt, owned);
+  for (const [file, bytes] of Object.entries(payload)) await f.put(`.harness/project-payloads/${receipt.payload}/${file}`, bytes);
+  await f.put('.harness/project-current.json', ownershipHeadBytes(receipt.payload));
+  await f.put('.harness/project-installation.json', JSON.stringify(receipt));
+
+  const audit = await f.plan('codex', 'audit');
+  assert.equal(audit.applicable, false);
+  assert.ok(audit.conflicts.some((entry) => entry.includes('machine authority')));
+  await f.apply('codex');
+  await assert.rejects(f.read('.claude/settings.json'), { code: 'ENOENT' });
+  await assert.rejects(f.read('.codex/hooks.json'), { code: 'ENOENT' });
+  assert.equal(await f.read('.codex/config.toml'), '[features]\nhooks = false\n');
+  await assert.rejects(f.read('.harness/hooks/guard-git.mjs'), { code: 'ENOENT' });
+  const migrated = JSON.parse(await f.read('.harness/project-installation.json'));
+  assert.deepEqual(migrated.settings, {});
+  assert.equal(migrated.codexFeatures, null);
+  assert.equal(run(f.target, 'scripts/verify-harness.mjs').status, 0);
+}));
+
+test('review regression: forged file and state ownership never authorizes mutation', async () => {
+  for (const kind of ['file', 'settings', 'features', 'ignore']) await fixture(async (f) => {
     await f.put('AGENTS.md', 'User-owned guidance\n');
     await f.apply('claude'); await f.apply('codex');
     const receipt = JSON.parse(await f.read('.harness/project-installation.json'));
     if (kind === 'file') receipt.owned['AGENTS.md'] = digest(await f.read('AGENTS.md'));
-    if (kind === 'hook') receipt.settings.claude.owned = false;
-    if (kind === 'scalar') receipt.settings.claude.scalars.autoMemoryEnabled = { present: true, value: true };
-    if (kind === 'features') receipt.codexFeatures.values.memories = true;
+    if (kind === 'settings') receipt.settings.claude = {};
+    if (kind === 'features') receipt.codexFeatures = {};
     if (kind === 'ignore') receipt.ignore.owned = false;
     await f.put('.harness/project-installation.json', JSON.stringify(receipt));
     const before = await snapshot(f.target);
@@ -104,9 +151,9 @@ test('review regression: removal preserves retained platform bytes despite chang
   await f.put('.harness/skills/sample/SKILL.md', skill());
   await f.apply('codex'); await f.apply('claude');
   const before = {};
-  for (const file of ['AGENTS.md', '.claude/settings.json', '.claude/skills/sample/SKILL.md', '.harness/hooks/guard-policy.mjs']) before[file] = await f.read(file);
+  for (const file of ['AGENTS.md', 'CLAUDE.md', '.claude/skills/sample/SKILL.md', '.harness/project-runtime/project-state.mjs']) before[file] = await f.read(file);
   await fs.appendFile(path.join(f.source, 'project/AGENTS.selected.md'), '\nUpstream revision\n');
-  await fs.appendFile(path.join(f.source, 'components/guard-policy.mjs'), '\n// Upstream revision\n');
+  await fs.appendFile(path.join(f.source, 'scripts/project-state.mjs'), '\n// Upstream revision\n');
   await f.put('.harness/skills/sample/SKILL.md', skill() + '\nLocal draft revision\n');
   const plan = await f.plan('codex', 'remove');
   assert.ok(!plan.changes.some((change) => Object.hasOwn(before, change.id)));
@@ -131,22 +178,13 @@ test('review regression: nested .NET entry points are explicit and ambiguous lay
   assert.ok(plan.conflicts.some((message) => message.includes('.NET')));
 }));
 
-test('review regression: Claude scalar ownership is independent of matcher text', async () => fixture(async (f) => {
-  const file = path.join(f.source, 'project/.claude/settings.json');
-  const template = JSON.parse(await fs.readFile(file, 'utf8'));
-  template.hooks.PreToolUse[0].matcher = 'Bash|Read';
-  await fs.writeFile(file, JSON.stringify(template));
-  await f.apply('claude');
-  const settings = JSON.parse(await f.read('.claude/settings.json'));
-  assert.equal(settings.autoMemoryEnabled, undefined);
-  assert.equal(settings.includeCoAuthoredBy, false);
-}));
-
 test('selected project lifecycle preserves an existing verifier, unrelated platform and Git configuration', async () => {
   for (const platform of ['codex', 'claude']) await fixture(async (f) => {
     await f.put('AGENTS.md', 'Existing project rules\n');
     await f.put('.git/config', '[core]\n hooksPath = existing-hooks\n');
-    await f.put(platform === 'codex' ? '.claude/settings.json' : '.codex/hooks.json', '{"unrelated":true}');
+    await f.put('.claude/settings.json', '{"unrelated":"claude"}');
+    await f.put('.codex/hooks.json', '{"unrelated":"codex"}');
+    await f.put('.codex/config.toml', '[features]\nhooks = false\n');
     const home = await snapshot(f.home);
     const git = await f.read('.git/config');
     const verifier = await f.read('scripts/verify.mjs');
@@ -198,44 +236,8 @@ test('project adapters preserve policy/resources, detect drift in the shipped ga
   assert.equal(await f.read('.harness/skills/team/sample/examples.md'), 'Changed resource\n');
 }));
 
-test('project settings merge exact hooks and restore only their ownership', async () => fixture(async (f) => {
-  const original = { autoMemoryEnabled: true, hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: 'company-guard' }] }], Stop: [] }, other: true };
-  await f.put('.claude/settings.json', JSON.stringify(original));
-  await f.apply('claude');
-  const current = JSON.parse(await f.read('.claude/settings.json'));
-  assert.equal(current.autoMemoryEnabled, true);
-  current.addedLater = 'retained';
-  current.hooks.PreToolUse.at(-1).hooks.push({ type: 'command', command: 'another-user-hook' });
-  await f.put('.claude/settings.json', JSON.stringify(current));
-  await f.apply('claude', 'remove');
-  const removed = JSON.parse(await f.read('.claude/settings.json'));
-  assert.equal(removed.autoMemoryEnabled, true);
-  assert.equal(removed.addedLater, 'retained');
-  assert.equal(removed.hooks.PreToolUse[0].hooks[0].command, 'company-guard');
-  assert.equal(removed.hooks.PreToolUse[1].hooks[0].command, 'another-user-hook');
-}));
-
-test('project hook upgrades replace only the exact recorded handler', async () => fixture(async (f) => {
-  await f.apply();
-  const settings = JSON.parse(await f.read('.codex/hooks.json'));
-  const userHook = { type: 'command', command: 'user-hook' };
-  settings.hooks.PreToolUse[0].hooks.push(userHook);
-  await f.put('.codex/hooks.json', JSON.stringify(settings));
-  const file = path.join(f.source, 'project/.codex/hooks.json');
-  const template = JSON.parse(await fs.readFile(file, 'utf8'));
-  template.hooks.PreToolUse[0].hooks[0].timeout = 11;
-  await fs.writeFile(file, JSON.stringify(template));
-  await f.apply();
-  const updated = JSON.parse(await f.read('.codex/hooks.json'));
-  assert.deepEqual(updated.hooks.PreToolUse[0].hooks, [userHook]);
-  assert.equal(updated.hooks.PreToolUse[1].hooks[0].timeout, 11);
-  assert.equal(run(f.target, 'scripts/verify-harness.mjs').status, 0);
-  await f.apply('codex', 'remove');
-  assert.deepEqual(JSON.parse(await f.read('.codex/hooks.json')).hooks.PreToolUse[0].hooks, [userHook]);
-}));
-
-test('project ownership denies unsafe paths, edited files, malformed receipts and legacy collisions before writes', async () => {
-  for (const kind of ['root-link', 'parent-link', 'hardlink', 'edited', 'receipt', 'legacy', 'adapter-extra', 'bad-settings']) await fixture(async (f) => {
+test('project ownership denies unsafe paths, edited files and malformed receipts before writes', async () => {
+  for (const kind of ['root-link', 'parent-link', 'hardlink', 'edited', 'receipt', 'adapter-extra']) await fixture(async (f) => {
     if (['edited', 'receipt', 'adapter-extra'].includes(kind)) {
       await f.put('.harness/skills/sample/SKILL.md', skill());
       await f.apply();
@@ -252,9 +254,7 @@ test('project ownership denies unsafe paths, edited files, malformed receipts an
       receipt.owned['../outside/sentinel'] = 'a'.repeat(64);
       await f.put('.harness/project-installation.json', JSON.stringify(receipt));
     }
-    if (kind === 'legacy') await f.put('.harness/hooks/guard-git.mjs', 'Legacy runtime');
     if (kind === 'adapter-extra') await f.put('.agents/skills/sample/user.md', 'Unowned resource');
-    if (kind === 'bad-settings') await f.put('.codex/hooks.json', '{ invalid');
     const before = await snapshot(f.temporary);
     await assert.rejects(f.apply(), undefined, kind);
     assert.deepEqual(await snapshot(f.temporary), before, kind);
@@ -266,7 +266,7 @@ test('project publication rolls back install, update and removal and rejects sta
     if (operation !== 'install') await f.apply();
     if (operation === 'update') await fs.appendFile(path.join(f.source, 'project/AGENTS.selected.md'), '\nFixture update\n');
     const originals = {};
-    for (const file of ['AGENTS.md', 'scripts/verify-harness.mjs', '.codex/hooks.json', '.harness/project-installation.json']) originals[file] = await f.read(file).catch(() => null);
+    for (const file of ['AGENTS.md', 'scripts/verify-harness.mjs', '.harness/project-runtime/project-state.mjs', '.harness/project-installation.json']) originals[file] = await f.read(file).catch(() => null);
     await assert.rejects(f.apply('codex', operation === 'remove' ? 'remove' : 'apply', {}, { checkpoint: async (point) => { if (point === phase) throw new Error('Injected failure'); } }), /rolled back/);
     for (const [file, bytes] of Object.entries(originals)) assert.equal(await f.read(file).catch(() => null), bytes);
     await assert.rejects(fs.access(path.join(f.target, '.ai-harness-install.lock')));
@@ -338,7 +338,7 @@ test('abrupt project interruption preserves recovery staging and blocks the next
   await assert.rejects(f.apply(), /locked/);
 }));
 
-test('project feature and ignore ownership restores prior content and preserves later additions', async () => fixture(async (f) => {
+test('project ignore ownership restores prior content while Codex config remains untouched', async () => fixture(async (f) => {
   const config = '# Project config\n[features]\nhooks = false\nmemories = true\n';
   await f.put('.codex/config.toml', config);
   await f.put('.gitignore', 'user-cache/');
@@ -391,18 +391,12 @@ test('generated .NET CI requires a pinned SDK and installs its runtime', async (
   assert.match(await f.read('scripts/verify.mjs'), /"dotnet"/);
 }));
 
-test('installed project guard and attribution runtime retain denied behavior without the checkout', { skip: process.platform === 'win32' }, async () => fixture(async (f) => {
-  assert.equal(spawnSync('git', ['init', '-q', f.target]).status, 0);
+test('selected project runtime excludes machine guard policy', async () => fixture(async (f) => {
   await f.apply();
-  const hook = JSON.parse(await f.read('.codex/hooks.json')).hooks.PreToolUse[0].hooks[0];
-  await fs.rename(f.source, path.join(f.temporary, 'moved-source'));
-  const request = { tool_name: 'Bash', tool_input: { command: 'git reset --hard' } };
-  const result = spawnSync('/bin/sh', ['-c', hook.command], { cwd: f.target, input: JSON.stringify(request), encoding: 'utf8' });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(JSON.parse(result.stdout).hookSpecificOutput.permissionDecision, 'deny');
-  await f.put('message.txt', ['Co-Authored', '-By: ', 'Claude'].join(''));
-  const attribution = spawnSync(process.execPath, ['.harness/hooks/check-attribution.mjs', 'message.txt'], { cwd: f.target, encoding: 'utf8' });
-  assert.equal(attribution.status, 1, attribution.stderr);
+  for (const file of ['.harness/hooks/guard-git.mjs', '.harness/hooks/guard-policy.mjs', '.harness/project-runtime/global-settings.mjs', '.harness/project-runtime/project-settings.mjs']) {
+    await assert.rejects(f.read(file), { code: 'ENOENT' });
+  }
+  assert.equal(run(f.target, 'scripts/verify-harness.mjs').status, 0);
 }));
 
 

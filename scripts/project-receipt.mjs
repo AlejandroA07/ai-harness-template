@@ -1,11 +1,13 @@
-import { object } from './global-settings.mjs';
-
 export const receiptPath = '.harness/project-installation.json';
-export const runtimeNames = ['installation-core.mjs', 'installation-evidence.mjs', 'skill-lib.mjs', 'global-settings.mjs', 'project-settings.mjs', 'project-state.mjs', 'project-adapters.mjs', 'project-receipt.mjs', 'project-check.mjs', 'project-provenance.mjs'];
-export const componentNames = ['secret-policy.mjs', 'guard-policy.mjs', 'guard-git.mjs', 'attribution-policy.mjs', 'check-attribution.mjs'];
+export const runtimeNames = ['installation-core.mjs', 'installation-evidence.mjs', 'skill-lib.mjs', 'project-state.mjs', 'project-adapters.mjs', 'project-receipt.mjs', 'project-check.mjs', 'project-provenance.mjs'];
+export const componentNames = [];
+const legacyRuntimeNames = ['installation-core.mjs', 'installation-evidence.mjs', 'skill-lib.mjs', 'global-settings.mjs', 'project-settings.mjs', 'project-state.mjs', 'project-adapters.mjs', 'project-receipt.mjs', 'project-check.mjs', 'project-provenance.mjs'];
+const legacyComponentNames = ['secret-policy.mjs', 'guard-policy.mjs', 'guard-git.mjs', 'attribution-policy.mjs', 'check-attribution.mjs'];
+const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 export const sharedPaths = ['AGENTS.md', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', 'scripts/verify.mjs', 'scripts/verify-harness.mjs',
   '.gitleaks.toml', '.github/workflows/harness-project.yml', '.harness/runtime/windows-cli.mjs',
-  ...runtimeNames.map((name) => `.harness/project-runtime/${name}`), ...componentNames.map((name) => `.harness/hooks/${name}`)];
+  ...new Set([...runtimeNames, ...legacyRuntimeNames].map((name) => `.harness/project-runtime/${name}`)),
+  ...new Set([...componentNames, ...legacyComponentNames].map((name) => `.harness/hooks/${name}`))];
 export function filePlatform(file) {
   if (file === 'CLAUDE.md' || file.startsWith('.claude/skills/')) return 'claude';
   if (file.startsWith('.agents/skills/')) return 'codex';
@@ -22,9 +24,11 @@ export function validateProjectReceipt(value) {
   if (!object(value) || Object.keys(value).sort().join(',') !== 'codexFeatures,ignore,module,options,owned,payload,platforms,profile,scope,settings,version'
     || value.version !== 3 || typeof value.payload !== 'string' || !/^[a-f0-9]{64}$/.test(value.payload) || value.module !== 'project-configuration' || value.scope !== 'project' || value.profile !== 'coexistence'
     || !Array.isArray(value.platforms) || !value.platforms.length || value.platforms.some((name) => !['codex', 'claude'].includes(name))
-    || new Set(value.platforms).size !== value.platforms.length || !object(value.owned) || !object(value.settings)
-    || Object.keys(value.settings).sort().join(',') !== [...value.platforms].sort().join(',')) throw new Error('Invalid project receipt');
-  if (!object(value.ignore) || (value.platforms.includes('codex') ? !object(value.codexFeatures) : value.codexFeatures !== null)) throw new Error('Invalid scoped project state');
+    || new Set(value.platforms).size !== value.platforms.length || !object(value.owned) || !object(value.settings)) throw new Error('Invalid project receipt');
+  const legacyPolicy = Object.keys(value.settings).length > 0 || value.codexFeatures !== null;
+  if (legacyPolicy && Object.keys(value.settings).sort().join(',') !== [...value.platforms].sort().join(',')) throw new Error('Invalid project receipt');
+  if (!legacyPolicy && (Object.keys(value.settings).length !== 0 || value.codexFeatures !== null)) throw new Error('Invalid scoped project state');
+  if (!object(value.ignore) || (legacyPolicy && value.platforms.includes('codex') !== object(value.codexFeatures))) throw new Error('Invalid scoped project state');
   for (const [file, hash] of Object.entries(value.owned)) {
     if (!allowedProjectFile(file) || (filePlatform(file) && !value.platforms.includes(filePlatform(file)))
       || typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash)) throw new Error('Invalid project file ownership');
@@ -32,9 +36,15 @@ export function validateProjectReceipt(value) {
   if (!object(value.options) || Object.keys(value.options).sort().join(',') !== 'ci,domainLayout,tracker,verification'
     || !['none', 'github'].includes(value.options.ci) || !['single', 'multi'].includes(value.options.domainLayout)
     || !['local', 'github'].includes(value.options.tracker) || !['existing', 'generated'].includes(value.options.verification)) throw new Error('Invalid project options');
+  const requiredRuntime = legacyPolicy ? legacyRuntimeNames : runtimeNames;
+  const requiredComponents = legacyPolicy ? legacyComponentNames : componentNames;
   const required = ['scripts/verify-harness.mjs', '.harness/runtime/windows-cli.mjs',
-    ...runtimeNames.map((name) => `.harness/project-runtime/${name}`), ...componentNames.map((name) => `.harness/hooks/${name}`),
+    ...requiredRuntime.map((name) => `.harness/project-runtime/${name}`), ...requiredComponents.map((name) => `.harness/hooks/${name}`),
     ...(value.options.verification === 'generated' ? ['scripts/verify.mjs'] : []), ...(value.options.ci === 'github' ? ['.github/workflows/harness-project.yml'] : [])];
   if (required.some((file) => !Object.hasOwn(value.owned, file))) throw new Error('Project receipt is missing required runtime ownership');
   return value;
+}
+
+export function hasLegacyProjectPolicy(receipt) {
+  return Object.keys(receipt.settings).length > 0 || receipt.codexFeatures !== null;
 }
