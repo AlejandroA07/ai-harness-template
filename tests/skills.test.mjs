@@ -3,10 +3,24 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { discoverSkills, generateSkillTree, readInvocationPolicy } from '../scripts/skill-lib.mjs';
+import { discoverSkills, generateSkillTree, isPathWithin, readInvocationPolicy } from '../scripts/skill-lib.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const source = path.join(root, 'skills');
+
+test('path containment resolves filesystem aliases for missing descendants', async () => {
+  const fixture = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-path-alias-'));
+  try {
+    const physicalRoot = path.join(fixture, 'physical');
+    const aliasRoot = path.join(fixture, 'alias');
+    await fs.mkdir(physicalRoot);
+    await fs.symlink(physicalRoot, aliasRoot, process.platform === 'win32' ? 'junction' : 'dir');
+    assert.equal(await isPathWithin(path.join(aliasRoot, 'missing', 'skill'), physicalRoot), true);
+    assert.equal(await isPathWithin(path.join(fixture, 'outside', 'skill'), physicalRoot), false);
+  } finally {
+    await fs.rm(fixture, { recursive: true, force: true });
+  }
+});
 
 test('canonical skill inventory and invocation policy are consistent', async () => {
   const skills = await discoverSkills(source);

@@ -41,10 +41,9 @@ The groups below cover the tracked baseline. A path can have one implementation 
 | `components/guard-policy.mjs`, `guard-git.mjs`, `attribution-policy.mjs`, `check-attribution.mjs`, `pre-commit.mjs`, `global/claude-tools.json`, `scripts/claude-dev.mjs` | Shared policy/runtime | Global configuration, repository Git hooks, this repository's Git hooks and token-focused Claude CLI sessions |
 | `components/mcp/` | Tool integrations | Existing Context7/Playwright adapters; keep separate from the agent command guards |
 | `scripts/machine-setup.mjs`, `bootstrap.mjs` | Installation core entry points | Machine full-profile setup and the single public project setup command |
-| `scripts/config-merge.mjs`, `skill-lib.mjs`, `sync-skills.mjs`, `generate-skills.mjs`, `generate-project-skills.mjs` | Installation core | Generation and owned installation state for Skills, Workflows, and integration adapters |
+| `scripts/config-merge.mjs`, `skill-lib.mjs`, `generate-skills.mjs`, `generate-project-skills.mjs` | Installation core | Generation and owned installation state for Skills, Workflows, and integration adapters |
 | `scripts/project-configuration.mjs`, `project-verification.mjs` | Project configuration | Separate tracker, domain-layout, stack and hosting decisions from installation plumbing |
 | `scripts/windows-cli.mjs` | Shared runtime | Setup/audit and copied project verifier; retain shell-free command execution |
-| `scripts/audit.mjs` | Installation core | Audit template and machine state; installed projects use their own `scripts/verify-harness.mjs` gate |
 | `scripts/upstream-skills.mjs`, `skills/upstream-sources.json` | Source provenance/update maintenance | Skills, Workflows, future vendor integrations; local source path must become independent of upstream path |
 | `scripts/token-costs.mjs`, `TOKEN-COSTS.md` | Repository maintenance / observability | Report cost by selected capabilities without turning all documentation into startup context |
 | `scripts/verify.mjs`, `tests/` including fixtures and lockfile | Repository maintenance / verification | Verify the harness as a product; separate from the verifier it installs into applications |
@@ -80,13 +79,13 @@ Required installation dependencies must be acyclic. Workflow execution may later
 
 ### R1 — Selected installation conflicts with current reconciliation and audit (blocking)
 
-[Machine setup](../../scripts/machine-setup.mjs) delegates to the receipt-backed full-profile lifecycle: it preflights the exact skill inventory and required tools, configures both platforms, records ownership, and enables this repository's Git hooks. The legacy [skill synchronizer](../../scripts/sync-skills.mjs) and [audit](../../scripts/audit.mjs) remain separate for unmigrated checkout-bound installations.
+[Machine setup](../../scripts/machine-setup.mjs) delegates to the receipt-backed full-profile lifecycle: it preflights the exact skill inventory and required tools, configures both platforms, records ownership, and enables this repository's Git hooks. The checkout-bound synchronizer and audit command have been retired; repository verification and machine audit now use their receipt-backed interfaces.
 
 These are deliberate current full-profile rules, but incompatible with installing one skill or only Codex configuration. Make requirements, mutation scope, and audit derive from the same selection. Preserve the legacy managed profile explicitly. A tool-only selection must not alter unrelated skills or global policy.
 
 ### R2 — Regeneration can invalidate installed links before preflight completes (blocking)
 
-[generateSkillTree](../../scripts/skill-lib.mjs) deletes the whole output root; [sync --apply](../../scripts/sync-skills.mjs) calls it before validating target conflicts. Machine skills link into this shared tree. Generating a subset into the same root would erase unselected payloads, and changing branches or moving the source checkout can affect live installations.
+The receipt-backed installer publishes immutable skill payloads into the selected target and records their ownership. Machine skill links no longer depend on the source checkout, so changing branches or moving the checkout cannot change an installed payload.
 
 Generate to a staging location, validate, then publish owned payloads without deleting files used by other selections. Keep live installation paths stable or explicitly migrate them using receipts. Do not repoint the user's installation to a temporary refactor worktree.
 

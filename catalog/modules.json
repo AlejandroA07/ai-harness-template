@@ -277,10 +277,8 @@
         "scripts/config-merge.mjs",
         "scripts/retired-claude-denials.mjs",
         "scripts/skill-lib.mjs",
-        "scripts/sync-skills.mjs",
         "scripts/generate-skills.mjs",
-        "scripts/generate-project-skills.mjs",
-        "scripts/audit.mjs"
+        "scripts/generate-project-skills.mjs"
       ],
       "description": "Shared selection, generation, installation and audit machinery."
     },

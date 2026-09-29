@@ -63,13 +63,12 @@ managed value is unchanged. Plans for isolated fixture homes report this control
 as inactive and never alter the developer's repository or environment.
 
 `machine-setup.mjs` is the sole public full-profile command and delegates to the
-receipt-backed lifecycle. The older `sync-skills.mjs` and `audit.mjs` commands
-remain available for an unmigrated checkout-bound profile, but the synchronizer
-refuses a receipt-backed skill target because mixing the two modes would invalidate
-ownership and restore checkout-bound links. Use the matching module lifecycle for
-a deliberate selective change. Full-profile removal previews and then removes the
-four bound component ownership shares and aggregate receipt; each component still
-applies its own restoration and conflict rules.
+receipt-backed lifecycle. The checkout-bound skill synchronizer has been retired;
+an old installation must be adopted with `--legacy-root` instead of being updated
+in place. Use the matching module lifecycle for a deliberate selective change. Full-profile
+removal previews and then removes the four bound component ownership shares and
+aggregate receipt; each component still applies its own restoration and conflict
+rules.
 
 The four component publishers hold one target lock across the complete aggregate
 operation but publish sequentially rather than as one cross-module transaction.
