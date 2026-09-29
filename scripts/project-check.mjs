@@ -2,6 +2,7 @@ import { verifyOwnershipHead } from './installation-evidence.mjs';
 import { readProjectPayload } from './project-provenance.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readRegular, digest } from './installation-core.mjs';
 import { assertSafeDirectory } from './skill-lib.mjs';
@@ -18,12 +19,21 @@ export async function checkProject(target) {
   try { await fs.access(path.join(target, '.ai-harness-install.lock')); throw new Error('Project installation is locked or interrupted'); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
   const receipt = validateProjectReceipt(JSON.parse(await read(receiptPath)));
+  const required = ['AGENTS.md', 'docs/agents/domain.md', 'docs/agents/issue-tracker.md', '.gitleaks.toml', 'scripts/verify.mjs',
+    ...(receipt.platforms.includes('claude') ? ['CLAUDE.md'] : [])];
+  for (const file of required) {
+    try { await read(file); }
+    catch (error) { if (error.code === 'ENOENT') throw new Error(`Required project file is missing: ${file}`); throw error; }
+  }
   await readProjectPayload(target, receipt);
   await verifyOwnershipHead(target, path.join(target, '.harness/project-current.json'), receipt.payload);
   for (const [file, hash] of Object.entries(receipt.owned)) if (digest(await read(file)) !== hash) throw new Error(`Owned project file drift: ${file}`);
   if (process.platform !== 'win32') for (const file of ['.githooks/pre-commit', '.githooks/commit-msg']) {
     if (!((await fs.stat(path.join(target, file))).mode & 0o111)) throw new Error(`Project hook is not executable: ${file}`);
   }
+  const hooks = spawnSync('git', ['config', '--local', '--get', 'core.hooksPath'], { cwd: target, encoding: 'utf8', shell: false });
+  if (hooks.error) throw new Error('Git is required to verify repository hook activation');
+  if (hooks.status !== 0 || hooks.stdout.trim() !== '.githooks') throw new Error('Repository hooks are not active; expected core.hooksPath=.githooks');
   const rendered = await projectAdapters(target, receipt.platforms);
   const adapterOwned = Object.keys(receipt.owned).filter((file) => receipt.platforms.some((platform) => file.startsWith(adapterRoot(platform) + '/'))).sort();
   if (JSON.stringify(adapterOwned) !== JSON.stringify(Object.keys(rendered.files).sort())) throw new Error('Project adapter inventory drift');

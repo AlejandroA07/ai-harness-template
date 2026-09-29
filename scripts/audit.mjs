@@ -1,7 +1,6 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { claudeSecretDenials } from '../components/secret-policy.mjs';
 import { discoverSkills, inspectManagedSkillLink, readInvocationPolicy } from './skill-lib.mjs';
@@ -10,8 +9,10 @@ import { loadClaudeToolConfig } from './claude-dev.mjs';
 import { retiredHarnessClaudeDenials } from './retired-claude-denials.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const projectIndex = process.argv.indexOf('--project');
-const projectRoot = projectIndex === -1 ? null : path.resolve(process.argv[projectIndex + 1] ?? '');
+if (process.argv.length !== 2) {
+  console.error('Usage: node scripts/audit.mjs');
+  process.exit(2);
+}
 let failures = 0;
 let warnings = 0;
 
@@ -141,22 +142,8 @@ async function checkMachine() {
   }
 }
 
-async function checkProject(project) {
-  for (const relative of ['AGENTS.md', 'CLAUDE.md', 'scripts/verify.mjs', '.githooks/pre-commit', '.githooks/commit-msg', '.harness/hooks/pre-commit.mjs', '.harness/hooks/check-attribution.mjs', '.harness/runtime/windows-cli.mjs']) {
-    await exists(path.join(project, relative)) ? pass(`project has ${relative}`) : fail(`project missing ${relative}`);
-  }
-  const hooksPath = spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: project, encoding: 'utf8' });
-  hooksPath.status === 0 && hooksPath.stdout.trim() === '.githooks' ? pass('project core.hooksPath is active') : fail('project core.hooksPath is not .githooks');
-
-  if (await exists(path.join(project, '.harness', 'skills'))) {
-    const check = spawnSync(process.execPath, [path.join(root, 'scripts', 'generate-project-skills.mjs'), '--project', project, '--check'], { encoding: 'utf8' });
-    check.status === 0 ? pass('project skill adapters are current') : fail(check.stderr || check.stdout || 'project skill adapters are stale');
-  }
-}
-
 await checkTemplate();
-if (projectRoot) await checkProject(projectRoot);
-else await checkMachine();
+await checkMachine();
 
 console.log(`\nAudit complete: ${failures} failure(s), ${warnings} warning(s).`);
 if (failures) process.exit(1);

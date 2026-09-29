@@ -44,7 +44,7 @@ The groups below cover the tracked baseline. A path can have one implementation 
 | `scripts/config-merge.mjs`, `skill-lib.mjs`, `sync-skills.mjs`, `generate-skills.mjs`, `generate-project-skills.mjs` | Installation core | Generation and owned installation state for Skills, Workflows, and integration adapters |
 | `scripts/project-configuration.mjs`, `project-verification.mjs` | Project configuration | Separate tracker, domain-layout, stack and hosting decisions from installation plumbing |
 | `scripts/windows-cli.mjs` | Shared runtime | Setup/audit and copied project verifier; retain shell-free command execution |
-| `scripts/audit.mjs` | Installation core | Validate catalog independently, then only selected installed profiles/targets |
+| `scripts/audit.mjs` | Installation core | Audit template and machine state; installed projects use their own `scripts/verify-harness.mjs` gate |
 | `scripts/upstream-skills.mjs`, `skills/upstream-sources.json` | Source provenance/update maintenance | Skills, Workflows, future vendor integrations; local source path must become independent of upstream path |
 | `scripts/token-costs.mjs`, `TOKEN-COSTS.md` | Repository maintenance / observability | Report cost by selected capabilities without turning all documentation into startup context |
 | `scripts/verify.mjs`, `tests/` including fixtures and lockfile | Repository maintenance / verification | Verify the harness as a product; separate from the verifier it installs into applications |

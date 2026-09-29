@@ -143,6 +143,10 @@ test('machine audit rejects custom Claude agents', async () => {
   const audit = await read('scripts/audit.mjs');
   assert.match(audit, /\.claude', 'agents'/);
   assert.match(audit, /custom-agent discovery contains/);
+  assert.doesNotMatch(audit, /--project|checkProject/);
+  const retired = spawnSync(process.execPath, [path.join(root, 'scripts/audit.mjs'), '--project', root], { cwd: root, encoding: 'utf8' });
+  assert.equal(retired.status, 2);
+  assert.match(retired.stderr, /Usage: node scripts\/audit\.mjs/);
 });
 
 test('maintainer documentation has no broken relative Markdown links', async () => {
