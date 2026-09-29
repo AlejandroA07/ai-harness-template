@@ -12,7 +12,7 @@ This file is the project's source of truth. Keep commands, boundaries, and the d
 
 - Start: `<command>`
 - Focused test: `<command>`
-- Full verification: `node scripts/verify.mjs`
+- Full verification: `node scripts/verify-harness.mjs`
 
 <State the package-manager, lock-file, database, migration, and formatting conventions that actually exist. Delete this paragraph after tailoring.>
 
@@ -31,7 +31,7 @@ This file is the project's source of truth. Keep commands, boundaries, and the d
 
 ## Definition of done
 
-`node scripts/verify.mjs` must exit `0`. It is the final vote and runs the same restore, build, analysis, format, test, and security gates as CI.
+`node scripts/verify-harness.mjs` must exit `0`. It is the final vote: it checks the installed harness, then runs the project's `scripts/verify.mjs` gate used by CI.
 
 Before calling work complete, also confirm that new behavior is tested, applicable security-checklist items pass, the staged patch contains only intended files, and documentation reflects any durable project truth that changed.
 

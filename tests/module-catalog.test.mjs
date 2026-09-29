@@ -64,7 +64,7 @@ test('required dependencies are ordered first while conditional use and routes s
   assert.equal(plan.relationshipProvenance.containment.kind, 'declared');
   assert.equal(plan.relationshipProvenance.activation.source, 'skills/invocation-policy.json');
   assert.equal(plan.capabilities[2].requires[0].provenance, 'declared');
-  assert.ok(plan.capabilities[2].prerequisites.some((text) => text.includes('node scripts/verify.mjs')));
+  assert.ok(plan.capabilities[2].prerequisites.some((text) => text.includes('node scripts/verify-harness.mjs')));
   assert.deepEqual(names(planSelection(catalog, select(['grill-with-docs']))), ['domain-modeling', 'grilling', 'grill-with-docs']);
   const router = planSelection(catalog, select(['ask-alfred']));
   assert.deepEqual(names(router), ['ask-alfred']);
