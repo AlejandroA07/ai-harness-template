@@ -21,7 +21,7 @@ async function copyFixtureFile(root, relative) {
   await fs.copyFile(source, destination);
 }
 
-async function createFixture({ machineSetup = false } = {}) {
+async function createFixture() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'harness-skill-sync-'));
   const home = path.join(root, 'home');
   const files = [
@@ -38,16 +38,6 @@ async function createFixture({ machineSetup = false } = {}) {
     'global/claude-tools.json',
     'global/codex-hooks/hooks.json.template',
   ];
-  if (machineSetup) {
-    files.push(
-      'scripts/machine-setup.mjs',
-      'scripts/config-merge.mjs',
-      'global/CLAUDE.md',
-      'global/AGENTS.md',
-      'global/claude-settings.json',
-      'global/codex-hooks/hooks.json.template',
-    );
-  }
   for (const relative of files) await copyFixtureFile(root, relative);
 
   const skill = path.join(root, 'skills', 'engineering', 'canonical', 'SKILL.md');
@@ -215,23 +205,6 @@ test('machine audit rejects additional visible skills outside the canonical inve
 
     const audit = runScript(fixture.root, fixture.home, 'scripts/audit.mjs');
     assert.match(`${audit.stdout}\n${audit.stderr}`, /Codex skill inventory contains noncanonical entry: retired/);
-  } finally {
-    await fs.rm(fixture.root, { recursive: true, force: true });
-  }
-});
-
-test('machine setup rejects an unreconcilable skill entry before machine writes', async () => {
-  const fixture = await createFixture({ machineSetup: true });
-  try {
-    const conflict = path.join(fixture.home, '.agents', 'skills', 'canonical');
-    await fs.mkdir(path.dirname(conflict), { recursive: true });
-    await fs.writeFile(conflict, 'unexpected file\n');
-
-    const result = runScript(fixture.root, fixture.home, 'scripts/machine-setup.mjs');
-    assert.notEqual(result.status, 0);
-    assert.match(`${result.stdout}\n${result.stderr}`, /Skill sync stopped on conflicts/);
-    await assert.rejects(fs.access(path.join(fixture.home, '.codex', 'AGENTS.md')), { code: 'ENOENT' });
-    await assert.rejects(fs.access(path.join(fixture.home, '.claude', 'settings.json')), { code: 'ENOENT' });
   } finally {
     await fs.rm(fixture.root, { recursive: true, force: true });
   }

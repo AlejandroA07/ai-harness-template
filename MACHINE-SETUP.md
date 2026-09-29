@@ -2,15 +2,16 @@
 
 The setup is Windows-first on this machine and portable to macOS/Linux. It never installs missing tools silently and never changes configuration in dry-run mode.
 
-This page describes the full managed profile. New installs and migrations should
-use the receipt-backed [M8 lifecycle](docs/dev/modularity-m8-migration.md):
+Preview the receipt-backed full managed profile:
 
 ```powershell
-node scripts/setup.mjs plan --profile full --platform both --scope machine --target <absolute-home-path>
+node scripts/machine-setup.mjs
 ```
 
-Add `--legacy-root <absolute-old-checkout>` only when migrating the exact layout
-created by the compatibility command below. To select only one platform's
+The target defaults to the current home directory. Use `--target
+<absolute-home-path>` for an isolated target. Add `--legacy-root
+<absolute-old-checkout>` only when migrating the exact layout created by the
+retired checkout-bound setup. To select only one platform's
 global guidance and settings, follow the [global lifecycle guide](docs/dev/modularity-m3-global-configuration.md).
 It uses an explicit target and preserves unrelated configuration. Do not run
 the full-profile audit to judge a selective installation; use the matching
@@ -28,28 +29,27 @@ the full-profile audit to judge a selective installation; use the matching
 
 .NET SDK and Docker are conditional: install them only for projects that use them. Pin .NET projects with `global.json`; pin application dependencies with their normal lock files.
 
-Run the inventory:
+The preview checks the required inventory:
 
 ```powershell
 node scripts/machine-setup.mjs
 ```
 
-This is the compatibility entry point for an unmigrated checkout-bound profile.
-It first preflights skill reconciliation, before any machine configuration can be
-written, and then reports each tool as `FOUND`, `MISSING`, or `OPTIONAL`. Install
-anything marked `MISSING`, then rerun. On Windows, prefer `winget`; on macOS,
-prefer Homebrew; on Linux, use the vendor's supported package path. It refuses a
-receipt-backed skill target; manage that target with `setup.mjs` instead.
+Missing required tools block the plan. Missing optional tools are warnings. On
+Windows, prefer `winget`; on macOS, prefer Homebrew; on Linux, use the vendor's
+supported package path.
 
 ## 2. Apply
 
 Review the dry run, then:
 
 ```powershell
-node scripts/machine-setup.mjs --apply --replace-guidance
+node scripts/machine-setup.mjs --apply
 ```
 
-`--replace-guidance` is required only when existing global guidance differs. Settings are merged: unrelated permissions and hooks are preserved, while explicitly retired harness-owned rules are removed.
+Settings are merged: unrelated permissions and hooks are preserved, while
+explicitly retired harness-owned rules are removed. Conflicting or ambiguous
+existing state blocks the apply for review.
 
 The apply step:
 
@@ -57,8 +57,11 @@ The apply step:
 - disables Claude's automatic Git attribution;
 - removes retired harness-owned Claude tool denials while preserving secret-path denials;
 - installs the machine-wide command/secret guard;
-- reconciles the visible user skills to the canonical `skills/` inventory, generates Claude/Codex adapters, and safely links them into their official user locations;
+- installs the exact canonical skill inventory into a target-owned store and links it into the official user locations;
 - enables this template's Git hooks.
+
+Receipts under `~/.ai-harness/installations/` record ownership for later audit,
+updates, restoration, and removal.
 
 It does not enable, remove, or reconfigure MCP servers.
 
@@ -72,7 +75,7 @@ node scripts/claude-dev.mjs
 
 Arguments are forwarded to Claude, for example `node scripts/claude-dev.mjs --model sonnet`. Customize the available developer tools in `global/claude-tools.json`; use `node scripts/claude-dev.mjs --print-tools` to inspect the active list. This launcher uses Claude's `--tools` option, so excluded built-ins are unavailable to the model instead of merely being rejected after selection. Direct `claude` launches and Claude Desktop do not use this allowlist.
 
-The canonical `skills/` tree is the complete source of truth for harness-managed user skills. After apply, every visible skill directory or link under `~/.claude/skills/` and `~/.agents/skills/` is either a canonical harness link or has been moved to a recoverable archive under `~/.ai-harness-skill-archive/<session>/<claude|codex>/`. This includes an older manual copy whose name is now canonical and any case-variant spelling of a canonical name. The synchronizer never deletes the displaced entry. The two skill roots themselves must be absent or real directories; linked roots fail closed before enumeration. Hidden platform-managed entries and ordinary non-skill files are left alone; Codex system and plugin skills outside these two directories are not owned by the harness.
+The canonical `skills/` tree is the complete source of truth for harness-managed user skills. Existing visible skills, case variants, custom Claude agents, linked roots, or ambiguous ownership block setup for review. Hidden platform-managed entries and ordinary non-skill files are left alone; Codex system and plugin skills outside these two directories are not owned by the harness.
 
 The reviewed 22-skill inventory and the deliberately excluded skills are listed in `POCOCK-SKILLS-COMPARISON.md`. A skill absent from the canonical tree is not part of this harness, even when a historical or manually installed copy still exists on the machine.
 
@@ -85,11 +88,11 @@ Codex requires interactive trust for changed non-managed hooks. Open a new Codex
 Then run:
 
 ```powershell
-node scripts/audit.mjs
+node scripts/machine-setup.mjs audit
 node scripts/verify.mjs
 ```
 
-`audit.mjs` checks whether the template is correctly applied to the machine or selected project. `verify.mjs` tests the template repository itself, including its executable security gates; exit code `0` is the only definition of done.
+The machine audit checks the receipt-backed installation. `verify.mjs` tests the template repository itself, including its executable security gates; exit code `0` is the only definition of done.
 
 The audit enforces the same exact visible skill inventory and rejects linked skill roots, noncanonical entries, case variants, stale links, and missing canonical links. It will continue to warn about Codex hook trust because the public CLI does not expose a stable non-interactive trust-status check.
 
@@ -104,7 +107,10 @@ Record the CLI version, model, project, enabled MCPs, and measurement method. Do
 
 ## Recovery
 
-Setup is idempotent. Rerun the dry run after upgrades. The dry run reports every skill that will be archived before apply. Apply moves displaced skill directories and links to the external archive automatically, then installs the exact canonical inventory. It stops before machine writes when an entry cannot be reconciled safely, the archive path is not a real directory, or JSON configuration is invalid. Restore an archived entry by moving it out of the archive after first removing or relocating the harness link that replaced it.
+Setup is idempotent. Rerun the preview after upgrades. To preview complete
+restoration and removal, run `node scripts/machine-setup.mjs remove`; add
+`--apply` only after reviewing it. Conflicting external changes stop removal
+instead of overwriting them.
 
 ## Known limitation
 

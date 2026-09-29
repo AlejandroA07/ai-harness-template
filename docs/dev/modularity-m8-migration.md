@@ -10,21 +10,21 @@ can migrate the checkout-bound layout created by the legacy machine setup.
 Always preview against an isolated target first. A fresh full-profile plan is:
 
 ```text
-node scripts/setup.mjs plan --profile full --platform both --scope machine --target <absolute-home>
-node scripts/setup.mjs apply --profile full --platform both --scope machine --target <absolute-home>
-node scripts/setup.mjs apply --profile full --platform both --scope machine --target <absolute-home> --apply
-node scripts/setup.mjs audit --profile full --platform both --scope machine --target <absolute-home>
-node scripts/setup.mjs remove --profile full --platform both --scope machine --target <absolute-home>
-node scripts/setup.mjs remove --profile full --platform both --scope machine --target <absolute-home> --apply
+node scripts/machine-setup.mjs plan --target <absolute-home>
+node scripts/machine-setup.mjs apply --target <absolute-home>
+node scripts/machine-setup.mjs apply --target <absolute-home> --apply
+node scripts/machine-setup.mjs audit --target <absolute-home>
+node scripts/machine-setup.mjs remove --target <absolute-home>
+node scripts/machine-setup.mjs remove --target <absolute-home> --apply
 ```
 
 For a target previously configured by `machine-setup.mjs`, supply the exact old
 checkout path explicitly:
 
 ```text
-node scripts/setup.mjs plan --profile full --platform both --scope machine --target <absolute-home> --legacy-root <absolute-old-checkout>
-node scripts/setup.mjs apply --profile full --platform both --scope machine --target <absolute-home> --legacy-root <absolute-old-checkout> --apply
-node scripts/setup.mjs audit --profile full --platform both --scope machine --target <absolute-home>
+node scripts/machine-setup.mjs plan --target <absolute-home> --legacy-root <absolute-old-checkout>
+node scripts/machine-setup.mjs apply --target <absolute-home> --legacy-root <absolute-old-checkout> --apply
+node scripts/machine-setup.mjs audit --target <absolute-home>
 ```
 
 `plan` and `apply` without `--apply` are read-only. Migration recognizes only
@@ -62,14 +62,14 @@ The receipt records prior non-secret state and removal restores it only while th
 managed value is unchanged. Plans for isolated fixture homes report this control
 as inactive and never alter the developer's repository or environment.
 
-The legacy `machine-setup.mjs`, `sync-skills.mjs` and `audit.mjs` commands remain
-available for an unmigrated checkout-bound profile. `sync-skills.mjs` and therefore
-`machine-setup.mjs` now refuse a receipt-backed skill target: mixing the two modes
-would invalidate ownership and restore checkout-bound links. After migration use
-only `setup.mjs --profile full` for the combined profile, or the matching module
-lifecycle for a deliberate selective change. Full-profile removal previews and
-then removes the four bound component ownership shares and aggregate receipt;
-each component still applies its own restoration and conflict rules.
+`machine-setup.mjs` is the sole public full-profile command and delegates to the
+receipt-backed lifecycle. The older `sync-skills.mjs` and `audit.mjs` commands
+remain available for an unmigrated checkout-bound profile, but the synchronizer
+refuses a receipt-backed skill target because mixing the two modes would invalidate
+ownership and restore checkout-bound links. Use the matching module lifecycle for
+a deliberate selective change. Full-profile removal previews and then removes the
+four bound component ownership shares and aggregate receipt; each component still
+applies its own restoration and conflict rules.
 
 The four component publishers hold one target lock across the complete aggregate
 operation but publish sequentially rather than as one cross-module transaction.

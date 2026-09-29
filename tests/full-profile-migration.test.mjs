@@ -11,6 +11,7 @@ import { retiredHarnessClaudeDenials } from '../scripts/retired-claude-denials.m
 
 const repository = path.resolve(import.meta.dirname, '..');
 const setup = path.join(repository, 'scripts', 'setup.mjs');
+const machineSetup = path.join(repository, 'scripts', 'machine-setup.mjs');
 
 async function writeJson(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true });
@@ -79,6 +80,10 @@ function run(args, env = process.env) {
   return spawnSync(process.execPath, [setup, ...args], { cwd: repository, encoding: 'utf8', env });
 }
 
+function runMachineSetup(args, env = process.env) {
+  return spawnSync(process.execPath, [machineSetup, ...args], { cwd: repository, encoding: 'utf8', env });
+}
+
 function runWithHome(script, target, args = []) {
   return spawnSync(process.execPath, [path.join(repository, script), ...args], {
     cwd: repository, encoding: 'utf8', env: { ...process.env, HOME: target, USERPROFILE: target },
@@ -87,10 +92,10 @@ function runWithHome(script, target, args = []) {
 
 test('full managed profile migrates both legacy platforms off a moved checkout and audits cleanly', async () => {
   const fixture = await legacyFixture();
+  const homeEnv = { ...fixture.env, HOME: fixture.target, USERPROFILE: fixture.target };
   try {
-    const args = ['--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target,
-      '--legacy-root', fixture.legacyRoot, '--json'];
-    const preview = run(['plan', ...args], fixture.env);
+    const args = ['--legacy-root', fixture.legacyRoot, '--json'];
+    const preview = runMachineSetup(['plan', ...args], homeEnv);
     assert.equal(preview.status, 0, preview.stderr || preview.stdout);
     const planned = JSON.parse(preview.stdout);
     assert.equal(planned.applicable, true);
@@ -101,7 +106,7 @@ test('full managed profile migrates both legacy platforms off a moved checkout a
     assert.equal(planned.components.filter((entry) => entry.kind === 'global-configuration')
       .every((entry) => entry.migrated.guidance && entry.migrated.hook), true);
 
-    const apply = run(['apply', ...args, '--apply'], fixture.env);
+    const apply = runMachineSetup(['apply', ...args, '--apply'], homeEnv);
     assert.equal(apply.status, 0, apply.stderr || apply.stdout);
     await fs.rm(fixture.legacyRoot, { recursive: true, force: true });
     const canonicalTarget = await fs.realpath(fixture.target);
@@ -120,7 +125,7 @@ test('full managed profile migrates both legacy platforms off a moved checkout a
     assert.equal(profileReceipt.profile, 'full-managed');
     assert.equal(profileReceipt.selected.length, fixture.skills.length);
     assert.equal(profileReceipt.components.length, 4);
-    assert.deepEqual(profileReceipt.controls.repositoryHooks, { applicable: false });
+    assert.equal(profileReceipt.controls.repositoryHooks.applicable, true);
     await fs.access(path.join(fixture.target, '.agents', 'skills', '.system'));
     assert.equal(await fs.readFile(path.join(fixture.target, '.agents', 'skills', 'notes.txt'), 'utf8'), 'unmanaged note\n');
     const claudeSettings = JSON.parse(await fs.readFile(path.join(fixture.target, '.claude', 'settings.json'), 'utf8'));
@@ -130,20 +135,20 @@ test('full managed profile migrates both legacy platforms off a moved checkout a
     assert.equal(JSON.stringify(claudeSettings).includes(fixture.legacyRoot), false);
     assert.equal(JSON.stringify(codexHooks).includes(fixture.legacyRoot), false);
 
-    const audit = run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target, '--json'], fixture.env);
+    const audit = runMachineSetup(['audit', '--target', fixture.target, '--json'], homeEnv);
     assert.equal(audit.status, 0, audit.stderr || audit.stdout);
     assert.equal(JSON.parse(audit.stdout).applicable, true);
-    const repeat = run(['apply', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target, '--json', '--apply'], fixture.env);
+    const repeat = runMachineSetup(['apply', '--target', fixture.target, '--json', '--apply'], homeEnv);
     assert.equal(repeat.status, 0, repeat.stderr || repeat.stdout);
     assert.equal(JSON.parse(repeat.stdout).noOp, true);
     const legacySync = runWithHome('scripts/sync-skills.mjs', fixture.target, ['--apply']);
     assert.notEqual(legacySync.status, 0);
     assert.match(`${legacySync.stdout}\n${legacySync.stderr}`, /receipt-backed lifecycle/);
-    assert.equal(run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target], fixture.env).status, 0);
+    assert.equal(runMachineSetup(['audit', '--target', fixture.target], homeEnv).status, 0);
 
     profileReceipt.selected.pop();
     await writeJson(profileReceiptPath, profileReceipt);
-    const tampered = run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target], fixture.env);
+    const tampered = runMachineSetup(['audit', '--target', fixture.target], homeEnv);
     assert.notEqual(tampered.status, 0);
     assert.match(`${tampered.stdout}\n${tampered.stderr}`, /ownership evidence does not match/);
   } finally {
@@ -198,7 +203,7 @@ test('full-profile migration rejects ambiguous ownership and noncanonical discov
         await fs.mkdir(path.join(fixture.target, '.claude', 'agents'), { recursive: true });
         await fs.writeFile(path.join(fixture.target, '.claude', 'agents', 'company.md'), '# Company agent\n');
       }
-      const result = run(['plan', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target,
+      const result = runMachineSetup(['plan', '--target', fixture.target,
         '--legacy-root', fixture.legacyRoot, '--json'], fixture.env);
       assert.notEqual(result.status, 0, kind);
       assert.equal(JSON.parse(result.stdout).applicable, false, kind);
@@ -224,7 +229,7 @@ test('full-profile audit rejects a partial selective installation without full-p
       assert.equal(global.status, 0, global.stderr || global.stdout);
     }
 
-    const audit = run(['audit', '--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', target, '--json'], env);
+    const audit = runMachineSetup(['audit', '--target', target, '--json'], env);
     assert.notEqual(audit.status, 0, audit.stderr || audit.stdout);
     const result = JSON.parse(audit.stdout);
     assert.equal(result.applicable, false);
@@ -239,16 +244,16 @@ test('full-profile removal removes owned components and preserves unrelated targ
   const fixture = await legacyFixture();
   const unrelated = path.join(fixture.target, '.agents', 'skills', 'notes.txt');
   try {
-    const common = ['--profile', 'full', '--platform', 'both', '--scope', 'machine', '--target', fixture.target, '--json'];
-    const apply = run(['apply', ...common, '--legacy-root', fixture.legacyRoot, '--apply'], fixture.env);
+    const common = ['--target', fixture.target, '--json'];
+    const apply = runMachineSetup(['apply', ...common, '--legacy-root', fixture.legacyRoot, '--apply'], fixture.env);
     assert.equal(apply.status, 0, apply.stderr || apply.stdout);
 
-    const preview = run(['remove', ...common], fixture.env);
+    const preview = runMachineSetup(['remove', ...common], fixture.env);
     assert.equal(preview.status, 0, preview.stderr || preview.stdout);
     assert.equal(JSON.parse(preview.stdout).changes.length > 0, true);
     await fs.access(path.join(fixture.target, '.ai-harness', 'installations', 'full-managed', 'receipt.json'));
 
-    const remove = run(['remove', ...common, '--apply'], fixture.env);
+    const remove = runMachineSetup(['remove', ...common, '--apply'], fixture.env);
     assert.equal(remove.status, 0, remove.stderr || remove.stdout);
     const result = JSON.parse(remove.stdout);
     assert.equal(result.installed, false);
@@ -269,8 +274,8 @@ test('full-profile removal uses retained ownership after the source catalog chan
   const changedRepository = path.join(fixture.root, 'changed repository');
   await fs.mkdir(changedRepository);
   try {
-    const apply = run(['apply', '--profile', 'full', '--platform', 'both', '--scope', 'machine',
-      '--target', fixture.target, '--legacy-root', fixture.legacyRoot, '--apply', '--json'], fixture.env);
+    const apply = runMachineSetup(['apply', '--target', fixture.target,
+      '--legacy-root', fixture.legacyRoot, '--apply', '--json'], fixture.env);
     assert.equal(apply.status, 0, apply.stderr || apply.stdout);
 
     const removalPlan = await planFullProfileInstallation(changedRepository, { operation: 'remove',

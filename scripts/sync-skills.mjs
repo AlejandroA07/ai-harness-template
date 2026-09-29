@@ -24,7 +24,7 @@ for (const platform of platforms) {
   const receipt = path.join(home, '.ai-harness', 'installations', platform.archiveName, 'receipt.json');
   try {
     await fs.lstat(receipt);
-    console.error(`Skill sync stopped: ${platform.name} uses the receipt-backed lifecycle. Use setup.mjs --profile full or the matching selective lifecycle; legacy sync would invalidate ownership.`);
+    console.error(`Skill sync stopped: ${platform.name} uses the receipt-backed lifecycle. Use machine-setup.mjs or the matching selective lifecycle; legacy sync would invalidate ownership.`);
     process.exit(1);
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;

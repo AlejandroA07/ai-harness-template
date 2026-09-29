@@ -53,7 +53,7 @@ ownership, workflow composition, routing and the coexistence boundary with
 project-local adapters.
 
 For the complete managed machine profile on both platforms, use
-`node scripts/setup.mjs plan --profile full --platform both --scope machine --target <absolute-home-path>`.
+`node scripts/machine-setup.mjs`.
 To migrate the older checkout-bound profile, add
 `--legacy-root <absolute-old-checkout>` to the plan and apply. The
 [M8 migration guide](docs/dev/modularity-m8-migration.md) defines exact legacy
@@ -88,4 +88,4 @@ Exact-tracked Pocock skills are updated with `node scripts/upstream-skills.mjs`;
 
 GitHub Issues is canonical when the project is on GitHub. Ignored Markdown under `.scratch/` is the local fallback.
 
-Historical snapshots and retired components belong outside discovery paths. Machine setup treats the canonical `skills/` tree as the exact visible user-skill inventory and moves displaced skill directories or links to the recoverable machine-local archive at `~/.ai-harness-skill-archive/`; it does not manage hidden platform entries, Codex system skills, or plugin caches.
+Historical snapshots and retired components belong outside discovery paths. Machine setup treats the canonical `skills/` tree as the exact visible user-skill inventory and blocks unowned visible skills for review; it does not manage hidden platform entries, Codex system skills, or plugin caches.
