@@ -26,8 +26,7 @@ async function main() {
   const target = path.resolve(targets[0]);
   try { await fs.access(target); } catch { throw new Error(`Project path does not exist: ${target}`); }
   const origin = spawnSync('git', ['remote', 'get-url', 'origin'], { cwd: target, encoding: 'utf8' });
-  const github = spawnSync('gh', ['repo', 'view', '--json', 'nameWithOwner'], { cwd: target, encoding: 'utf8' });
-  const isGithub = githubOverride || github.status === 0 || (origin.status === 0 && /(?:github\.com|github\.enterprise)/i.test(origin.stdout));
+  const isGithub = githubOverride || (origin.status === 0 && /(?:github\.com|github\.enterprise)/i.test(origin.stdout));
   const gitRepository = spawnSync('git', ['rev-parse', '--git-dir'], { cwd: target, encoding: 'utf8' });
   const hookConfiguration = gitRepository.status === 0
     ? spawnSync('git', ['config', '--get', 'core.hooksPath'], { cwd: target, encoding: 'utf8' }) : null;

@@ -17,7 +17,7 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | Module | Purpose | Visibility | Platforms | Scopes | Planned / installed / observed | Depends on |
 | --- | --- | --- | --- | --- | --- | --- |
 | Global configuration | Machine-wide guidance and platform settings. | public | claude/codex | machine | not-evaluated / not-inspected / not-inspected | Installation core, Shared policy/runtime |
-| Project configuration | Repository-specific guidance, skill adapters, verification and optional CI. | public | claude/codex | project | not-evaluated / not-inspected / not-inspected | Installation core, Shared policy/runtime |
+| Project configuration | Repository-specific guidance, skill adapters, Git hooks, verification and optional CI. | public | claude/codex | project | not-evaluated / not-inspected / not-inspected | Installation core, Shared policy/runtime |
 | Skills | Individual reusable capabilities; ownership is refined per capability. | public | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Installation core |
 | Workflows | Ordered compositions packaged through the existing skill adapters. | public | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Skills, Installation core |
 | Tool integrations | Optional pinned programs and MCP adapters with explicit acquisition and activation definitions. | public | claude/codex | machine/project | not-evaluated / not-inspected / not-inspected | Installation core |
@@ -38,8 +38,8 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | --- | --- | --- |
 | Global configuration | claude | Claude machine guidance, Claude machine policy |
 | Global configuration | codex | Codex machine guidance, Codex machine policy |
-| Project configuration | claude | Claude project guidance, Project domain guidance, Project tracker guidance, Project verification, Project CI |
-| Project configuration | codex | Codex project guidance, Project domain guidance, Project tracker guidance, Project verification, Project CI |
+| Project configuration | claude | Claude project guidance, Project domain guidance, Project tracker guidance, Project skill adaptation, Repository pre-commit safety, Repository commit metadata policy, Project verification, Project CI |
+| Project configuration | codex | Codex project guidance, Project domain guidance, Project tracker guidance, Project skill adaptation, Repository pre-commit safety, Repository commit metadata policy, Project verification, Project CI |
 | Skills | claude | Code Review, Codebase Design, Diagnosing Bugs, Domain Modeling, Grilling, Handoff, Prototype, Research, Security Checklist, Tdd, To Questionnaire, Wait What, Writing For Agents |
 | Skills | codex | Code Review, Codebase Design, Diagnosing Bugs, Domain Modeling, Grilling, Handoff, Prototype, Research, Security Checklist, Tdd, To Questionnaire, Wait What, Writing For Agents |
 | Workflows | claude | Ask Alfred, Grill Me, Grill With Docs, Implement, Improve Codebase Architecture, Teach, To Spec, To Tickets, Wayfinder |
@@ -61,6 +61,9 @@ The checked-in overview is target-free, so its state is normally `not-evaluated 
 | project-configuration | Codex project guidance | Load repository-owned guidance into Codex sessions. | codex | session: Codex opens the repository and loads AGENTS.md | not-evaluated / not-inspected / not-inspected | [`project/AGENTS.md.template`](project/AGENTS.md.template) |
 | project-configuration | Project domain guidance | Load project domain terminology and decisions only when relevant. | claude/codex | session: An agent task needs project domain terminology or decisions and follows docs/agents/domain.md | not-evaluated / not-inspected / not-inspected | [`scripts/project-configuration.mjs`](scripts/project-configuration.mjs) |
 | project-configuration | Project tracker guidance | Load project issue-tracker conventions only for tracker operations. | claude/codex | session: An agent task performs issue-tracker operations and follows docs/agents/issue-tracker.md | not-evaluated / not-inspected / not-inspected | [`scripts/project-configuration.mjs`](scripts/project-configuration.mjs) |
+| project-configuration | Project skill adaptation | Render project-owned skills into Claude and Codex discovery formats. | claude/codex | command: node scripts/bootstrap.mjs applies project configuration containing .harness/skills | not-evaluated / not-inspected / not-inspected | [`scripts/project-adapters.mjs`](scripts/project-adapters.mjs) |
+| project-configuration | Repository pre-commit safety | Reject secret-bearing staged paths and scan staged changes with Gitleaks. | claude/codex | hook: Git pre-commit through core.hooksPath=.githooks | not-evaluated / not-inspected / not-inspected | [`components/pre-commit.mjs`](components/pre-commit.mjs)<br>[`components/pre-commit.mjs`](components/pre-commit.mjs) |
+| project-configuration | Repository commit metadata policy | Reject model or tool attribution and tool-branded branch names. | claude/codex | hook: Git commit-msg through core.hooksPath=.githooks | not-evaluated / not-inspected / not-inspected | [`components/check-attribution.mjs`](components/check-attribution.mjs)<br>[`components/check-attribution.mjs`](components/check-attribution.mjs) |
 | project-configuration | Project verification | Run the repository's selected deterministic completion gate. | claude/codex | command: node scripts/verify-harness.mjs | not-evaluated / not-inspected / not-inspected | [`project/scripts/verify-harness.mjs`](project/scripts/verify-harness.mjs) |
 | project-configuration | Project CI | Run the generated project verification gate in GitHub Actions when selected. | claude/codex | ci: GitHub push to main or pull_request when bootstrap can generate CI with known dependencies | not-evaluated / not-inspected / not-inspected | [`project/.github/workflows/verify.yml`](project/.github/workflows/verify.yml) |
 | workflows | Ask Alfred | Ask which skill or flow fits your situation. A router over the skills in this harness. | claude/codex | user-only | not-evaluated / not-inspected / not-inspected | [`skills/engineering/ask-alfred/SKILL.md`](skills/engineering/ask-alfred/SKILL.md)<br>[`skills/engineering/ask-alfred/PHASE-BOUNDARIES.md`](skills/engineering/ask-alfred/PHASE-BOUNDARIES.md) |
@@ -176,6 +179,11 @@ Containment, installation, activation, dependencies, conditional uses, routes an
 | Project domain guidance | configures | domainLayout | — | declared |
 | An agent task performs issue-tracker operations and follows docs/agents/issue-tracker.md | activates | Project tracker guidance | — | declared |
 | Project tracker guidance | configures | tracker | — | declared |
+| node scripts/bootstrap.mjs applies project configuration containing .harness/skills | activates | Project skill adaptation | — | declared |
+| Git pre-commit through core.hooksPath=.githooks | activates | Repository pre-commit safety | — | declared |
+| Repository pre-commit safety | executes | components/pre-commit.mjs | — | declared |
+| Git commit-msg through core.hooksPath=.githooks | activates | Repository commit metadata policy | — | declared |
+| Repository commit metadata policy | executes | components/check-attribution.mjs | — | declared |
 | node scripts/verify-harness.mjs | activates | Project verification | — | declared |
 | Project verification | configures | verification | — | declared |
 | GitHub push to main or pull_request when bootstrap can generate CI with known dependencies | activates | Project CI | — | declared |

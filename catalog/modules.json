@@ -160,6 +160,47 @@
           ]
         },
         {
+          "id": "project-skill-adaptation",
+          "label": "Project skill adaptation",
+          "purpose": "Render project-owned skills into Claude and Codex discovery formats.",
+          "platforms": ["claude", "codex"],
+          "scopes": ["project"],
+          "source": "scripts/project-adapters.mjs",
+          "activation": {
+            "kind": "command",
+            "event": "node scripts/bootstrap.mjs applies project configuration containing .harness/skills"
+          },
+          "settings": []
+        },
+        {
+          "id": "project-pre-commit-safety",
+          "label": "Repository pre-commit safety",
+          "purpose": "Reject secret-bearing staged paths and scan staged changes with Gitleaks.",
+          "platforms": ["claude", "codex"],
+          "scopes": ["project"],
+          "source": "components/pre-commit.mjs",
+          "activation": {
+            "kind": "hook",
+            "event": "Git pre-commit through core.hooksPath=.githooks",
+            "program": "components/pre-commit.mjs"
+          },
+          "settings": []
+        },
+        {
+          "id": "project-commit-metadata-policy",
+          "label": "Repository commit metadata policy",
+          "purpose": "Reject model or tool attribution and tool-branded branch names.",
+          "platforms": ["claude", "codex"],
+          "scopes": ["project"],
+          "source": "components/check-attribution.mjs",
+          "activation": {
+            "kind": "hook",
+            "event": "Git commit-msg through core.hooksPath=.githooks",
+            "program": "components/check-attribution.mjs"
+          },
+          "settings": []
+        },
+        {
           "id": "project-verification",
           "label": "Project verification",
           "purpose": "Run the repository's selected deterministic completion gate.",
@@ -191,6 +232,8 @@
         }
       ],
       "sources": [
+        "components/check-attribution.mjs",
+        "components/pre-commit.mjs",
         "project",
         "scripts/bootstrap.mjs",
         "scripts/project-configuration.mjs",
@@ -202,7 +245,7 @@
         "scripts/project-provenance.mjs",
         "scripts/project-check.mjs"
       ],
-      "description": "Repository-specific guidance, skill adapters, verification and optional CI."
+      "description": "Repository-specific guidance, skill adapters, Git hooks, verification and optional CI."
     },
     {
       "id": "skills",
