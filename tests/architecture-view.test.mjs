@@ -18,7 +18,7 @@ test('architecture view links modules through platforms and capabilities to vali
   assert.equal(model.nodes.filter((entry) => entry.kind === 'module').length, 7);
   assert.equal(model.nodes.filter((entry) => entry.kind === 'capability').length, 22);
   assert.equal(model.nodes.filter((entry) => entry.kind === 'integration').length, 4);
-  assert.equal(model.nodes.filter((entry) => entry.kind === 'behavior').length, 8);
+  assert.equal(model.nodes.filter((entry) => entry.kind === 'behavior').length, 10);
   assert.equal(model.costs.capabilities.length, 22);
   assert.equal(model.costs.measurements.samples.length, 3);
   assert.equal(node(model, 'capability:implement').state.planned, 'not-evaluated');
@@ -105,6 +105,12 @@ test('focused module reviews contain only the selected module context', async ()
   assert.match(global, /global\/CLAUDE\.md/);
   assert.match(global, /Installation core, Shared policy\/runtime/);
   assert.doesNotMatch(global, /Project configuration|Code Review|Graphify/);
+
+  const project = renderModuleArchitectureMarkdown(model, 'project-configuration');
+  assert.match(project, /Project domain guidance/);
+  assert.match(project, /Project tracker guidance/);
+  assert.match(project, /domainLayout.*single or multi/);
+  assert.match(project, /tracker.*local or github/);
 
   const workflows = renderModuleArchitectureMarkdown(model, 'workflows');
   assert.match(workflows, /Ordered workflow stages/);

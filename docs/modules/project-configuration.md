@@ -18,6 +18,8 @@ Repository-specific guidance, skill adapters, verification and optional CI.
 | --- | --- | --- | --- | --- | --- |
 | Claude project guidance | behavior | Load repository-owned guidance into Claude sessions. | claude | session: Claude opens the repository and loads CLAUDE.md | [`project/CLAUDE.md`](../../project/CLAUDE.md) |
 | Codex project guidance | behavior | Load repository-owned guidance into Codex sessions. | codex | session: Codex opens the repository and loads AGENTS.md | [`project/AGENTS.md.template`](../../project/AGENTS.md.template) |
+| Project domain guidance | behavior | Load project domain terminology and decisions only when relevant. | claude/codex | session: An agent task needs project domain terminology or decisions and follows docs/agents/domain.md | [`scripts/project-configuration.mjs`](../../scripts/project-configuration.mjs) |
+| Project tracker guidance | behavior | Load project issue-tracker conventions only for tracker operations. | claude/codex | session: An agent task performs issue-tracker operations and follows docs/agents/issue-tracker.md | [`scripts/project-configuration.mjs`](../../scripts/project-configuration.mjs) |
 | Project verification | behavior | Run the repository's selected deterministic completion gate. | claude/codex | command: node scripts/verify-harness.mjs | [`project/scripts/verify-harness.mjs`](../../project/scripts/verify-harness.mjs) |
 | Project CI | behavior | Run the generated project verification gate in GitHub Actions when selected. | claude/codex | ci: GitHub push to main or pull_request when bootstrap can generate CI with known dependencies | [`project/.github/workflows/verify.yml`](../../project/.github/workflows/verify.yml) |
 
@@ -25,6 +27,8 @@ Repository-specific guidance, skill adapters, verification and optional CI.
 
 | Behavior | Setting | Declared value |
 | --- | --- | --- |
+| Project domain guidance | domainLayout | single or multi |
+| Project tracker guidance | tracker | local or github |
 | Project verification | verification | existing or generated |
 | Project CI | ci | none or github |
 
@@ -37,6 +41,10 @@ Repository-specific guidance, skill adapters, verification and optional CI.
 | Installation core | installs | Project configuration | — | declared |
 | Claude opens the repository and loads CLAUDE.md | activates | Claude project guidance | — | declared |
 | Codex opens the repository and loads AGENTS.md | activates | Codex project guidance | — | declared |
+| An agent task needs project domain terminology or decisions and follows docs/agents/domain.md | activates | Project domain guidance | — | declared |
+| Project domain guidance | configures | domainLayout | — | declared |
+| An agent task performs issue-tracker operations and follows docs/agents/issue-tracker.md | activates | Project tracker guidance | — | declared |
+| Project tracker guidance | configures | tracker | — | declared |
 | node scripts/verify-harness.mjs | activates | Project verification | — | declared |
 | Project verification | configures | verification | — | declared |
 | GitHub push to main or pull_request when bootstrap can generate CI with known dependencies | activates | Project CI | — | declared |

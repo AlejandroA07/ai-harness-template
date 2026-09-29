@@ -130,6 +130,36 @@
           "settings": []
         },
         {
+          "id": "project-domain-guidance",
+          "label": "Project domain guidance",
+          "purpose": "Load project domain terminology and decisions only when relevant.",
+          "platforms": ["claude", "codex"],
+          "scopes": ["project"],
+          "source": "scripts/project-configuration.mjs",
+          "activation": {
+            "kind": "session",
+            "event": "An agent task needs project domain terminology or decisions and follows docs/agents/domain.md"
+          },
+          "settings": [
+            { "path": "domainLayout", "value": "single or multi" }
+          ]
+        },
+        {
+          "id": "project-tracker-guidance",
+          "label": "Project tracker guidance",
+          "purpose": "Load project issue-tracker conventions only for tracker operations.",
+          "platforms": ["claude", "codex"],
+          "scopes": ["project"],
+          "source": "scripts/project-configuration.mjs",
+          "activation": {
+            "kind": "session",
+            "event": "An agent task performs issue-tracker operations and follows docs/agents/issue-tracker.md"
+          },
+          "settings": [
+            { "path": "tracker", "value": "local or github" }
+          ]
+        },
+        {
           "id": "project-verification",
           "label": "Project verification",
           "purpose": "Run the repository's selected deterministic completion gate.",
