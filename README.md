@@ -6,7 +6,7 @@ A reusable, cross-platform workflow for Claude Code and Codex. It keeps durable 
 
 - New machine: follow [MACHINE-SETUP.md](MACHINE-SETUP.md), beginning with `node scripts/machine-setup.mjs`.
 - New or existing project: follow [BOOTSTRAP.md](BOOTSTRAP.md), beginning with `node scripts/bootstrap.mjs <project-path>`.
-- Architecture: browse [ARCHITECTURE.md](ARCHITECTURE.md), regenerate it with `node scripts/architecture-view.mjs --write`, or inspect a receipt-backed target with `node scripts/architecture-view.mjs --platform codex --scope project --target <absolute-project-path> --json`.
+- Architecture: browse [ARCHITECTURE.md](ARCHITECTURE.md), open a [focused module review](docs/modules/global-configuration.md), regenerate all views with `node scripts/architecture-view.mjs --write`, or print one module with `node scripts/architecture-view.mjs --focus global-configuration`. Inspect receipt-backed state with `--platform`, `--scope`, `--target`, and `--json`.
 - Token cost: review [TOKEN-COSTS.md](TOKEN-COSTS.md) and update it with `node scripts/token-costs.mjs --write`.
 - Verify an installed project harness and the project itself: run `node scripts/verify-harness.mjs` from that project.
 - Verify repository correctness: run `node scripts/verify.mjs` to execute the template's tests and security gates. Normal success prints only `PASS`; warnings and failures stay concise, while `--verbose` exposes complete stage output. Exit code `0` is the definition of done. See [ADR 0001](docs/adr/0001-token-efficient-verification.md). CodeQL runs separately in GitHub; check its result before merging.

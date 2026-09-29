@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { buildArchitectureModel, renderArchitectureMarkdown } from '../scripts/architecture-view.mjs';
+import { buildArchitectureModel, renderArchitectureMarkdown, renderModuleArchitectureMarkdown } from '../scripts/architecture-view.mjs';
 import { validateTokenMeasurements } from '../scripts/cost-inventory.mjs';
 import { planInstallation, applyInstallation } from '../scripts/selection-installation.mjs';
 
@@ -93,7 +93,24 @@ test('architecture Markdown exposes navigation, relationship provenance, costs a
   assert.match(markdown, /\| invokes \|/);
   assert.match(markdown, /Graphify interchange decision/);
   assert.match(markdown, /linked but separate/);
+  assert.match(markdown, /docs\/modules\/global-configuration\.md/);
   assert.doesNotMatch(markdown, /\]\(\.scratch\//);
+});
+
+test('focused module reviews contain only the selected module context', async () => {
+  const model = await buildArchitectureModel(root);
+  const global = renderModuleArchitectureMarkdown(model, 'global-configuration');
+  assert.match(global, /^# Global configuration module/m);
+  assert.match(global, /Claude machine guidance/);
+  assert.match(global, /global\/CLAUDE\.md/);
+  assert.match(global, /Installation core, Shared policy\/runtime/);
+  assert.doesNotMatch(global, /Project configuration|Code Review|Graphify/);
+
+  const workflows = renderModuleArchitectureMarkdown(model, 'workflows');
+  assert.match(workflows, /Ordered workflow stages/);
+  assert.match(workflows, /Implement/);
+  assert.doesNotMatch(workflows, /Claude machine guidance|Context7 MCP/);
+  assert.throws(() => renderModuleArchitectureMarkdown(model, 'installation-core'), /Unknown public architecture module/);
 });
 
 test('measured token samples use a strict separate ledger', () => {
@@ -115,6 +132,16 @@ test('checked-in architecture and token views match deterministic generation', a
   const architecture = spawnSync(process.execPath, [path.join(root, 'scripts/architecture-view.mjs')], { cwd: root, encoding: 'utf8' });
   assert.equal(architecture.status, 0, architecture.stderr);
   assert.equal(architecture.stdout, await fs.readFile(path.join(root, 'ARCHITECTURE.md'), 'utf8'));
+  const model = await buildArchitectureModel(root);
+  for (const module of model.nodes.filter((entry) => entry.kind === 'module' && entry.visibility === 'public')) {
+    assert.equal(
+      await fs.readFile(path.join(root, 'docs', 'modules', `${module.module}.md`), 'utf8'),
+      renderModuleArchitectureMarkdown(model, module.module),
+    );
+  }
+  const focused = spawnSync(process.execPath, [path.join(root, 'scripts/architecture-view.mjs'), '--focus', 'global-configuration'], { cwd: root, encoding: 'utf8' });
+  assert.equal(focused.status, 0, focused.stderr);
+  assert.equal(focused.stdout, renderModuleArchitectureMarkdown(model, 'global-configuration'));
   const costs = spawnSync(process.execPath, [path.join(root, 'scripts/token-costs.mjs')], { cwd: root, encoding: 'utf8' });
   assert.equal(costs.status, 0, costs.stderr);
   assert.equal(costs.stdout, await fs.readFile(path.join(root, 'TOKEN-COSTS.md'), 'utf8'));

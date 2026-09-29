@@ -138,10 +138,13 @@ test('Windows bootstrap commits normalize Git hook executable modes', async () =
 });
 
 test('maintainer documentation has no broken relative Markdown links', async () => {
-  const files = (await Promise.all(['README.md', 'MACHINE-SETUP.md', 'BOOTSTRAP.md', 'docs/dev'].map(markdownFiles))).flat();
+  const files = (await Promise.all(['README.md', 'MACHINE-SETUP.md', 'BOOTSTRAP.md', 'docs/dev', 'docs/modules'].map(markdownFiles))).flat();
   const trackedResult = spawnSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' });
   assert.equal(trackedResult.status, 0, trackedResult.stderr);
-  const tracked = trackedResult.stdout.split('\0').filter(Boolean).map((entry) => entry.replaceAll('\\', '/'));
+  const untrackedResult = spawnSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], { cwd: root, encoding: 'utf8' });
+  assert.equal(untrackedResult.status, 0, untrackedResult.stderr);
+  const workspacePaths = `${trackedResult.stdout}${untrackedResult.stdout}`.split('\0').filter(Boolean)
+    .map((entry) => entry.replaceAll('\\', '/'));
   const broken = [];
   for (const file of files) {
     const source = await fs.readFile(file, 'utf8');
@@ -153,10 +156,10 @@ test('maintainer documentation has no broken relative Markdown links', async () 
       const resolved = path.resolve(path.dirname(file), destination);
       const relative = path.relative(root, resolved).replaceAll('\\', '/');
       const inside = relative !== '..' && !relative.startsWith('../') && !path.isAbsolute(relative);
-      const versioned = !inside || tracked.includes(relative) || tracked.some((entry) => entry.startsWith(`${relative}/`));
+      const available = !inside || workspacePaths.includes(relative) || workspacePaths.some((entry) => entry.startsWith(`${relative}/`));
       try {
         await fs.access(resolved);
-        if (!versioned) broken.push(`${path.relative(root, file)} -> ${match[1]}`);
+        if (!available) broken.push(`${path.relative(root, file)} -> ${match[1]}`);
       }
       catch { broken.push(`${path.relative(root, file)} -> ${match[1]}`); }
     }
