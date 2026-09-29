@@ -37,7 +37,6 @@ test('CI provisions the tools used by the full verification gate', async () => {
 
 test('portable workflows retain active action pins', async () => {
   const pairs = [
-    ['.github/workflows/security.yml', 'project/.github/workflows/harness-security.yml'],
     ['.github/workflows/verify.yml', 'project/.github/workflows/verify.yml'],
   ];
 
@@ -100,10 +99,11 @@ test('prototype branch isolation lives with the prototype workflow', async () =>
   }
 });
 
-test('GitHub hosting requires a working remote or explicit override', async () => {
+test('GitHub hosting uses the remote or explicit override without probing GitHub', async () => {
   const bootstrap = await read('scripts/bootstrap.mjs');
   assert.doesNotMatch(bootstrap, /hasGithubDirectory/);
-  assert.match(bootstrap, /githubOverride\s*\|\|\s*github\.status\s*===\s*0/);
+  assert.doesNotMatch(bootstrap, /spawnSync\('gh'/);
+  assert.match(bootstrap, /githubOverride\s*\|\|\s*\(origin\.status\s*===\s*0/);
   assert.match(bootstrap, /origin\.status\s*===\s*0/);
 });
 

@@ -18,7 +18,7 @@ test('architecture view links modules through platforms and capabilities to vali
   assert.equal(model.nodes.filter((entry) => entry.kind === 'module').length, 7);
   assert.equal(model.nodes.filter((entry) => entry.kind === 'capability').length, 22);
   assert.equal(model.nodes.filter((entry) => entry.kind === 'integration').length, 4);
-  assert.equal(model.nodes.filter((entry) => entry.kind === 'behavior').length, 10);
+  assert.equal(model.nodes.filter((entry) => entry.kind === 'behavior').length, 13);
   assert.equal(model.costs.capabilities.length, 22);
   assert.equal(model.costs.measurements.samples.length, 3);
   assert.equal(node(model, 'capability:implement').state.planned, 'not-evaluated');
@@ -109,6 +109,10 @@ test('focused module reviews contain only the selected module context', async ()
   const project = renderModuleArchitectureMarkdown(model, 'project-configuration');
   assert.match(project, /Project domain guidance/);
   assert.match(project, /Project tracker guidance/);
+  assert.match(project, /Project skill adaptation/);
+  assert.match(project, /scripts\/project-adapters\.mjs/);
+  assert.match(project, /Repository pre-commit safety/);
+  assert.match(project, /Repository commit metadata policy/);
   assert.match(project, /domainLayout.*single or multi/);
   assert.match(project, /tracker.*local or github/);
 
