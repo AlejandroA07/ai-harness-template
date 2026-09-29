@@ -80,7 +80,7 @@ Required installation dependencies must be acyclic. Workflow execution may later
 
 ### R1 — Selected installation conflicts with current reconciliation and audit (blocking)
 
-[Machine setup](../../scripts/machine-setup.mjs) preflights all skills, requires both CLIs and GitHub/security tools, configures both platforms, and enables this repository's Git hooks. [Skill synchronization](../../scripts/sync-skills.mjs) archives visible directories outside the full inventory. [Audit](../../scripts/audit.mjs) requires 22 canonical skills, both platforms, and no custom Claude agents. The [test](../../tests/skills.test.mjs) also hard-codes 22.
+[Machine setup](../../scripts/machine-setup.mjs) delegates to the receipt-backed full-profile lifecycle: it preflights the exact skill inventory and required tools, configures both platforms, records ownership, and enables this repository's Git hooks. The legacy [skill synchronizer](../../scripts/sync-skills.mjs) and [audit](../../scripts/audit.mjs) remain separate for unmigrated checkout-bound installations.
 
 These are deliberate current full-profile rules, but incompatible with installing one skill or only Codex configuration. Make requirements, mutation scope, and audit derive from the same selection. Preserve the legacy managed profile explicitly. A tool-only selection must not alter unrelated skills or global policy.
 
