@@ -62,15 +62,13 @@ test('the harness repository carries CodeQL and Dependabot', async () => {
   await fs.access(path.join(root, '.github', 'dependabot.yml'));
 });
 
-test('active template text is portable and audits explicit skill ownership', async () => {
+test('active template text is portable', async () => {
   const readme = await read('README.md');
-  const audit = await read('scripts/audit.mjs');
   assert.doesNotMatch(readme, /[A-Z]:\\Users\\/i);
-  assert.match(audit, /upstream-sources\.json/);
 });
 
 test('harness scripts reach Windows tools without a shell', async () => {
-  for (const script of ['scripts/machine-setup.mjs', 'scripts/audit.mjs']) {
+  for (const script of ['scripts/machine-setup.mjs']) {
     const source = await read(script);
     assert.doesNotMatch(source, /ComSpec/);
     assert.doesNotMatch(source, /shell:\s*true/);
@@ -137,16 +135,6 @@ test('Windows bootstrap commits normalize Git hook executable modes', async () =
   const preCommit = await read('components/pre-commit.mjs');
   assert.match(preCommit, /update-index/);
   assert.match(preCommit, /--chmod=\+x/);
-});
-
-test('machine audit rejects custom Claude agents', async () => {
-  const audit = await read('scripts/audit.mjs');
-  assert.match(audit, /\.claude', 'agents'/);
-  assert.match(audit, /custom-agent discovery contains/);
-  assert.doesNotMatch(audit, /--project|checkProject/);
-  const retired = spawnSync(process.execPath, [path.join(root, 'scripts/audit.mjs'), '--project', root], { cwd: root, encoding: 'utf8' });
-  assert.equal(retired.status, 2);
-  assert.match(retired.stderr, /Usage: node scripts\/audit\.mjs/);
 });
 
 test('maintainer documentation has no broken relative Markdown links', async () => {

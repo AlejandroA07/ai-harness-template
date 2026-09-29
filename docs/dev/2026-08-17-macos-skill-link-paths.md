@@ -10,7 +10,7 @@ Skill reconciliation treated a stale managed link as user-owned on macOS when th
 ## What changed
 
 - `scripts/skill-lib.mjs` now exposes an alias-aware path-containment check that also supports missing descendants.
-- `scripts/sync-skills.mjs` uses the canonical containment result when deciding whether to replace or archive a stale link.
+- The now-retired checkout-bound synchronizer used the canonical containment result when deciding whether to replace or archive a stale link.
 - `tests/skill-sync.test.mjs` covers aliased roots, missing descendants, outside paths, and the original stale-link reconciliation flow.
 
 ## Decisions
@@ -21,7 +21,7 @@ Containment resolves the deepest existing ancestor instead of calling `realpath`
 
 - `node --test tests/skill-sync.test.mjs` — 7 passed.
 - `node scripts/verify.mjs` — 61 passed, 2 platform-specific tests skipped; whitespace, full-history secret scanning, workflow security, and syntax checks passed.
-- `node scripts/audit.mjs` after machine reconciliation — 0 failures and 2 expected interactive-platform warnings.
+- The now-retired audit command reported 0 failures and 2 expected interactive-platform warnings after machine reconciliation.
 - A follow-up dry run reported 22 skills per platform and 0 skill changes.
 
 ## Follow-ups
